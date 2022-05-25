@@ -106,16 +106,24 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     output.push(format!("pub trait {} {{ ", name.substring(1, name.len())));
 
     let mut i = contract_definition.next_line;
+    let mut search_semicolon = false;
     // read body of contract
     while i < lines.len() {
         let mut line = lines[i].trim().to_string();
+        if line.substring(0, 5) == "event" && !line.contains(";") {
+            search_semicolon = true;
+        }
         if line.is_empty()
             || line.chars().nth(0).unwrap() == '/'
             || line.chars().nth(0).unwrap() == '*'
             || line.substring(0, 5) == "event"
+            || search_semicolon
         {
             // TODO add event parser
             // if first char of line is / or * -> it is a comment, we do not care
+            if line.contains(";") {
+                search_semicolon = false;
+            }
             i += 1;
             continue
         } else if line.substring(0, 4) == "enum" {
@@ -127,13 +135,14 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
         while line.chars().nth(line.len() - 1).unwrap() != ';' {
             i += 1;
             let next = lines[i].trim();
-            let new = line
-                + next
-                + if next.chars().nth(next.len() - 1).unwrap() == ';' {
-                    ""
-                } else {
+            // some nice formatting
+            let new = line.to_owned()
+                + if line.contains(')') || line.contains(',') {
                     " "
-                };
+                } else {
+                    ""
+                }
+                + next;
             line = new;
         }
         let tokens: Vec<String> = line.replace(" )", ")").split('(').map(|s| s.to_string()).collect();
@@ -360,6 +369,10 @@ fn convert_argument_type(arg_type: String, imports: &mut HashSet<String>) -> Str
     };
     let output_type = match no_array_arg_type {
         "uint256" | "uint" => String::from("u128"),
+        "bytes" => {
+            imports.insert(String::from("use ink::prelude::vec::Vec;"));
+            String::from("Vec<u8>")
+        }
         "address" => {
             imports.insert(String::from("use brush::traits::AccountId;"));
             String::from("AccountId")
