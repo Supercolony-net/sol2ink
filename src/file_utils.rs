@@ -19,8 +19,9 @@ pub fn read_file(path: &String) -> std::io::Result<String> {
 ///
 /// `lines` the transpiled file in the form of vec of strings
 /// each item in the vec represents a separate line in the output file
-pub fn write_file(lines: &Vec<String>) -> std::io::Result<()> {
-    let mut file = File::create("output.rs")?;
+pub fn write_file(lines: &Vec<String>, file_name: Option<String>) -> std::io::Result<()> {
+    let path = file_name.unwrap_or(String::from("output.rs"));
+    let mut file = File::create(path)?;
     for line in lines.iter() {
         file.write_all(line.as_bytes())?;
     }

@@ -79,7 +79,8 @@ pub fn run(path: &String) -> Result<(), ParserError> {
                     }
                 })
                 .collect();
-            file_utils::write_file(&output_vec)?;
+            let file_name = path.replace(".sol", ".rs");
+            file_utils::write_file(&output_vec, Some(file_name))?;
             println!("File saved!");
             Ok(())
         }
