@@ -108,8 +108,13 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     // read body of contract
     while i < lines.len() {
         let mut line = lines[i].trim().to_string();
-        if line.is_empty() || line.chars().nth(0).unwrap() == '/' {
-            // if first char of line is / -> it is a comment, we do not care
+        if line.is_empty()
+            || line.chars().nth(0).unwrap() == '/'
+            || line.chars().nth(0).unwrap() == '*'
+            || line.substring(0, 5) == "event"
+        {
+            // TODO add event parser
+            // if first char of line is / or * -> it is a comment, we do not care
             i += 1;
             continue
         } else if line.substring(0, 4) == "enum" {
@@ -353,7 +358,7 @@ fn convert_argument_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         (arg_type.as_str(), false)
     };
     let output_type = match no_array_arg_type {
-        "uint" => String::from("u128"),
+        "uint256" | "uint" => String::from("u128"),
         "address" => {
             imports.insert(String::from("use brush::traits::AccountId;"));
             String::from("AccountId")
