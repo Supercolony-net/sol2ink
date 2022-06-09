@@ -37,3 +37,7 @@ And the result file will be saved in `output.rs` file.
 ### Examples
 
 Examples are stored in the example folder, where we have the input Solidity file and the output Rust and Ink! file.
+Here we can find a folder with interface transpiling example and a folder with contracts transpiling example.
+All examples are taken from OpenZeppelin repository, and then transpiled to ink! by Sol2Ink. 
+Sol2Ink can at the time handle simple smart contracts parsing without inheritance, that is why in contracts we removed
+inheritance, and changed the calls to the Context functions to the basic retrieving of this data.

@@ -99,7 +99,7 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     let mut imports = HashSet::<String>::new();
     // brush trait definition
     output.push(format!(
-        "#[brush::wrapper] pub type {0}Ref = dyn {0};",
+        "#[brush::wrapper] \npub type {0}Ref = dyn {0};",
         name.substring(1, name.len())
     ));
     output.push(String::from("#[brush::trait_definition] "));
@@ -214,7 +214,7 @@ fn parse_interface_function_header(tokens: Vec<String>) -> (Vec<String>, HashSet
     }
 
     function.push(format!(
-        "#[ink(message)] fn {} (&{}self{}",
+        "#[ink(message)] \nfn {} (&{}self{}",
         fn_name,
         if is_mut { "mut " } else { "" },
         if has_args { "," } else { "" }
