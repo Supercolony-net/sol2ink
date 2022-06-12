@@ -96,6 +96,7 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     let name = contract_definition.contract_name;
 
     let mut output = Vec::<String>::new();
+    let mut events = Vec::<String>::new();
     let mut imports = HashSet::<String>::new();
     // brush trait definition
     output.push(format!(
@@ -116,10 +117,8 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
         if line.is_empty()
             || line.chars().nth(0).unwrap() == '/'
             || line.chars().nth(0).unwrap() == '*'
-            || line.substring(0, 5) == "event"
             || search_semicolon
         {
-            // TODO add event parser
             // if first char of line is / or * -> it is a comment, we do not care
             if line.contains(";") {
                 search_semicolon = false;
@@ -128,6 +127,15 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
             continue
         } else if line.substring(0, 4) == "enum" {
             parse_enum(&line);
+            i += 1;
+            continue
+        } else if line.substring(0, 5) == "event" {
+            let (mut event_definition, event_imports) = parse_event(&line);
+            events.append(event_definition.as_mut());
+            for import in event_imports.iter() {
+                imports.insert(import.to_owned());
+            }
+            i += 1;
             continue
         } else if line == "}" {
             break
@@ -157,6 +165,9 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     // end of body
     output.push(String::from("}"));
 
+    // we add events
+    output.append(events.as_mut());
+
     Interface {
         imports,
         functions: output,
@@ -181,6 +192,47 @@ fn parse_enum(line: &String) -> Vec<String> {
         }
     }
     out
+}
+
+/// This function parses event
+///
+/// `line` the Solidity event definition
+///
+/// returns the event definition in ink! along with imports needed by this event
+fn parse_event(line: &String) -> (Vec<String>, HashSet<String>) {
+    let mut out = Vec::<String>::new();
+    let tokens: Vec<String> = line.split(' ').map(|s| s.to_string()).collect();
+
+    let mut imports = HashSet::<String>::new();
+    // we assume Approval(address, didnt get split by white space
+    let split_brace: Vec<String> = tokens[1].split('(').map(|s| s.to_string()).collect();
+    let event_name = split_brace[0].to_owned();
+    out.push(format!("#[ink(event)] \n pub struct {} {{", event_name));
+    let mut args_reader = ArgsReader::ARGNAME;
+    let mut is_indexed = false;
+    let mut arg_type = convert_argument_type(split_brace[1].to_owned(), &mut imports);
+    for i in 2..tokens.len() {
+        let mut token = tokens[i].to_string();
+        if args_reader == ArgsReader::ARGTYPE {
+            arg_type = convert_argument_type(token, &mut imports);
+            args_reader = ArgsReader::ARGNAME;
+        } else if token == "indexed" {
+            is_indexed = true;
+            continue
+        } else {
+            token.remove_matches(&[',', ')', ';'][..]);
+            out.push(format!(
+                "{}{} : {},",
+                if is_indexed { "#[ink(topic)]\n" } else { "" },
+                token,
+                arg_type
+            ));
+            is_indexed = false;
+            args_reader = ArgsReader::ARGTYPE;
+        }
+    }
+    out.push(String::from("}"));
+    (out, imports)
 }
 
 /// Parses interface function definition into ink! trait

@@ -1,4 +1,5 @@
 #![feature(once_cell)]
+#![feature(string_remove_matches)]
 
 pub mod file_utils;
 pub mod parser;
