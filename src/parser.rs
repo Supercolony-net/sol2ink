@@ -50,6 +50,51 @@ struct Interface {
     functions: Vec<String>,
 }
 
+struct ContractField {
+    is_array: bool,
+    field_type: String,
+    name: String,
+}
+
+struct Event {
+    name: String,
+    fields: Vec<EventField>,
+}
+
+struct EventField {
+    indexed: bool,
+    field_type: String,
+    name: String,
+}
+
+struct Struct {
+    name: String,
+    fields: Vec<StructField>,
+}
+
+struct StructField {
+    name: String,
+    field_type: String,
+}
+
+struct Function {
+    name: String,
+    params: Vec<FunctionParam>,
+    external: bool,
+    return_params: Vec<String>,
+    body: Vec<Statement>,
+    view: bool,
+}
+
+struct FunctionParam {
+    name: String,
+    param_type: String,
+}
+
+struct Statement {
+    content: String,
+}
+
 /// Function which will run the parser
 pub fn run(path: &String) -> Result<(), ParserError> {
     // read the file
