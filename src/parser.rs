@@ -50,6 +50,16 @@ struct Interface {
     functions: Vec<String>,
 }
 
+struct Contract {
+    name: String,
+    fields: Vec<ContractField>,
+    constructor: Function,
+    events: Vec<Event>,
+    structs: Vec<Struct>,
+    functions: Vec<Function>,
+    imports: HashSet<String>,
+}
+
 struct ContractField {
     is_array: bool,
     field_type: String,
@@ -128,7 +138,10 @@ pub fn run(path: &String) -> Result<(), ParserError> {
             println!("File saved!");
             Ok(())
         }
-        ContractType::CONTRACT => Err(ParserError::ContractsParsingNotImplemented),
+        ContractType::CONTRACT => {
+            parse_contract(contract_definition, lines);
+            Err(ParserError::ContractsParsingNotImplemented)
+        }
     }
 }
 
@@ -212,6 +225,94 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     Interface {
         imports,
         functions: output,
+    }
+}
+
+fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
+    let name = contract_definition.contract_name;
+
+    let mut fields = Vec::<ContractField>::new();
+    let mut events = Vec::<Event>::new();
+    let mut structs = Vec::<Struct>::new();
+    let mut functions = Vec::<Function>::new();
+    let mut imports = HashSet::<String>::new();
+
+    let mut in_function = false;
+    let mut open_braces = 0;
+    let mut close_braces = 0;
+    let mut functions_count = 0;
+    let mut total_braces = 0;
+    // read body of contract
+    for i in contract_definition.next_line..lines.len() {
+        let mut line = lines[i].trim().to_owned();
+
+        if line.is_empty() {
+            continue
+        } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
+            // TODO parse comments
+        } else if line.substring(0, 11) == "constructor" {
+            in_function = true;
+            open_braces += line.matches("{").count();
+            close_braces += line.matches("}").count();
+            if open_braces == close_braces && open_braces > 0 {
+                in_function = false;
+                total_braces += open_braces + close_braces;
+                open_braces = 0;
+                close_braces = 0;
+            }
+            // parse constructor
+            functions_count += 1;
+        } else if line.substring(0, 8) == "function" {
+            in_function = true;
+            open_braces += line.matches("{").count();
+            close_braces += line.matches("}").count();
+            if open_braces == close_braces && open_braces > 0 {
+                in_function = false;
+                total_braces += open_braces + close_braces;
+                open_braces = 0;
+                close_braces = 0;
+            }
+            // parse constructor
+            functions_count += 1;
+        } else if in_function {
+            open_braces += line.matches("{").count();
+            close_braces += line.matches("}").count();
+            if open_braces == close_braces && open_braces > 0 {
+                in_function = false;
+                total_braces += open_braces + close_braces;
+                open_braces = 0;
+                close_braces = 0;
+            }
+        } else {
+            println!("{}", line);
+        }
+    }
+
+    // output.push(format!("#[brush::wrapper] \npub type {0}Ref = dyn {0};", name));
+    // // we add events and enums
+    // output.append(non_trait.as_mut());
+    // output.push(String::from("#[brush::trait_definition]\n"));
+    // output.push(format!("pub trait {} {{\n", name));
+    // // add the trait
+    // output.append(trait_def.as_mut());
+    // // end of body
+    // output.push(String::from("}"));
+
+    Contract {
+        name,
+        fields,
+        constructor: Function {
+            name: String::from("String"),
+            params: Vec::<FunctionParam>::new(),
+            external: true,
+            return_params: Vec::<String>::new(),
+            body: Vec::<Statement>::new(),
+            view: true,
+        },
+        events,
+        structs,
+        functions,
+        imports,
     }
 }
 
