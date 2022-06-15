@@ -391,21 +391,24 @@ fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
 /// This function will assemble the constructor of the ink! contract from the parsed contract
 fn assemble_constructor(constructor: Constructor) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
+    // we do this so we dont put tab between each string that we insert (function params)
+    let mut header = String::new();
 
     output_vec.push(String::from("\t#[ink(constructor)]\n"));
-    output_vec.push(String::from("\tpub fn new("));
+    header.push_str("\tpub fn new(");
 
     for param in constructor.params.iter() {
-        output_vec.push(format!("{}: {},", param.name, param.param_type));
+        header.push_str(format!("{}: {},", param.name, param.param_type).as_str());
     }
-    output_vec.push(String::from(") -> Self {\n"));
+    header.push_str(") -> Self {\n");
+    output_vec.push(header);
 
     output_vec.push(String::from(
         "\t\tink_lang::codegen::initialize_contract(|instance: &mut Self| {\n",
     ));
     for statement in constructor.body.iter() {
         // TODO remove comments
-        output_vec.push(format!("\t\t\t//{}", statement.content));
+        output_vec.push(format!("\t\t\t//{}\n", statement.content));
     }
     output_vec.push(String::from("\t\t})\n"));
     output_vec.push(String::from("\t}\n"));
@@ -416,8 +419,11 @@ fn assemble_constructor(constructor: Constructor) -> Vec<String> {
 /// This function will assemble the constructor of the ink! contract from the parsed contract
 fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
+    // we do this so we dont put tab between each string that we insert (function params)
+    let mut header: String;
 
     for function in functions.iter() {
+        header = String::new();
         output_vec.push(format!(
             "\t#[ink(message{})]\n",
             if function.payable {
@@ -426,50 +432,60 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
                 String::from("")
             }
         ));
-        output_vec.push(format!(
-            "\t{}fn {}(",
-            if function.external {
-                String::from("pub ")
-            } else {
-                String::from("")
-            },
-            function.name.to_case(Case::Snake)
-        ));
+        header.push_str(
+            format!(
+                "\t{}fn {}(",
+                if function.external {
+                    String::from("pub ")
+                } else {
+                    String::from("")
+                },
+                function.name.to_case(Case::Snake)
+            )
+            .as_str(),
+        );
         // arguments
-        output_vec.push(format!(
-            "&{}self",
-            if function.view {
-                String::from("")
-            } else {
-                String::from(" mut ")
-            }
-        ));
+        header.push_str(
+            format!(
+                "&{}self",
+                if function.view {
+                    String::from("")
+                } else {
+                    String::from(" mut ")
+                }
+            )
+            .as_str(),
+        );
         for param in function.params.iter() {
-            output_vec.push(format!(",{}: {}", param.name, param.param_type));
+            header.push_str(format!(",{}: {}", param.name, param.param_type).as_str());
         }
-        output_vec.push(String::from(")"));
+        header.push_str(")");
         // return params
         if !function.return_params.is_empty() {
-            output_vec.push(String::from(" -> "));
+            header.push_str(" -> ");
             if function.return_params.len() > 1 {
-                output_vec.push(String::from("("));
+                header.push_str("(");
             }
             for i in 0..function.return_params.len() {
-                output_vec.push(format!(
-                    "{}{}",
-                    if i > 0 { String::from(", ") } else { String::from("") },
-                    function.return_params[i]
-                ));
+                header.push_str(
+                    format!(
+                        "{}{}",
+                        if i > 0 { String::from(", ") } else { String::from("") },
+                        function.return_params[i]
+                    )
+                    .as_str(),
+                );
             }
             if function.return_params.len() > 1 {
-                output_vec.push(String::from(")"));
+                header.push_str(")");
             }
         }
-        output_vec.push(String::from("{\n"));
+        header.push_str("{\n");
+        output_vec.push(header.to_owned());
         // body
         for statement in function.body.iter() {
             // TODO remove comments
-            output_vec.push(format!("\t\t//{}", statement.content));
+            output_vec.push(format!("\t\t//{}\n", statement.content));
         }
         output_vec.push(String::from("\t}\n"));
         output_vec.push(String::from("\n"));

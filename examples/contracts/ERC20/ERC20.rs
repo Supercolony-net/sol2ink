@@ -11,7 +11,7 @@ pub mod erc_20 {
 	
 	impl ERC20 {
 		#[ink(constructor)]
-		pub fn new(	) -> Self {
+		pub fn new() -> Self {
 			ink_lang::codegen::initialize_contract(|instance: &mut Self| {
 			})
 		}
