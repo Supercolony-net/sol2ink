@@ -6,6 +6,7 @@ use convert_case::{
 use std::{
     collections::HashSet,
     lazy::Lazy,
+    ops::Add,
 };
 use substring::Substring;
 
@@ -145,7 +146,10 @@ pub fn run(path: &String) -> Result<(), ParserError> {
         }
         ContractType::CONTRACT => {
             let contract = parse_contract(contract_definition, lines);
-            Err(ParserError::ContractsParsingNotImplemented)
+            let ink_contract = assemble_contract(contract);
+            let file_name = path.replace(".sol", ".rs");
+            file_utils::write_file(&ink_contract, Some(file_name))?;
+            Ok(())
         }
     }
 }
@@ -258,13 +262,19 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
+            // TODO parse constructor
             in_function = true;
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if line.substring(0, 8) == "function" {
+            // TODO parse function
             in_function = true;
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if in_function {
+            // TODO parse statements
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
+        } else if line == "}" {
+            // end of contract
+            continue
         } else {
             println!("{}", line);
         }
@@ -293,8 +303,24 @@ fn update_in_function(line: String, open_braces: &mut usize, close_braces: &mut 
 }
 
 /// This function will assemble ink! contract from the parsed contract struct and save it to a file
-fn assemble_contract(contract:Contract){
-    
+fn assemble_contract(contract: Contract) -> Vec<String> {
+    let mut output_vec = Vec::<String>::new();
+    output_vec.push(String::from("#![cfg_attr(not(feature = \"std\"), no_std)]\n"));
+    output_vec.push(String::from("#![feature(min_specialization)]\n\n"));
+    output_vec.push(String::from("#[brush::contract]\n"));
+    output_vec.push(format!("pub mod {} {{\n", contract.name.to_case(Case::Snake)));
+
+    output_vec.append(
+        Vec::from_iter(contract.imports)
+            .iter()
+            .map(|string| "\t".to_string() + string)
+            .collect::<Vec<String>>()
+            .as_mut(),
+    );
+    // contract body
+
+    output_vec.push(String::from("}\n"));
+    output_vec
 }
 
 /// This function parses enum from one-liner enum
@@ -565,17 +591,18 @@ fn convert_argument_type(arg_type: String, imports: &mut HashSet<String>) -> Str
     let output_type = match no_array_arg_type {
         "uint256" | "uint" => String::from("u128"),
         "bytes" => {
-            imports.insert(String::from("use ink::prelude::vec::Vec;"));
+            imports.insert(String::from("use ink::prelude::vec::Vec;\n"));
             String::from("Vec<u8>")
         }
         "address" => {
-            imports.insert(String::from("use brush::traits::AccountId;"));
+            imports.insert(String::from("use brush::traits::AccountId;\n"));
             String::from("AccountId")
         }
         "bytes32" => String::from("[u8; 32]"),
         _ => arg_type,
     };
     return if is_vec {
+        imports.insert(String::from("use ink::prelude::vec::Vec;\n"));
         format!("Vec<{}>", output_type)
     } else {
         output_type
