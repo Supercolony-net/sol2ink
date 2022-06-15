@@ -144,7 +144,7 @@ pub fn run(path: &String) -> Result<(), ParserError> {
             Ok(())
         }
         ContractType::CONTRACT => {
-            parse_contract(contract_definition, lines);
+            let contract = parse_contract(contract_definition, lines);
             Err(ParserError::ContractsParsingNotImplemented)
         }
     }
@@ -236,12 +236,12 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
 fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
     let name = contract_definition.contract_name;
 
-    let mut fields = Vec::<ContractField>::new();
-    let mut events = Vec::<Event>::new();
-    let mut structs = Vec::<Struct>::new();
-    let mut functions = Vec::<Function>::new();
-    let mut imports = HashSet::<String>::new();
-    let mut constructor = Constructor {
+    let fields = Vec::<ContractField>::new();
+    let events = Vec::<Event>::new();
+    let structs = Vec::<Struct>::new();
+    let functions = Vec::<Function>::new();
+    let imports = HashSet::<String>::new();
+    let constructor = Constructor {
         params: Vec::<FunctionParam>::new(),
         body: Vec::<Statement>::new(),
     };
@@ -251,7 +251,7 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
     let mut close_braces = 0;
     // read body of contract
     for i in contract_definition.next_line..lines.len() {
-        let mut line = lines[i].trim().to_owned();
+        let line = lines[i].trim().to_owned();
 
         if line.is_empty() {
             continue
@@ -259,32 +259,12 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
             in_function = true;
-            open_braces += line.matches("{").count();
-            close_braces += line.matches("}").count();
-            if open_braces == close_braces && open_braces > 0 {
-                in_function = false;
-                open_braces = 0;
-                close_braces = 0;
-            }
-            // parse constructor
+            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if line.substring(0, 8) == "function" {
             in_function = true;
-            open_braces += line.matches("{").count();
-            close_braces += line.matches("}").count();
-            if open_braces == close_braces && open_braces > 0 {
-                in_function = false;
-                open_braces = 0;
-                close_braces = 0;
-            }
-            // parse constructor
+            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if in_function {
-            open_braces += line.matches("{").count();
-            close_braces += line.matches("}").count();
-            if open_braces == close_braces && open_braces > 0 {
-                in_function = false;
-                open_braces = 0;
-                close_braces = 0;
-            }
+            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else {
             println!("{}", line);
         }
@@ -299,6 +279,22 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
         functions,
         imports,
     }
+}
+
+/// This function updates the count of opne and close braces and ends reading of function if conditions are met
+fn update_in_function(line: String, open_braces: &mut usize, close_braces: &mut usize, in_function: &mut bool) {
+    *open_braces += line.matches("{").count();
+    *close_braces += line.matches("}").count();
+    if *open_braces == *close_braces && *open_braces > 0 {
+        *in_function = false;
+        *open_braces = 0;
+        *close_braces = 0;
+    }
+}
+
+/// This function will assemble ink! contract from the parsed contract struct and save it to a file
+fn assemble_contract(contract:Contract){
+    
 }
 
 /// This function parses enum from one-liner enum
