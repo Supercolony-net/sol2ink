@@ -367,7 +367,7 @@ fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> Vec<St
     output_vec.push(String::from("#[ink(storage)]\n"));
     output_vec.push(String::from("#[derive(Default, SpreadAllocate)]\n"));
 
-    output_vec.push(format!("pub struct {}{{\n", contract_name));
+    output_vec.push(format!("pub struct {} {{\n", contract_name));
     for field in fields.iter() {
         output_vec.push(format!("\t{}: {},\n", field.name, field.field_type));
     }
@@ -679,13 +679,7 @@ fn parse_return_params(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
     let mut args = Vec::<String>::new();
     let mut imports = HashSet::<String>::new();
     let mut arg_type: String;
-    let params: Vec<String> = right
-        .iter()
-        .map(|x| x.to_owned() + " ")
-        .collect::<String>()
-        .split(',')
-        .map(|s| s.to_owned())
-        .collect();
+    let params: Vec<String> = right.join(" ").split(',').map(|s| s.to_owned()).collect();
 
     if params.len() > 1 {
         args.push(String::from("("));
