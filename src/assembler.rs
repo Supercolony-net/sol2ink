@@ -210,6 +210,8 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
             // TODO remove comments
             output_vec.push(format!("\t\t//{}\n", statement.content));
         }
+        // TODO remove todo
+        output_vec.push(String::from("\t\ttodo!()\n"));
         output_vec.push(String::from("\t}\n"));
         output_vec.push(String::from("\n"));
     }
