@@ -1,4 +1,4 @@
-use crate::file_utils;
+use crate::structures::*;
 use convert_case::{
     Case,
     Casing,
@@ -9,32 +9,14 @@ use std::{
 };
 use substring::Substring;
 
-#[derive(Debug, PartialEq, Default)]
-enum ContractType {
-    #[default]
-    INTERFACE,
-    CONTRACT,
-}
-
 #[derive(Debug, PartialEq)]
 enum ArgsReader {
     ARGTYPE,
     ARGNAME,
 }
 
-/// `contract_name` the name of the contract
-/// `next_line` n-th line where we found contract definition
-/// `contract_type` type of parsed contract (contract/interface)
-#[derive(Debug, Default)]
-struct ContractDefinition {
-    pub contract_name: String,
-    pub next_line: usize,
-    pub contract_type: ContractType,
-}
-
 #[derive(Debug)]
 pub enum ParserError {
-    ContractsParsingNotImplemented,
     FileError(std::io::Error),
     NoContractDefinitionFound,
 }
@@ -45,119 +27,11 @@ impl From<std::io::Error> for ParserError {
     }
 }
 
-struct Interface {
-    imports: HashSet<String>,
-    functions: Vec<String>,
-}
-
-struct Contract {
-    name: String,
-    fields: Vec<ContractField>,
-    constructor: Constructor,
-    events: Vec<Event>,
-    structs: Vec<Struct>,
-    functions: Vec<Function>,
-    imports: HashSet<String>,
-}
-
-struct ContractField {
-    field_type: String,
-    name: String,
-}
-
-struct Event {
-    name: String,
-    fields: Vec<EventField>,
-}
-
-struct EventField {
-    indexed: bool,
-    field_type: String,
-    name: String,
-}
-
-struct Struct {
-    name: String,
-    fields: Vec<StructField>,
-}
-
-struct StructField {
-    name: String,
-    field_type: String,
-}
-
-struct Function {
-    name: String,
-    params: Vec<FunctionParam>,
-    external: bool,
-    view: bool,
-    payable: bool,
-    return_params: Vec<String>,
-    body: Vec<Statement>,
-}
-
-struct Constructor {
-    params: Vec<FunctionParam>,
-    body: Vec<Statement>,
-}
-
-struct FunctionParam {
-    name: String,
-    param_type: String,
-}
-
-struct Statement {
-    content: String,
-}
-
-/// Function which will run the parser
-pub fn run(path: &String) -> Result<(), ParserError> {
-    // read the file
-    let content = file_utils::read_file(path)?;
-
-    let lines: Vec<String> = content.split('\n').map(|s| s.trim().to_owned()).collect();
-
-    // we skip all lines until the contract definition
-    let contract_definition: ContractDefinition = get_contract_definition(&lines)?;
-
-    match contract_definition.contract_type {
-        ContractType::INTERFACE => {
-            let (mut interface, imports) = {
-                let int = parse_interface(contract_definition, lines);
-                (int.functions, int.imports)
-            };
-            let mut output_vec = Vec::from_iter(imports);
-            output_vec.append(interface.as_mut());
-            output_vec = output_vec
-                .iter()
-                .map(|line| {
-                    if line.contains(";") {
-                        line.to_owned() + "\n"
-                    } else {
-                        line.to_owned()
-                    }
-                })
-                .collect();
-            let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&output_vec, Some(file_name))?;
-            println!("File saved!");
-            Ok(())
-        }
-        ContractType::CONTRACT => {
-            let contract = parse_contract(contract_definition, lines);
-            let ink_contract = assemble_contract(contract);
-            let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_contract, Some(file_name))?;
-            Ok(())
-        }
-    }
-}
-
 /// This function will build the code of a ink! interface (trait) without function bodies
 ///
 /// `contract_definition` the definition of the interfacet
 /// `lines` the solidity code of the interface
-fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) -> Interface {
+pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) -> Interface {
     let name = contract_definition
         .contract_name
         .substring(1, contract_definition.contract_name.len());
@@ -246,7 +120,7 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
     }
 }
 
-fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
+pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
     let name = contract_definition.contract_name;
 
     let mut fields = Vec::<ContractField>::new();
@@ -318,226 +192,6 @@ fn update_in_function(
         *open_braces = 0;
         *close_braces = 0;
     }
-}
-
-/// This function will assemble ink! contract from the parsed contract struct and save it to a file
-fn assemble_contract(contract: Contract) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-    output_vec.push(String::from(
-        "#![cfg_attr(not(feature = \"std\"), no_std)]\n",
-    ));
-    output_vec.push(String::from("#![feature(min_specialization)]\n\n"));
-    output_vec.push(String::from("#[brush::contract]\n"));
-    output_vec.push(format!(
-        "pub mod {} {{\n",
-        contract.name.to_case(Case::Snake)
-    ));
-
-    // imports
-    append_and_tab(&mut output_vec, Vec::from_iter(contract.imports));
-    output_vec.push(String::from("\n"));
-    // events
-    append_and_tab(&mut output_vec, assemble_events(contract.events));
-    // fields
-    append_and_tab(
-        &mut output_vec,
-        assemble_storage(contract.name.clone(), contract.fields),
-    );
-    // structs
-    append_and_tab(&mut output_vec, assemble_structs(contract.structs));
-    output_vec.push(format!("\timpl {} {{\n", contract.name));
-    // constructor
-    append_and_tab(&mut output_vec, assemble_constructor(contract.constructor));
-    // functions
-    append_and_tab(&mut output_vec, assemble_functions(contract.functions));
-    output_vec.push(String::from("\t}\n"));
-
-    output_vec.push(String::from("}\n"));
-    output_vec
-}
-
-/// This function will assemble ink! events from the parsed contract
-fn assemble_events(events: Vec<Event>) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-
-    for event in events.iter() {
-        output_vec.push(String::from("#[ink(event)]\n"));
-        output_vec.push(format!("pub struct {} {{\n", event.name));
-        for event_field in event.fields.iter() {
-            if event_field.indexed {
-                output_vec.push(String::from("\t#[ink(topic)]\n"));
-            }
-            output_vec.push(format!(
-                "\t{}: {},\n",
-                event_field.name, event_field.field_type
-            ));
-        }
-        output_vec.push(String::from("}}\n"));
-    }
-
-    output_vec
-}
-
-/// This function will assemble ink! storage from the parsed contract
-fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-
-    output_vec.push(String::from("#[ink(storage)]\n"));
-    output_vec.push(String::from("#[derive(Default, SpreadAllocate)]\n"));
-
-    output_vec.push(format!("pub struct {} {{\n", contract_name));
-    for field in fields.iter() {
-        output_vec.push(format!("\t{}: {},\n", field.name, field.field_type));
-    }
-
-    output_vec.push(String::from("}\n"));
-    output_vec.push(String::from("\n"));
-
-    output_vec
-}
-
-/// This function will assemble rust structs from the parsed contract
-fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-
-    for structure in structs.iter() {
-        output_vec.push(String::from("#[derive(Default, Encode, Decode)]\n"));
-        output_vec.push(String::from(
-            "#[cfg_attr(feature = \"std\", derive(scale_info::TypeInfo))]\n",
-        ));
-        output_vec.push(format!("pub struct {} {{\n", structure.name));
-        for struct_field in structure.fields.iter() {
-            output_vec.push(format!(
-                "\tpub {}: {},\n",
-                struct_field.name, struct_field.field_type
-            ));
-        }
-        output_vec.push(String::from("}\n"));
-    }
-
-    output_vec
-}
-
-/// This function will assemble the constructor of the ink! contract from the parsed contract
-fn assemble_constructor(constructor: Constructor) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-    // we do this so we dont put tab between each string that we insert (function params)
-    let mut header = String::new();
-
-    output_vec.push(String::from("\t#[ink(constructor)]\n"));
-    header.push_str("\tpub fn new(");
-
-    for param in constructor.params.iter() {
-        header.push_str(format!("{}: {},", param.name, param.param_type).as_str());
-    }
-    header.push_str(") -> Self {\n");
-    output_vec.push(header);
-
-    output_vec.push(String::from(
-        "\t\tink_lang::codegen::initialize_contract(|instance: &mut Self| {\n",
-    ));
-    for statement in constructor.body.iter() {
-        // TODO remove comments
-        output_vec.push(format!("\t\t\t//{}\n", statement.content));
-    }
-    output_vec.push(String::from("\t\t})\n"));
-    output_vec.push(String::from("\t}\n"));
-
-    output_vec
-}
-
-/// This function will assemble the constructor of the ink! contract from the parsed contract
-fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
-    let mut output_vec = Vec::<String>::new();
-    // we do this so we dont put tab between each string that we insert (function params)
-    let mut header: String;
-
-    for function in functions.iter() {
-        header = String::new();
-        output_vec.push(format!(
-            "\t#[ink(message{})]\n",
-            if function.payable {
-                String::from(", payable")
-            } else {
-                String::from("")
-            }
-        ));
-        header.push_str(
-            format!(
-                "\t{}fn {}(",
-                if function.external {
-                    String::from("pub ")
-                } else {
-                    String::from("")
-                },
-                function.name.to_case(Case::Snake)
-            )
-            .as_str(),
-        );
-        // arguments
-        header.push_str(
-            format!(
-                "&{}self",
-                if function.view {
-                    String::from("")
-                } else {
-                    String::from(" mut ")
-                }
-            )
-            .as_str(),
-        );
-        for param in function.params.iter() {
-            header.push_str(format!(",{}: {}", param.name, param.param_type).as_str());
-        }
-        header.push_str(")");
-        // return params
-        if !function.return_params.is_empty() {
-            header.push_str(" -> ");
-            if function.return_params.len() > 1 {
-                header.push_str("(");
-            }
-            for i in 0..function.return_params.len() {
-                header.push_str(
-                    format!(
-                        "{}{}",
-                        if i > 0 {
-                            String::from(", ")
-                        } else {
-                            String::from("")
-                        },
-                        function.return_params[i]
-                    )
-                    .as_str(),
-                );
-            }
-            if function.return_params.len() > 1 {
-                header.push_str(")");
-            }
-        }
-        header.push_str("{\n");
-        output_vec.push(header.to_owned());
-        // body
-        for statement in function.body.iter() {
-            // TODO remove comments
-            output_vec.push(format!("\t\t//{}\n", statement.content));
-        }
-        output_vec.push(String::from("\t}\n"));
-        output_vec.push(String::from("\n"));
-    }
-
-    output_vec
-}
-
-/// This function will append `appended` vec of Strings to `output` vec of strings
-/// and add a tab to the front
-fn append_and_tab(output: &mut Vec<String>, appended: Vec<String>) {
-    output.append(
-        appended
-            .iter()
-            .map(|string| "\t".to_string() + string)
-            .collect::<Vec<String>>()
-            .as_mut(),
-    );
 }
 
 /// This function parses the field of a contract represented by `line`
@@ -783,7 +437,7 @@ fn parse_args(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
 ///
 /// returns `NoContractDefinitionFound` if no definition of a contract nor interface was found
 /// return the definition of the contract
-fn get_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, ParserError> {
+pub fn parse_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, ParserError> {
     for i in 0..lines.len() {
         let line = lines[i].trim();
         if line.is_empty() {
