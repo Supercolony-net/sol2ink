@@ -23,5 +23,71 @@ pub mod erc_20 {
 			ink_lang::codegen::initialize_contract(|instance: &mut Self| {
 			})
 		}
+
+		#[ink(message)]
+		pub fn name(&self) -> String {
+		}
+	
+		#[ink(message)]
+		pub fn symbol(&self) -> String {
+		}
+	
+		#[ink(message)]
+		pub fn decimals(&self) -> u8 {
+		}
+	
+		#[ink(message)]
+		pub fn total_supply(&self) -> u128 {
+		}
+	
+		#[ink(message)]
+		pub fn balance_of(&self, account: AccountId) -> u128 {
+		}
+	
+		#[ink(message)]
+		pub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {
+		}
+	
+		#[ink(message)]
+		pub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {
+		}
+	
+		#[ink(message)]
+		pub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {
+		}
+	
+		#[ink(message)]
+		pub fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool {
+		}
+	
+		#[ink(message)]
+		pub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {
+		}
+	
+		#[ink(message)]
+		pub fn decrease_allowance(&mut self, spender: AccountId, subtracted_value: u128) -> bool {
+		}
+	
+		fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+		}
+	
+		fn _mint(&mut self, account: AccountId, amount: u128) {
+		}
+	
+		fn _burn(&mut self, account: AccountId, amount: u128) {
+		}
+	
+		fn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
+		}
+	
+		fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
+		}
+	
+		fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+		}
+	
+		fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+		}
+	
 	}
 }

@@ -126,7 +126,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let mut fields = Vec::<ContractField>::new();
     let events = Vec::<Event>::new();
     let structs = Vec::<Struct>::new();
-    let functions = Vec::<Function>::new();
+    let mut functions = Vec::<Function>::new();
     let mut imports = HashSet::<String>::new();
     let constructor = Constructor {
         params: Vec::<FunctionParam>::new(),
@@ -136,6 +136,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let mut in_function = false;
     let mut open_braces = 0;
     let mut close_braces = 0;
+    let mut buffer = String::new();
     // read body of contract
     for i in contract_definition.next_line..lines.len() {
         let line = lines[i].trim().to_owned();
@@ -151,6 +152,11 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         } else if line.substring(0, 8) == "function" {
             // TODO parse function
             in_function = true;
+            if line.contains("{") {
+                functions.push(parse_function(line.clone(), &mut imports));
+            } else {
+                buffer = line.to_owned();
+            }
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if line.substring(0, 5) == "event" {
             // TODO parse event
@@ -158,6 +164,13 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
             // TODO parse struct
         } else if in_function {
             // TODO parse statements
+            if open_braces == 0 && line.contains("{") {
+                buffer.push_str(line.as_str());
+                buffer = buffer.replace(",", ", ");
+                functions.push(parse_function(buffer.clone(), &mut imports));
+            } else {
+                buffer.push_str(line.as_str());
+            }
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
         } else if line == "}" {
             // end of contract
@@ -214,6 +227,157 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
         .to_owned()
         .to_case(Case::Snake);
     ContractField { field_type, name }
+}
+
+fn parse_function(line: String, imports: &mut HashSet<String>) -> Function {
+    let split_by_left_brace = line
+        .split("(")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+    let name = split_by_left_brace[0]
+        .substring(9, split_by_left_brace[0].len())
+        .to_case(Case::Snake);
+    let split_by_right_brace = split_by_left_brace[1]
+        .split(")")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+
+    let params_raw = split_by_right_brace[0].to_owned();
+    let params = parse_function_parameters(params_raw, imports);
+    let attributes_raw = split_by_right_brace[1].to_owned();
+    let (external, view, payable) = parse_function_attributes(attributes_raw);
+
+    let return_params = if split_by_left_brace.len() == 3 {
+        parse_return_parameters(
+            split_by_left_brace[2]
+                .split(")")
+                .map(|s| s.to_owned())
+                .collect::<Vec<String>>()[0]
+                .to_owned(),
+            imports,
+        )
+    } else {
+        Vec::<String>::new()
+    };
+
+    // TODO parse statements
+    Function {
+        name,
+        params,
+        external,
+        view,
+        payable,
+        return_params,
+        body: Vec::<Statement>::new(),
+    }
+}
+
+/// Parses parameters of a function
+///
+/// `parameters` the String which contains the paramters of the function
+/// `imports` the Set of imports of the contract
+///
+/// returns the vec of function parameters of this function
+fn parse_function_parameters(
+    parameters: String,
+    imports: &mut HashSet<String>,
+) -> Vec<FunctionParam> {
+    let mut out = Vec::<FunctionParam>::new();
+
+    if !parameters.is_empty() {
+        let tokens = parameters
+            .split(" ")
+            .map(|s| {
+                let mut out = s.to_owned();
+                out.remove_matches(",");
+                out
+            })
+            .collect::<Vec<String>>();
+        let mut mode = ArgsReader::ARGNAME;
+        let mut param_type = convert_variable_type(tokens[0].to_owned(), imports);
+
+        for j in 1..tokens.len() {
+            if mode == ArgsReader::ARGTYPE {
+                param_type = convert_variable_type(tokens[j].to_owned(), imports);
+                mode = ArgsReader::ARGNAME;
+            } else if mode == ArgsReader::ARGNAME {
+                let name = tokens[j].to_case(Case::Snake);
+
+                if name == "memory" || name == "calldata" {
+                    continue
+                }
+
+                out.push(FunctionParam {
+                    name,
+                    param_type: param_type.to_owned(),
+                });
+                mode = ArgsReader::ARGTYPE;
+            }
+        }
+    }
+
+    out
+}
+
+/// Parses attributes of a function like payable, external, view
+///
+/// `attributes` the String which contains the attributes of the function
+///
+/// returns 0. external 1. view 2. payable
+fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
+    let mut external = false;
+    let mut view = false;
+    let mut payable = false;
+
+    let tokens = attributes
+        .split(" ")
+        .map(|s| {
+            let mut out = s.to_owned();
+            out.remove_matches(",");
+            out
+        })
+        .collect::<Vec<String>>();
+
+    for i in 0..tokens.len() {
+        let attribute = tokens[i].to_case(Case::Snake);
+        if attribute == "external" || attribute == "public" {
+            external = true;
+        } else if attribute == "view" {
+            view = true;
+        } else if attribute == "payable" {
+            payable = true;
+        }
+    }
+
+    (external, view, payable)
+}
+
+/// Parses return parameters of a function
+///
+/// `parameters` the String which contains the return paramters of the function
+/// `imports` the Set of imports of the contract
+///
+/// returns the vec of function return parameters of this function
+fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) -> Vec<String> {
+    let mut out = Vec::<String>::new();
+    let mut updated_parameters = parameters.to_owned();
+    updated_parameters.remove_matches(" memory");
+    updated_parameters.remove_matches(" calldata");
+    let tokens: Vec<String> = updated_parameters
+        .split(' ')
+        .map(|s| s.to_owned())
+        .collect();
+
+    for i in 0..tokens.len() {
+        if i % 2 == 1 && tokens.len() >= (parameters.matches(",").count() + 1) * 2 {
+            continue
+        }
+        let mut param = tokens[i].to_owned();
+        param.remove_matches(",");
+        out.push(convert_variable_type(param, imports));
+    }
+
+    out
 }
 
 /// This function parses enum from one-liner enum
@@ -507,6 +671,7 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         return format!("Mapping<{}, {}>", from, to)
     }
     let output_type = match no_array_arg_type {
+        "uint8" => String::from("u8"),
         "uint256" | "uint" => String::from("u128"),
         "bytes" => {
             imports.insert(String::from("use ink::prelude::vec::Vec;\n"));
