@@ -25,7 +25,7 @@ pub struct Interface {
 pub struct Contract {
     pub name: String,
     pub fields: Vec<ContractField>,
-    pub constructor: Constructor,
+    pub constructor: Function,
     pub events: Vec<Event>,
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
@@ -58,26 +58,25 @@ pub struct StructField {
     pub field_type: String,
 }
 
+#[derive(Default, Clone)]
 pub struct Function {
     pub name: String,
     pub params: Vec<FunctionParam>,
     pub external: bool,
     pub view: bool,
     pub payable: bool,
+    pub cosntructor: bool,
     pub return_params: Vec<String>,
     pub body: Vec<Statement>,
 }
 
-pub struct Constructor {
-    pub params: Vec<FunctionParam>,
-    pub body: Vec<Statement>,
-}
-
+#[derive(Clone)]
 pub struct FunctionParam {
     pub name: String,
     pub param_type: String,
 }
 
+#[derive(Clone, Debug)]
 pub struct Statement {
     pub content: String,
 }

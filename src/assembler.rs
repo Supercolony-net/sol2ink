@@ -106,7 +106,7 @@ fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
 }
 
 /// This function will assemble the constructor of the ink! contract from the parsed contract
-fn assemble_constructor(constructor: Constructor) -> Vec<String> {
+fn assemble_constructor(constructor: Function) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
     // we do this so we dont put tab between each string that we insert (function params)
     let mut header = String::new();
@@ -125,7 +125,7 @@ fn assemble_constructor(constructor: Constructor) -> Vec<String> {
     ));
     for statement in constructor.body.iter() {
         // TODO remove comments
-        output_vec.push(format!("\t\t\t//{}\n", statement.content));
+        output_vec.push(format!("\t\t\t// {}\n", statement.content));
     }
     output_vec.push(String::from("\t\t})\n"));
     output_vec.push(String::from("\t}\n\n"));
@@ -208,7 +208,7 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
         // body
         for statement in function.body.iter() {
             // TODO remove comments
-            output_vec.push(format!("\t\t//{}\n", statement.content));
+            output_vec.push(format!("\t\t// {}\n", statement.content));
         }
         // TODO remove todo
         output_vec.push(String::from("\t\ttodo!()\n"));

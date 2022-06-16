@@ -15,6 +15,13 @@ enum ArgsReader {
     ARGNAME,
 }
 
+#[derive(Debug, PartialEq)]
+enum FunctionReader {
+    FUNCTION,
+    CONSTRUCTOR,
+    NONE,
+}
+
 #[derive(Debug)]
 pub enum ParserError {
     FileError(std::io::Error),
@@ -127,13 +134,12 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let events = Vec::<Event>::new();
     let structs = Vec::<Struct>::new();
     let mut functions = Vec::<Function>::new();
+    let mut statements = Vec::<Statement>::new();
     let mut imports = HashSet::<String>::new();
-    let constructor = Constructor {
-        params: Vec::<FunctionParam>::new(),
-        body: Vec::<Statement>::new(),
-    };
+    let mut constructor = Function::default();
 
-    let mut in_function = false;
+    let mut function = Function::default();
+    let mut function_reader = FunctionReader::NONE;
     let mut open_braces = 0;
     let mut close_braces = 0;
     let mut buffer = String::new();
@@ -147,31 +153,67 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
             // TODO parse constructor
-            in_function = true;
-            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
+            function_reader = FunctionReader::CONSTRUCTOR;
+            update_in_function(
+                line,
+                &mut open_braces,
+                &mut close_braces,
+                &mut function_reader,
+                None,
+                None,
+            );
         } else if line.substring(0, 8) == "function" {
             // TODO parse function
-            in_function = true;
+            function_reader = FunctionReader::FUNCTION;
             if line.contains("{") {
-                functions.push(parse_function(line.clone(), &mut imports));
+                statements = Vec::<Statement>::new();
+                function = parse_function_header(line.clone(), &mut imports);
             } else {
                 buffer = line.to_owned();
             }
-            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
+            let function_maybe = update_in_function(
+                line,
+                &mut open_braces,
+                &mut close_braces,
+                &mut function_reader,
+                Some(function.clone()),
+                Some(statements.clone()),
+            );
+            if function_maybe.is_some() {
+                functions.push(function_maybe.unwrap());
+            }
         } else if line.substring(0, 5) == "event" {
             // TODO parse event
         } else if line.substring(0, 6) == "struct" {
             // TODO parse struct
-        } else if in_function {
+        } else if function_reader != FunctionReader::NONE {
             // TODO parse statements
             if open_braces == 0 && line.contains("{") {
                 buffer.push_str(line.as_str());
                 buffer = buffer.replace(",", ", ");
-                functions.push(parse_function(buffer.clone(), &mut imports));
-            } else {
+                function = parse_function_header(buffer.clone(), &mut imports);
+                statements = Vec::<Statement>::new();
+            } else if open_braces == 0 {
                 buffer.push_str(line.as_str());
+            } else if !line.contains("}") || open_braces != close_braces + 1 {
+                statements.push(parse_statement(line.clone()));
             }
-            update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
+            let function_maybe = update_in_function(
+                line,
+                &mut open_braces,
+                &mut close_braces,
+                &mut function_reader,
+                Some(function.clone()),
+                Some(statements.clone()),
+            );
+            if function_maybe.is_some() {
+                let function = function_maybe.unwrap();
+                if function.cosntructor {
+                    constructor = function;
+                } else {
+                    functions.push(function);
+                }
+            }
         } else if line == "}" {
             // end of contract
             continue
@@ -196,15 +238,28 @@ fn update_in_function(
     line: String,
     open_braces: &mut usize,
     close_braces: &mut usize,
-    in_function: &mut bool,
-) {
+    function_reader: &mut FunctionReader,
+    function: Option<Function>,
+    statements: Option<Vec<Statement>>,
+) -> Option<Function> {
     *open_braces += line.matches("{").count();
     *close_braces += line.matches("}").count();
     if *open_braces == *close_braces && *open_braces > 0 {
-        *in_function = false;
+        let mut output = None;
+        if function.is_some() {
+            let mut updated_function = function.unwrap();
+            updated_function.body = statements.unwrap();
+            if *function_reader == FunctionReader::CONSTRUCTOR {
+                updated_function.cosntructor = true;
+            }
+            output = Some(updated_function);
+        }
+        *function_reader = FunctionReader::NONE;
         *open_braces = 0;
         *close_braces = 0;
+        return output
     }
+    None
 }
 
 /// This function parses the field of a contract represented by `line`
@@ -229,7 +284,11 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
     ContractField { field_type, name }
 }
 
-fn parse_function(line: String, imports: &mut HashSet<String>) -> Function {
+/// This function parses the function header represented by `line`
+/// and adds imports to `imports`
+///
+/// returns the representation of the function `Function` struct
+fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Function {
     let split_by_left_brace = line
         .split("(")
         .map(|s| s.to_owned())
@@ -267,9 +326,20 @@ fn parse_function(line: String, imports: &mut HashSet<String>) -> Function {
         external,
         view,
         payable,
+        cosntructor: false,
         return_params,
         body: Vec::<Statement>::new(),
     }
+}
+
+/// This function parses the statement in `line` into rust statement
+///
+/// TODO: for now we only return the original statement and comment it
+///
+/// returns the statement as `Statement` struct
+fn parse_statement(line: String) -> Statement {
+    // TODO actual parsing
+    Statement { content: line }
 }
 
 /// Parses parameters of a function
