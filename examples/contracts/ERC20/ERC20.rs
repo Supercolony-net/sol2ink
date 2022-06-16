@@ -3,10 +3,18 @@
 
 #[brush::contract]
 pub mod erc_20 {
+	use brush::traits::AccountId;
+	use ink::prelude::string::String;
+	use ink_storage::Mapping;
 
 	#[ink(storage)]
 	#[derive(Default, SpreadAllocate)]
 	pub struct ERC20{
+		balances: Mapping<AccountId, u128>,
+		allowances: Mapping<(AccountId, AccountId), u128>,
+		total_supply: u128,
+		name: String,
+		symbol: String,
 	}
 	
 	impl ERC20 {

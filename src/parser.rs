@@ -239,11 +239,11 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
 fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
     let name = contract_definition.contract_name;
 
-    let fields = Vec::<ContractField>::new();
+    let mut fields = Vec::<ContractField>::new();
     let events = Vec::<Event>::new();
     let structs = Vec::<Struct>::new();
     let functions = Vec::<Function>::new();
-    let imports = HashSet::<String>::new();
+    let mut imports = HashSet::<String>::new();
     let constructor = Constructor {
         params: Vec::<FunctionParam>::new(),
         body: Vec::<Statement>::new(),
@@ -268,6 +268,10 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
             // TODO parse function
             in_function = true;
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
+        } else if line.substring(0, 5) == "event" {
+            // TODO parse event
+        } else if line.substring(0, 6) == "struct" {
+            // TODO parse struct
         } else if in_function {
             // TODO parse statements
             update_in_function(line, &mut open_braces, &mut close_braces, &mut in_function);
@@ -275,7 +279,7 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
             // end of contract
             continue
         } else {
-            println!("{}", line);
+            fields.push(parse_contract_field(line, &mut imports));
         }
     }
 
@@ -291,7 +295,12 @@ fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -
 }
 
 /// This function updates the count of opne and close braces and ends reading of function if conditions are met
-fn update_in_function(line: String, open_braces: &mut usize, close_braces: &mut usize, in_function: &mut bool) {
+fn update_in_function(
+    line: String,
+    open_braces: &mut usize,
+    close_braces: &mut usize,
+    in_function: &mut bool,
+) {
     *open_braces += line.matches("{").count();
     *close_braces += line.matches("}").count();
     if *open_braces == *close_braces && *open_braces > 0 {
@@ -380,7 +389,10 @@ fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
         ));
         output_vec.push(format!("pub struct {} {{\n", structure.name));
         for struct_field in structure.fields.iter() {
-            output_vec.push(format!("\tpub {}: {},\n", struct_field.name, struct_field.field_type));
+            output_vec.push(format!(
+                "\tpub {}: {},\n",
+                struct_field.name, struct_field.field_type
+            ));
         }
         output_vec.push(String::from("}\n"));
     }
@@ -470,7 +482,11 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
                 header.push_str(
                     format!(
                         "{}{}",
-                        if i > 0 { String::from(", ") } else { String::from("") },
+                        if i > 0 {
+                            String::from(", ")
+                        } else {
+                            String::from("")
+                        },
                         function.return_params[i]
                     )
                     .as_str(),
@@ -504,6 +520,24 @@ fn append_and_tab(output: &mut Vec<String>, appended: Vec<String>) {
             .collect::<Vec<String>>()
             .as_mut(),
     );
+}
+
+fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
+    // most mappings are written as `type => type`
+    // we will make it `type=>type`
+    let tokens = line
+        .replace(" => ", "=>")
+        .split(" ")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+    let name_index = if tokens.len() > 2 { 2 } else { 1 };
+
+    let field_type = convert_variable_type(tokens[0].to_owned(), imports);
+    let name = tokens[name_index]
+        .substring(0, tokens[name_index].len() - 1)
+        .to_owned()
+        .to_case(Case::Snake);
+    ContractField { field_type, name }
 }
 
 /// This function parses enum from one-liner enum
@@ -544,12 +578,12 @@ fn parse_event(line: &String) -> (Vec<String>, HashSet<String>) {
     // we assume Approval(address, didnt get split by white space
     let split_brace: Vec<String> = tokens[1].split('(').map(|s| s.to_owned()).collect();
     let event_name = split_brace[0].to_owned();
-    let mut arg_type = convert_argument_type(split_brace[1].to_owned(), &mut imports);
+    let mut arg_type = convert_variable_type(split_brace[1].to_owned(), &mut imports);
 
     for i in 2..tokens.len() {
         let mut token = tokens[i].to_owned();
         if args_reader == ArgsReader::ARGTYPE {
-            arg_type = convert_argument_type(token, &mut imports);
+            arg_type = convert_variable_type(token, &mut imports);
             args_reader = ArgsReader::ARGNAME;
         } else if token == "indexed" {
             is_indexed = true;
@@ -669,7 +703,7 @@ fn parse_return_params(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
             arg_type = arg_type.substring(0, arg_type.len() - 2).to_owned();
         }
 
-        arg_type = convert_argument_type(arg_type, &mut imports);
+        arg_type = convert_variable_type(arg_type, &mut imports);
 
         if end {
             args.push(arg_type);
@@ -713,7 +747,7 @@ fn parse_args(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
                 arg_name = arg_name.substring(0, arg_name.len() - 1).to_owned();
             }
 
-            arg_type = convert_argument_type(arg_type, &mut imports);
+            arg_type = convert_variable_type(arg_type, &mut imports);
 
             if end {
                 args.push(format!("{} : {}", arg_name, arg_type));
@@ -764,13 +798,42 @@ fn get_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, Pa
 /// `imports` the set of imports
 ///
 /// return the converted type
-fn convert_argument_type(arg_type: String, imports: &mut HashSet<String>) -> String {
+fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> String {
     // removes array braces from the type
     let (no_array_arg_type, is_vec) = if arg_type.substring(arg_type.len() - 2, arg_type.len()) == "[]" {
         (arg_type.substring(0, arg_type.len() - 2), true)
     } else {
         (arg_type.as_str(), false)
     };
+    if arg_type.substring(0, 7) == "mapping" {
+        imports.insert(String::from("use ink_storage::Mapping;\n"));
+        let type_args = arg_type
+            .substring(8, arg_type.len() - 1)
+            .split("=>")
+            .map(|s| s.to_owned())
+            .collect::<Vec<String>>();
+        let to = convert_variable_type(
+            {
+                let mut arg_type_no_braces = type_args.last().unwrap().to_owned();
+                arg_type_no_braces.remove_matches(")");
+                arg_type_no_braces
+            },
+            imports,
+        );
+        let mut from_vec: Vec<String> = vec![convert_variable_type(type_args[0].to_owned(), imports)];
+        for i in 1..type_args.len() - 1 {
+            from_vec.push(convert_variable_type(
+                type_args[i].substring(8, type_args[i].len()).to_owned(),
+                imports,
+            ));
+        }
+        let from = if from_vec.len() > 1 {
+            format!("({})", from_vec.join(", "))
+        } else {
+            from_vec[0].to_owned()
+        };
+        return format!("Mapping<{}, {}>", from, to)
+    }
     let output_type = match no_array_arg_type {
         "uint256" | "uint" => String::from("u128"),
         "bytes" => {
@@ -780,6 +843,10 @@ fn convert_argument_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         "address" => {
             imports.insert(String::from("use brush::traits::AccountId;\n"));
             String::from("AccountId")
+        }
+        "string" => {
+            imports.insert(String::from("use ink::prelude::string::String;\n"));
+            String::from("String")
         }
         "bytes32" => String::from("[u8; 32]"),
         _ => arg_type,
