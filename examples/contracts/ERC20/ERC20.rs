@@ -3,8 +3,8 @@
 
 #[brush::contract]
 pub mod erc_20 {
-	use ink::prelude::string::String;
 	use ink_storage::Mapping;
+	use ink::prelude::string::String;
 	use brush::traits::AccountId;
 
 	#[ink(storage)]

@@ -175,7 +175,10 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
         if !line.contains(";") && line.substring(0, 5) != "event" {
             search_semicolon = true;
         }
-        if line.is_empty() || line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
+        if line.is_empty()
+            || line.chars().nth(0).unwrap() == '/'
+            || line.chars().nth(0).unwrap() == '*'
+        {
             i += 1;
             continue
         } else if search_semicolon && line.contains(";") {
@@ -211,7 +214,11 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
                 + next;
             line = new;
         }
-        let tokens: Vec<String> = line.replace(" )", ")").split('(').map(|s| s.to_owned()).collect();
+        let tokens: Vec<String> = line
+            .replace(" )", ")")
+            .split('(')
+            .map(|s| s.to_owned())
+            .collect();
         let (mut function, function_imports) = parse_interface_function_header(tokens);
         trait_def.append(function.as_mut());
         for import in function_imports.iter() {
@@ -220,7 +227,10 @@ fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) 
         i += 1;
     }
 
-    output.push(format!("#[brush::wrapper] \npub type {0}Ref = dyn {0};", name));
+    output.push(format!(
+        "#[brush::wrapper] \npub type {0}Ref = dyn {0};",
+        name
+    ));
     // we add events and enums
     output.append(non_trait.as_mut());
     output.push(String::from("#[brush::trait_definition]\n"));
@@ -313,10 +323,15 @@ fn update_in_function(
 /// This function will assemble ink! contract from the parsed contract struct and save it to a file
 fn assemble_contract(contract: Contract) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
-    output_vec.push(String::from("#![cfg_attr(not(feature = \"std\"), no_std)]\n"));
+    output_vec.push(String::from(
+        "#![cfg_attr(not(feature = \"std\"), no_std)]\n",
+    ));
     output_vec.push(String::from("#![feature(min_specialization)]\n\n"));
     output_vec.push(String::from("#[brush::contract]\n"));
-    output_vec.push(format!("pub mod {} {{\n", contract.name.to_case(Case::Snake)));
+    output_vec.push(format!(
+        "pub mod {} {{\n",
+        contract.name.to_case(Case::Snake)
+    ));
 
     // imports
     append_and_tab(&mut output_vec, Vec::from_iter(contract.imports));
@@ -352,7 +367,10 @@ fn assemble_events(events: Vec<Event>) -> Vec<String> {
             if event_field.indexed {
                 output_vec.push(String::from("\t#[ink(topic)]\n"));
             }
-            output_vec.push(format!("\t{}: {},\n", event_field.name, event_field.field_type));
+            output_vec.push(format!(
+                "\t{}: {},\n",
+                event_field.name, event_field.field_type
+            ));
         }
         output_vec.push(String::from("}}\n"));
     }
@@ -522,6 +540,10 @@ fn append_and_tab(output: &mut Vec<String>, appended: Vec<String>) {
     );
 }
 
+/// This function parses the field of a contract represented by `line`
+/// and adds imports to `imports`
+///
+/// returns the representation of contract field in `ContractField` struct
 fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
     // most mappings are written as `type => type`
     // we will make it `type=>type`
@@ -794,11 +816,12 @@ fn get_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, Pa
 /// return the converted type
 fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> String {
     // removes array braces from the type
-    let (no_array_arg_type, is_vec) = if arg_type.substring(arg_type.len() - 2, arg_type.len()) == "[]" {
-        (arg_type.substring(0, arg_type.len() - 2), true)
-    } else {
-        (arg_type.as_str(), false)
-    };
+    let (no_array_arg_type, is_vec) =
+        if arg_type.substring(arg_type.len() - 2, arg_type.len()) == "[]" {
+            (arg_type.substring(0, arg_type.len() - 2), true)
+        } else {
+            (arg_type.as_str(), false)
+        };
     if arg_type.substring(0, 7) == "mapping" {
         imports.insert(String::from("use ink_storage::Mapping;\n"));
         let type_args = arg_type
@@ -814,7 +837,8 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
             },
             imports,
         );
-        let mut from_vec: Vec<String> = vec![convert_variable_type(type_args[0].to_owned(), imports)];
+        let mut from_vec: Vec<String> =
+            vec![convert_variable_type(type_args[0].to_owned(), imports)];
         for i in 1..type_args.len() - 1 {
             from_vec.push(convert_variable_type(
                 type_args[i].substring(8, type_args[i].len()).to_owned(),
