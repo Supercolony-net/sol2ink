@@ -4,8 +4,26 @@
 #[brush::contract]
 pub mod erc_20 {
 	use ink_storage::Mapping;
-	use brush::traits::AccountId;
 	use ink::prelude::string::String;
+	use brush::traits::AccountId;
+
+	#[ink(event)]
+	pub struct Transfer {
+		#[ink(topic)]
+		Transfer: AccountId,
+		#[ink(topic)]
+		Transfer: AccountId,
+		Transfer: u128,
+	}
+
+	#[ink(event)]
+	pub struct Approval {
+		#[ink(topic)]
+		Approval: AccountId,
+		#[ink(topic)]
+		Approval: AccountId,
+		Approval: u128,
+	}
 
 	#[ink(storage)]
 	#[derive(Default, SpreadAllocate)]

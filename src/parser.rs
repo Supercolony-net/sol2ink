@@ -131,7 +131,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let name = contract_definition.contract_name;
 
     let mut fields = Vec::<ContractField>::new();
-    let events = Vec::<Event>::new();
+    let mut events = Vec::<Event>::new();
     let structs = Vec::<Struct>::new();
     let mut functions = Vec::<Function>::new();
     let mut statements = Vec::<Statement>::new();
@@ -191,7 +191,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
                 functions.push(function_maybe.unwrap());
             }
         } else if line.substring(0, 5) == "event" {
-            // TODO parse event
+            events.push(parse_event_new(line, &mut imports));
         } else if line.substring(0, 6) == "struct" {
             // TODO parse struct
         } else if function_reader != FunctionReader::NONE {
@@ -453,9 +453,51 @@ fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) ->
     out
 }
 
+/// This function parses event
+///
+/// `line` the Solidity event definition
+///
+/// returns the event definition in ink! along with imports needed by this event
+fn parse_event_new(line: String, imports: &mut HashSet<String>) -> Event {
+    let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
+
+    let mut args_reader = ArgsReader::ARGNAME;
+    let mut indexed = false;
+    // we assume Approval(address, didnt get split by white space
+    let split_brace: Vec<String> = tokens[1].split('(').map(|s| s.to_owned()).collect();
+    let name = split_brace[0].to_owned();
+    let mut field_type = convert_variable_type(split_brace[1].to_owned(), imports);
+    let mut fields = Vec::<EventField>::new();
+
+    for i in 2..tokens.len() {
+        let mut token = tokens[i].to_owned();
+        if args_reader == ArgsReader::ARGTYPE {
+            field_type = convert_variable_type(token, imports);
+            args_reader = ArgsReader::ARGNAME;
+        } else if token == "indexed" {
+            indexed = true;
+            continue
+        } else {
+            token.remove_matches(&[',', ')', ';'][..]);
+            fields.push(EventField {
+                indexed,
+                field_type: field_type.to_owned(),
+                name: name.to_owned(),
+            });
+            indexed = false;
+            args_reader = ArgsReader::ARGTYPE;
+        }
+    }
+
+    Event { name, fields }
+}
+
 /// This function parses enum from one-liner enum
 ///
 /// `line` the line of enum from solidity
+///
+/// TODO: DEPRECATED
+///
 /// returns the enum definition in ink!
 fn parse_enum(line: &String) -> Vec<String> {
     let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
@@ -477,6 +519,8 @@ fn parse_enum(line: &String) -> Vec<String> {
 /// This function parses event
 ///
 /// `line` the Solidity event definition
+///
+/// TODO: DEPRECATED
 ///
 /// returns the event definition in ink! along with imports needed by this event
 fn parse_event(line: &String) -> (Vec<String>, HashSet<String>) {
@@ -531,6 +575,8 @@ fn parse_event(line: &String) -> (Vec<String>, HashSet<String>) {
 /// when the length of this vec is 3, we know it is a return function
 ///
 /// `tokens` solidity function definition split by '('
+///
+/// TODO: DEPRECATED
 ///
 /// returns the trait definition in ink! and a set of imports needed by this function
 fn parse_interface_function_header(tokens: Vec<String>) -> (Vec<String>, HashSet<String>) {
@@ -587,6 +633,8 @@ fn parse_interface_function_header(tokens: Vec<String>) -> (Vec<String>, HashSet
 ///
 /// `right` the right side of the function
 ///
+/// TODO: DEPRECATED
+///
 /// returns the return parameters of the function and a set of imports needed
 fn parse_return_params(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
     let mut args = Vec::<String>::new();
@@ -628,6 +676,8 @@ fn parse_return_params(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {
 /// Parses arguments of a function
 ///
 /// `right` the right side of the function
+///
+/// TODO: DEPRECATED
 ///
 /// returns the return parameters of the function and a set of imports needed
 fn parse_args(right: &Vec<String>) -> (Vec<String>, HashSet<String>) {

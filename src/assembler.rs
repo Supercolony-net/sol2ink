@@ -59,7 +59,7 @@ fn assemble_events(events: Vec<Event>) -> Vec<String> {
                 event_field.name, event_field.field_type
             ));
         }
-        output_vec.push(String::from("}}\n"));
+        output_vec.push(String::from("}\n\n"));
     }
 
     output_vec
