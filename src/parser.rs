@@ -47,10 +47,8 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
     let mut function_headers = Vec::<FunctionHeader>::new();
     let mut imports = HashSet::<String>::new();
 
-    let mut function_reader = FunctionReader::NONE;
     let mut struct_name: Option<String> = None;
     let mut struct_fields = Vec::<StructField>::new();
-    let mut buffer = String::new();
 
     let mut iterator = lines.iter();
     // read body of contract
@@ -62,18 +60,29 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 8) == "function" {
-            function_reader = FunctionReader::FUNCTION;
             if line.contains(";") {
                 function_headers.push(parse_function_header(line.clone(), &mut imports));
             } else {
-                buffer = line.to_owned();
-                function_reader = FunctionReader::FUNCTION;
+                let mut buffer = line.to_owned();
+
+                while let Some(raw_line) = iterator.next() {
+                    let line = raw_line.trim().to_owned();
+                    if line.contains(";") {
+                        buffer.push_str(line.as_str());
+                        buffer = buffer.replace(",", ", ");
+                        buffer = buffer.replace("  ", " ");
+                        function_headers.push(parse_function_header(buffer.clone(), &mut imports));
+                        break
+                    } else {
+                        buffer.push_str(line.as_str());
+                    }
+                }
             }
         } else if line.substring(0, 5) == "event" {
             if line.contains(";") {
                 events.push(parse_event(line, &mut imports));
             } else {
-                buffer = line;
+                let mut buffer = line;
 
                 while let Some(raw_line) = iterator.next() {
                     let line = raw_line.trim().to_owned();
@@ -100,16 +109,6 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
                 struct_fields = Vec::<StructField>::new();
             } else {
                 struct_fields.push(parse_struct_field(line, &mut imports));
-            }
-        } else if function_reader != FunctionReader::NONE {
-            if line.contains(";") {
-                buffer.push_str(line.as_str());
-                buffer = buffer.replace(",", ", ");
-                buffer = buffer.replace("  ", " ");
-                function_headers.push(parse_function_header(buffer.clone(), &mut imports));
-                function_reader = FunctionReader::NONE;
-            } else {
-                buffer.push_str(line.as_str());
             }
         } else if line == "}" {
             // end of contract
