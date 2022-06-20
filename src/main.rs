@@ -55,3 +55,32 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::run;
+
+    #[test]
+    fn transpile_examples() {
+        assert_eq!(
+            run(&"examples/contracts/ERC20/ERC20.sol".to_string()),
+            Ok(())
+        );
+        assert_eq!(
+            run(&"examples/interfaces/IERC20/IERC20.sol".to_string()),
+            Ok(())
+        );
+        assert_eq!(
+            run(&"examples/interfaces/IERC721/IERC721.sol".to_string()),
+            Ok(())
+        );
+        assert_eq!(
+            run(&"examples/interfaces/IERC1155/IERC1155.sol".to_string()),
+            Ok(())
+        );
+        assert_eq!(
+            run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
+            Ok(())
+        );
+    }
+}

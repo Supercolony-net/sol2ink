@@ -22,15 +22,15 @@ enum FunctionReader {
     NONE,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ParserError {
-    FileError(std::io::Error),
+    FileError(String),
     NoContractDefinitionFound,
 }
 
 impl From<std::io::Error> for ParserError {
     fn from(error: std::io::Error) -> Self {
-        ParserError::FileError(error)
+        ParserError::FileError(error.to_string())
     }
 }
 

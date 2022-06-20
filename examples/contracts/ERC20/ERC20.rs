@@ -1,3 +1,6 @@
+// Generated with Sol2Ink v0.2.0
+// https://github.com/Supercolony-net/sol2ink
+
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 

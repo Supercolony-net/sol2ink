@@ -1,3 +1,6 @@
+// Generated with Sol2Ink v0.2.0
+// https://github.com/Supercolony-net/sol2ink
+
 use brush::traits::AccountId;
 use ink::prelude::vec::Vec;
 

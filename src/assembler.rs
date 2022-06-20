@@ -10,6 +10,8 @@ use convert_case::{
 /// This function will assemble ink! contract from the parsed contract struct and save it to a file
 pub fn assemble_contract(contract: Contract) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
+
+    output_vec.append(signature().as_mut());
     output_vec.push(String::from(
         "#![cfg_attr(not(feature = \"std\"), no_std)]\n",
     ));
@@ -49,6 +51,7 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
 pub fn assemble_interface(interface: Interface) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
 
+    output_vec.append(signature().as_mut());
     // imports
     output_vec.append(Vec::from_iter(interface.imports).as_mut());
     output_vec.push(String::from("\n"));
@@ -336,4 +339,12 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> Vec<Strin
     }
 
     output_vec
+}
+
+fn signature() -> Vec<String> {
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    vec![
+        format!("// Generated with Sol2Ink v{}\n", VERSION),
+        String::from("// https://github.com/Supercolony-net/sol2ink\n\n"),
+    ]
 }
