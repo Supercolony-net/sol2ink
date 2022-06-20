@@ -44,6 +44,11 @@ contract ERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
     /**
+     * This enum is added just to test enum parsing
+     */
+    enum Enum { FIRST, SECOND }
+
+    /**
      * This struct is added just to test struct parsing
      */
     struct Struct {

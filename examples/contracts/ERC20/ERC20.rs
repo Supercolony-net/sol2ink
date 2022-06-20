@@ -3,9 +3,9 @@
 
 #[brush::contract]
 pub mod erc_20 {
+	use brush::traits::AccountId;
 	use ink_storage::Mapping;
 	use ink::prelude::string::String;
-	use brush::traits::AccountId;
 
 	#[ink(event)]
 	pub struct Transfer {
@@ -23,6 +23,11 @@ pub mod erc_20 {
 		#[ink(topic)]
 		Approval: AccountId,
 		Approval: u128,
+	}
+
+	pub enum Enum {
+		FIRST, 
+		SECOND, 
 	}
 
 	#[derive(Default, Encode, Decode)]

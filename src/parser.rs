@@ -132,6 +132,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
 
     let mut fields = Vec::<ContractField>::new();
     let mut events = Vec::<Event>::new();
+    let mut enums = Vec::<Enum>::new();
     let mut structs = Vec::<Struct>::new();
     let mut functions = Vec::<Function>::new();
     let mut statements = Vec::<Statement>::new();
@@ -194,6 +195,8 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
             }
         } else if line.substring(0, 5) == "event" {
             events.push(parse_event_new(line, &mut imports));
+        } else if line.substring(0, 4) == "enum" {
+            enums.push(parse_enum_new(line));
         } else if line.substring(0, 6) == "struct" {
             struct_name = Some(parse_struct_name(line));
         } else if struct_name.is_some() {
@@ -247,6 +250,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         fields,
         constructor,
         events,
+        enums,
         structs,
         functions,
         imports,
@@ -505,6 +509,11 @@ fn parse_event_new(line: String, imports: &mut HashSet<String>) -> Event {
     Event { name, fields }
 }
 
+/// This function parses struct name
+///
+/// `line` the Solidity struct definition
+///
+/// returns the struct name
 fn parse_struct_name(line: String) -> String {
     let tokens = line
         .split(" ")
@@ -513,6 +522,11 @@ fn parse_struct_name(line: String) -> String {
     tokens[1].to_owned()
 }
 
+/// This function parses struct fields
+///
+/// `line` the Solidity definition of the struct fields
+///
+/// returns the field in form of `StructField` struct
 fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructField {
     let tokens = line
         .split(" ")
@@ -522,6 +536,28 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
     let mut name = tokens[1].to_case(Case::Snake);
     name.remove_matches(";");
     StructField { name, field_type }
+}
+
+/// This function parses enum
+///
+/// `line` the Solidity definition of enum
+///
+/// returns the enum in form of `Enum` struct
+fn parse_enum_new(line: String) -> Enum {
+    let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
+    let name = tokens[1].to_owned();
+    let mut values = Vec::<String>::new();
+
+    for i in 2..tokens.len() {
+        let mut token = tokens[i].to_owned();
+        if token == "{" || token == "}" {
+            continue
+        } else {
+            token.remove_matches(",");
+            values.push(token);
+        }
+    }
+    Enum { name, values }
 }
 
 /// This function parses enum from one-liner enum

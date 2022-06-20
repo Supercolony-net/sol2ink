@@ -23,8 +23,10 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
     // imports
     append_and_tab(&mut output_vec, Vec::from_iter(contract.imports));
     output_vec.push(String::from("\n"));
-    // events
+    // enums
     append_and_tab(&mut output_vec, assemble_events(contract.events));
+    // events
+    append_and_tab(&mut output_vec, assemble_enums(contract.enums));
     // structs
     append_and_tab(&mut output_vec, assemble_structs(contract.structs));
     // fields
@@ -40,6 +42,21 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
     output_vec.push(String::from("\t}\n"));
 
     output_vec.push(String::from("}\n"));
+    output_vec
+}
+
+/// This function will assemble ink! events from the parsed contract
+fn assemble_enums(enums: Vec<Enum>) -> Vec<String> {
+    let mut output_vec = Vec::<String>::new();
+
+    for enumeration in enums.iter() {
+        output_vec.push(format!("pub enum {} {{\n", enumeration.name));
+        for value in enumeration.values.iter() {
+            output_vec.push(format!("\t{}, \n", value));
+        }
+        output_vec.push(String::from("}\n\n"));
+    }
+
     output_vec
 }
 
