@@ -19,7 +19,7 @@ pub mod erc_20 {
 	
 	impl ERC20 {
 		#[ink(constructor)]
-		pub fn new() -> Self {
+		pub fn new(name: String, symbol: String) -> Self {
 			ink_lang::codegen::initialize_contract(|instance: &mut Self| {
 				// _name = name_;
 				// _symbol = symbol_;

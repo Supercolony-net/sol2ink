@@ -60,14 +60,19 @@ pub struct StructField {
 
 #[derive(Default, Clone)]
 pub struct Function {
+    pub header: FunctionHeader,
+    pub cosntructor: bool,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Default, Clone)]
+pub struct FunctionHeader {
     pub name: String,
     pub params: Vec<FunctionParam>,
     pub external: bool,
     pub view: bool,
     pub payable: bool,
-    pub cosntructor: bool,
     pub return_params: Vec<String>,
-    pub body: Vec<Statement>,
 }
 
 #[derive(Clone)]

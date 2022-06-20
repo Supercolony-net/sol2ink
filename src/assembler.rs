@@ -114,9 +114,16 @@ fn assemble_constructor(constructor: Function) -> Vec<String> {
     output_vec.push(String::from("\t#[ink(constructor)]\n"));
     header.push_str("\tpub fn new(");
 
-    for param in constructor.params.iter() {
-        header.push_str(format!("{}: {},", param.name, param.param_type).as_str());
-    }
+    header.push_str(
+        constructor
+            .header
+            .params
+            .iter()
+            .map(|param| format!("{}: {}", param.name, param.param_type))
+            .collect::<Vec<String>>()
+            .join(", ")
+            .as_str(),
+    );
     header.push_str(") -> Self {\n");
     output_vec.push(header);
 
@@ -141,10 +148,10 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
 
     for function in functions.iter() {
         header = String::new();
-        if function.external {
+        if function.header.external {
             output_vec.push(format!(
                 "\t#[ink(message{})]\n",
-                if function.payable {
+                if function.header.payable {
                     String::from(", payable")
                 } else {
                     String::from("")
@@ -154,12 +161,12 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
         header.push_str(
             format!(
                 "\t{}{}(",
-                if function.external {
+                if function.header.external {
                     String::from("pub fn ")
                 } else {
                     String::from("fn _")
                 },
-                function.name.to_case(Case::Snake)
+                function.header.name.to_case(Case::Snake)
             )
             .as_str(),
         );
@@ -167,7 +174,7 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
         header.push_str(
             format!(
                 "&{}self",
-                if function.view {
+                if function.header.view {
                     String::from("")
                 } else {
                     String::from("mut ")
@@ -175,17 +182,17 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
             )
             .as_str(),
         );
-        for param in function.params.iter() {
+        for param in function.header.params.iter() {
             header.push_str(format!(", {}: {}", param.name, param.param_type).as_str());
         }
         header.push_str(")");
         // return params
-        if !function.return_params.is_empty() {
+        if !function.header.return_params.is_empty() {
             header.push_str(" -> ");
-            if function.return_params.len() > 1 {
+            if function.header.return_params.len() > 1 {
                 header.push_str("(");
             }
-            for i in 0..function.return_params.len() {
+            for i in 0..function.header.return_params.len() {
                 header.push_str(
                     format!(
                         "{}{}",
@@ -194,12 +201,12 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
                         } else {
                             String::from("")
                         },
-                        function.return_params[i]
+                        function.header.return_params[i]
                     )
                     .as_str(),
                 );
             }
-            if function.return_params.len() > 1 {
+            if function.header.return_params.len() > 1 {
                 header.push_str(")");
             }
         }
