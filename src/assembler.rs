@@ -45,6 +45,37 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
     output_vec
 }
 
+/// This function will assemble ink! contract from the parsed contract struct and save it to a file
+pub fn assemble_interface(interface: Interface) -> Vec<String> {
+    let mut output_vec = Vec::<String>::new();
+
+    // imports
+    output_vec.append(Vec::from_iter(interface.imports).as_mut());
+    output_vec.push(String::from("\n"));
+
+    // events
+    output_vec.append(assemble_events(interface.events).as_mut());
+    // enums
+    output_vec.append(assemble_enums(interface.enums).as_mut());
+    // structs
+    output_vec.append(assemble_structs(interface.structs).as_mut());
+
+    output_vec.push(format!(
+        "#[brush::wrapper]\npub type {0}Ref = dyn {0};\n\n",
+        interface.name
+    ));
+    output_vec.push(format!(
+        "#[brush::trait_definition]\npub trait {} {{\n",
+        interface.name
+    ));
+
+    // functions
+    output_vec.append(assemble_function_headers(interface.function_headers).as_mut());
+    output_vec.push(String::from("}\n"));
+
+    output_vec
+}
+
 /// This function will assemble ink! events from the parsed contract
 fn assemble_enums(enums: Vec<Enum>) -> Vec<String> {
     let mut output_vec = Vec::<String>::new();
@@ -238,6 +269,70 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
         output_vec.push(String::from("\t\ttodo!()\n"));
         output_vec.push(String::from("\t}\n"));
         output_vec.push(String::from("\n"));
+    }
+
+    output_vec
+}
+
+/// This function will assemble the constructor of the ink! contract from the parsed contract
+fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> Vec<String> {
+    let mut output_vec = Vec::<String>::new();
+    // we do this so we dont put tab between each string that we insert (function params)
+    let mut header: String;
+
+    for function in function_headers.iter() {
+        header = String::new();
+        output_vec.push(format!(
+            "\t#[ink(message{})]\n",
+            if function.payable {
+                String::from(", payable")
+            } else {
+                String::from("")
+            }
+        ));
+        header.push_str(format!("\tfn {}(", function.name.to_case(Case::Snake)).as_str());
+        // arguments
+        header.push_str(
+            format!(
+                "&{}self",
+                if function.view {
+                    String::from("")
+                } else {
+                    String::from("mut ")
+                }
+            )
+            .as_str(),
+        );
+        for param in function.params.iter() {
+            header.push_str(format!(", {}: {}", param.name, param.param_type).as_str());
+        }
+        header.push_str(")");
+        // return params
+        if !function.return_params.is_empty() {
+            header.push_str(" -> ");
+            if function.return_params.len() > 1 {
+                header.push_str("(");
+            }
+            for i in 0..function.return_params.len() {
+                header.push_str(
+                    format!(
+                        "{}{}",
+                        if i > 0 {
+                            String::from(", ")
+                        } else {
+                            String::from("")
+                        },
+                        function.return_params[i]
+                    )
+                    .as_str(),
+                );
+            }
+            if function.return_params.len() > 1 {
+                header.push_str(")");
+            }
+        }
+        header.push_str(";\n\n");
+        output_vec.push(header.to_owned());
     }
 
     output_vec

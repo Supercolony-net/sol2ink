@@ -17,11 +17,6 @@ pub struct ContractDefinition {
     pub contract_type: ContractType,
 }
 
-pub struct Interface {
-    pub imports: HashSet<String>,
-    pub functions: Vec<String>,
-}
-
 pub struct Contract {
     pub name: String,
     pub fields: Vec<ContractField>,
@@ -30,6 +25,15 @@ pub struct Contract {
     pub enums: Vec<Enum>,
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
+    pub imports: HashSet<String>,
+}
+
+pub struct Interface {
+    pub name: String,
+    pub events: Vec<Event>,
+    pub enums: Vec<Enum>,
+    pub structs: Vec<Struct>,
+    pub function_headers: Vec<FunctionHeader>,
     pub imports: HashSet<String>,
 }
 

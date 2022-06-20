@@ -38,25 +38,10 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
 
     match contract_definition.contract_type {
         structures::ContractType::INTERFACE => {
-            // TODO make it pretty
-            let (mut interface, imports) = {
-                let int = parser::parse_interface(contract_definition, lines);
-                (int.functions, int.imports)
-            };
-            let mut output_vec = Vec::from_iter(imports);
-            output_vec.append(interface.as_mut());
-            output_vec = output_vec
-                .iter()
-                .map(|line| {
-                    if line.contains(";") {
-                        line.to_owned() + "\n"
-                    } else {
-                        line.to_owned()
-                    }
-                })
-                .collect();
+            let interface = parser::parse_interface(contract_definition, lines);
+            let ink_trait = assembler::assemble_interface(interface);
             let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&output_vec, Some(file_name))?;
+            file_utils::write_file(&ink_trait, Some(file_name))?;
             println!("File saved!");
             Ok(())
         }
@@ -65,6 +50,7 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(&ink_contract, Some(file_name))?;
+            println!("File saved!");
             Ok(())
         }
     }
