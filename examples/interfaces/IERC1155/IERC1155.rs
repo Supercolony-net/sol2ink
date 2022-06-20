@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.2.1
+// Generated with Sol2Ink v0.2.2
 // https://github.com/Supercolony-net/sol2ink
 
 use ink::prelude::string::String;

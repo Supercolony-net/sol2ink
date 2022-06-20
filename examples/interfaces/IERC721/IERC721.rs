@@ -1,8 +1,8 @@
-// Generated with Sol2Ink v0.2.1
+// Generated with Sol2Ink v0.2.2
 // https://github.com/Supercolony-net/sol2ink
 
-use ink::prelude::vec::Vec;
 use brush::traits::AccountId;
+use ink::prelude::vec::Vec;
 
 #[ink(event)]
 pub struct Transfer {

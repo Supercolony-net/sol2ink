@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.2.1
+// Generated with Sol2Ink v0.2.2
 // https://github.com/Supercolony-net/sol2ink
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -6,9 +6,9 @@
 
 #[brush::contract]
 pub mod erc_20 {
+	use brush::traits::AccountId;
 	use ink_storage::Mapping;
 	use ink::prelude::string::String;
-	use brush::traits::AccountId;
 
 	#[ink(event)]
 	pub struct Transfer {
