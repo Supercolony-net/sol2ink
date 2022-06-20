@@ -3,19 +3,19 @@ use brush::traits::AccountId;
 #[ink(event)]
 pub struct Transfer {
 	#[ink(topic)]
-	Transfer: AccountId,
+	from: AccountId,
 	#[ink(topic)]
-	Transfer: AccountId,
-	Transfer: u128,
+	to: AccountId,
+	value: u128,
 }
 
 #[ink(event)]
 pub struct Approval {
 	#[ink(topic)]
-	Approval: AccountId,
+	owner: AccountId,
 	#[ink(topic)]
-	Approval: AccountId,
-	Approval: u128,
+	spender: AccountId,
+	value: u128,
 }
 
 #[brush::wrapper]

@@ -51,9 +51,11 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
     let mut struct_name: Option<String> = None;
     let mut struct_fields = Vec::<StructField>::new();
     let mut buffer = String::new();
+
+    let mut iterator = lines.iter();
     // read body of contract
-    for i in contract_definition.next_line..lines.len() {
-        let line = lines[i].trim().to_owned();
+    while let Some(raw_line) = iterator.next() {
+        let line = raw_line.trim().to_owned();
 
         if line.is_empty() {
             continue
@@ -68,7 +70,22 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
                 function_reader = FunctionReader::FUNCTION;
             }
         } else if line.substring(0, 5) == "event" {
-            events.push(parse_event(line, &mut imports));
+            if line.contains(";") {
+                events.push(parse_event(line, &mut imports));
+            } else {
+                buffer = line;
+
+                while let Some(raw_line) = iterator.next() {
+                    let line = raw_line.trim().to_owned();
+                    buffer.push_str(line.as_str());
+                    if line.contains(";") {
+                        buffer = buffer.replace(",", ", ");
+                        buffer = buffer.replace("  ", " ");
+                        events.push(parse_event(buffer.to_owned(), &mut imports));
+                        break
+                    }
+                }
+            }
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
@@ -88,6 +105,7 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
             if line.contains(";") {
                 buffer.push_str(line.as_str());
                 buffer = buffer.replace(",", ", ");
+                buffer = buffer.replace("  ", " ");
                 function_headers.push(parse_function_header(buffer.clone(), &mut imports));
                 function_reader = FunctionReader::NONE;
             } else {
@@ -470,18 +488,18 @@ fn parse_event(line: String, imports: &mut HashSet<String>) -> Event {
 
     for i in 2..tokens.len() {
         let mut token = tokens[i].to_owned();
-        if args_reader == ArgsReader::ARGTYPE {
-            field_type = convert_variable_type(token, imports);
-            args_reader = ArgsReader::ARGNAME;
-        } else if token == "indexed" {
+        if token == "indexed" {
             indexed = true;
             continue
+        } else if args_reader == ArgsReader::ARGTYPE {
+            field_type = convert_variable_type(token, imports);
+            args_reader = ArgsReader::ARGNAME;
         } else {
             token.remove_matches(&[',', ')', ';'][..]);
             fields.push(EventField {
                 indexed,
                 field_type: field_type.to_owned(),
-                name: name.to_owned(),
+                name: token.to_owned(),
             });
             indexed = false;
             args_reader = ArgsReader::ARGTYPE;

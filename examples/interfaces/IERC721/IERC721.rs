@@ -4,30 +4,30 @@ use ink::prelude::vec::Vec;
 #[ink(event)]
 pub struct Transfer {
 	#[ink(topic)]
-	Transfer: AccountId,
+	from: AccountId,
 	#[ink(topic)]
-	Transfer: AccountId,
+	to: AccountId,
 	#[ink(topic)]
-	Transfer: u128,
+	tokenId: u128,
 }
 
 #[ink(event)]
 pub struct Approval {
 	#[ink(topic)]
-	Approval: AccountId,
+	owner: AccountId,
 	#[ink(topic)]
-	Approval: AccountId,
+	approved: AccountId,
 	#[ink(topic)]
-	Approval: u128,
+	tokenId: u128,
 }
 
 #[ink(event)]
 pub struct ApprovalForAll {
 	#[ink(topic)]
-	ApprovalForAll: AccountId,
+	owner: AccountId,
 	#[ink(topic)]
-	ApprovalForAll: AccountId,
-	ApprovalForAll: bool,
+	operator: AccountId,
+	approved: bool,
 }
 
 #[brush::wrapper]
