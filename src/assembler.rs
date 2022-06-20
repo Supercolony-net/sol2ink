@@ -25,13 +25,13 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
     output_vec.push(String::from("\n"));
     // events
     append_and_tab(&mut output_vec, assemble_events(contract.events));
+    // structs
+    append_and_tab(&mut output_vec, assemble_structs(contract.structs));
     // fields
     append_and_tab(
         &mut output_vec,
         assemble_storage(contract.name.clone(), contract.fields),
     );
-    // structs
-    append_and_tab(&mut output_vec, assemble_structs(contract.structs));
     output_vec.push(format!("\timpl {} {{\n", contract.name));
     // constructor
     append_and_tab(&mut output_vec, assemble_constructor(contract.constructor));
@@ -99,7 +99,7 @@ fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
                 struct_field.name, struct_field.field_type
             ));
         }
-        output_vec.push(String::from("}\n"));
+        output_vec.push(String::from("}\n\n"));
     }
 
     output_vec

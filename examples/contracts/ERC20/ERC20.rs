@@ -25,6 +25,13 @@ pub mod erc_20 {
 		Approval: u128,
 	}
 
+	#[derive(Default, Encode, Decode)]
+	#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+	pub struct Struct {
+		pub field_1: u128,
+		pub field_2: u128,
+	}
+
 	#[ink(storage)]
 	#[derive(Default, SpreadAllocate)]
 	pub struct ERC20 {

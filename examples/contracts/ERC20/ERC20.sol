@@ -43,6 +43,14 @@ contract ERC20 {
      */
     event Approval(address indexed owner, address indexed spender, uint256 value);
 
+    /**
+     * This struct is added just to test struct parsing
+     */
+    struct Struct {
+        uint field1;
+        uint field2;
+    }
+
     mapping(address => uint256) private _balances;
 
     mapping(address => mapping(address => uint256)) private _allowances;

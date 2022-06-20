@@ -132,13 +132,15 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
 
     let mut fields = Vec::<ContractField>::new();
     let mut events = Vec::<Event>::new();
-    let structs = Vec::<Struct>::new();
+    let mut structs = Vec::<Struct>::new();
     let mut functions = Vec::<Function>::new();
     let mut statements = Vec::<Statement>::new();
     let mut imports = HashSet::<String>::new();
     let mut constructor = Function::default();
 
     let mut function_reader = FunctionReader::NONE;
+    let mut struct_name: Option<String> = None;
+    let mut struct_fields = Vec::<StructField>::new();
     let mut function_header = FunctionHeader::default();
     let mut open_braces = 0;
     let mut close_braces = 0;
@@ -193,7 +195,18 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         } else if line.substring(0, 5) == "event" {
             events.push(parse_event_new(line, &mut imports));
         } else if line.substring(0, 6) == "struct" {
-            // TODO parse struct
+            struct_name = Some(parse_struct_name(line));
+        } else if struct_name.is_some() {
+            if line == "}" {
+                structs.push(Struct {
+                    name: struct_name.unwrap(),
+                    fields: struct_fields,
+                });
+                struct_name = None;
+                struct_fields = Vec::<StructField>::new();
+            } else {
+                struct_fields.push(parse_struct_field(line, &mut imports));
+            }
         } else if function_reader != FunctionReader::NONE {
             if open_braces == 0 && line.contains("{") {
                 buffer.push_str(line.as_str());
@@ -490,6 +503,25 @@ fn parse_event_new(line: String, imports: &mut HashSet<String>) -> Event {
     }
 
     Event { name, fields }
+}
+
+fn parse_struct_name(line: String) -> String {
+    let tokens = line
+        .split(" ")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+    tokens[1].to_owned()
+}
+
+fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructField {
+    let tokens = line
+        .split(" ")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+    let field_type = convert_variable_type(tokens[0].to_owned(), imports);
+    let mut name = tokens[1].to_case(Case::Snake);
+    name.remove_matches(";");
+    StructField { name, field_type }
 }
 
 /// This function parses enum from one-liner enum

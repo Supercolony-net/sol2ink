@@ -53,6 +53,7 @@ pub struct Struct {
     pub fields: Vec<StructField>,
 }
 
+#[derive(Default, Clone)]
 pub struct StructField {
     pub name: String,
     pub field_type: String,
