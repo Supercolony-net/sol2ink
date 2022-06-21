@@ -89,10 +89,10 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
             let struct_name = parse_struct_name(line);
+            let mut struct_fields = Vec::<StructField>::new();
 
             while let Some(raw_line) = iterator.next() {
                 let line = raw_line.trim().to_owned();
-                let mut struct_fields = Vec::<StructField>::new();
 
                 if line == "}" {
                     structs.push(Struct {
@@ -131,8 +131,6 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let mut imports = HashSet::<String>::new();
     let mut constructor = Function::default();
 
-    let mut struct_name: Option<String> = None;
-    let mut struct_fields = Vec::<StructField>::new();
     // read body of contract
     let mut iterator = lines.iter();
     while let Some(raw_line) = iterator.next() {
@@ -242,17 +240,21 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
-            struct_name = Some(parse_struct_name(line));
-        } else if struct_name.is_some() {
-            if line == "}" {
-                structs.push(Struct {
-                    name: struct_name.unwrap(),
-                    fields: struct_fields,
-                });
-                struct_name = None;
-                struct_fields = Vec::<StructField>::new();
-            } else {
-                struct_fields.push(parse_struct_field(line, &mut imports));
+            let struct_name = parse_struct_name(line);
+            let mut struct_fields = Vec::<StructField>::new();
+
+            while let Some(raw_line) = iterator.next() {
+                let line = raw_line.trim().to_owned();
+
+                if line == "}" {
+                    structs.push(Struct {
+                        name: struct_name.to_owned(),
+                        fields: struct_fields,
+                    });
+                    break
+                } else {
+                    struct_fields.push(parse_struct_field(line, &mut imports));
+                }
             }
         } else if line == "}" {
             // end of contract
