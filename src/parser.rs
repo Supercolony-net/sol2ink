@@ -141,31 +141,15 @@ pub fn parse_contract(
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
-            let mut statements = Vec::<Statement>::new();
-            let mut function_header = FunctionHeader::default();
-
-            let mut open_braces = 0;
-            let mut close_braces = 0;
-
-            if line.contains("{") {
-                function_header = parse_function_header(line.clone(), &mut imports);
-                open_braces += line.matches("{").count();
-                close_braces += line.matches("}").count();
+            let function_header_raw = if line.contains("{") {
+                line
             } else {
-                let mut buffer = line.to_owned();
-
-                while let Some(raw_line) = iterator.next() {
-                    let line = raw_line.trim().to_owned();
-                    buffer.push_str(line.as_str());
-                    open_braces += line.matches("{").count();
-                    close_braces += line.matches("}").count();
-
-                    if line.contains("{") {
-                        function_header = parse_function_header(buffer.clone(), &mut imports);
-                        break
-                    }
-                }
-            }
+                compose_function_header(line, &mut iterator)?
+            };
+            let mut open_braces = function_header_raw.matches("{").count();
+            let mut close_braces = function_header_raw.matches("}").count();
+            let mut statements = Vec::<Statement>::new();
+            let function_header = parse_function_header(function_header_raw, &mut imports);
 
             while let Some(raw_line) = iterator.next() {
                 let line = raw_line.trim().to_owned();
