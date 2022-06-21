@@ -29,12 +29,12 @@ impl From<std::io::Error> for ParserError {
     }
 }
 
-/// This function will parse the code of an ink! interface (trait)
+/// Parses the code of a Solidity interface
 ///
-/// `contract_definition` the definition of the interfacet
+/// `contract_definition` the definition of the interface
 /// `lines` the solidity code of the interface
 ///
-/// returns the definition of the interface in form of `Interface` struct
+/// returns the representation of the interface as `Interface` struct
 pub fn parse_interface(
     contract_definition: ContractDefinition,
     lines: Vec<String>,
@@ -87,6 +87,12 @@ pub fn parse_interface(
     })
 }
 
+/// Parses the code of a Solidity contract
+///
+/// `contract_definition` the definition of the contract
+/// `lines` the solidity code of the contract
+///
+/// returns the representation of the contract as `Contract` struct
 pub fn parse_contract(
     contract_definition: ContractDefinition,
     lines: Vec<String>,
@@ -142,10 +148,12 @@ pub fn parse_contract(
     })
 }
 
-/// This function parses the field of a contract represented by `line`
-/// and adds imports to `imports`
+/// Parses a field of the contract
 ///
-/// returns the representation of contract field in `ContractField` struct
+/// `line` the raw representation of the field
+/// `imports` the HashSet of imports of the contract
+///
+/// returns the representation of contract field as `ContractField` struct
 fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
     // most mappings are written as `type => type`
     // we will make it `type=>type`
@@ -164,10 +172,12 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
     ContractField { field_type, name }
 }
 
-/// This function parses the function header represented by `line`
-/// and adds imports to `imports`
+/// Parses the function header of a Solidity function
 ///
-/// returns the representation of the function `Function` struct
+/// `line` the raw representation of the function header
+/// `imports` the set of imports of the contract
+///
+/// returns the representation of the function header as `FunctionHeader` struct
 fn parse_function_header(line: String, imports: &mut HashSet<String>) -> FunctionHeader {
     let split_by_left_brace = line
         .split("(")
@@ -210,13 +220,13 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
     }
 }
 
-/// This function parses the function from solidity file
+/// Parses the Solidity function
 ///
-/// `line` the first line where we found function or contract definition
+/// `line` the first line where we found function definition
 /// `imports` the set of imports of the contract
 /// `iterator` the iterator over lines of the contract file
 ///
-/// returns the function definition in form of `Function` struct
+/// returns the function definition as `Function` struct
 fn parse_function(
     line: String,
     imports: &mut HashSet<String>,
@@ -252,14 +262,13 @@ fn parse_function(
     })
 }
 
-/// This function will compose one line of a function header in case the header is
-/// divided into multiple lines
+/// Composes a function header in case the header is divided into multiple lines
 ///
-/// `line` the starting line
-/// `iterator` the iterator of file lines
+/// `line` the line where we found the function definition
+/// `iterator` the iterator over lines of the contract file
 ///
 /// returns `ParserError::ContractCorrupted` if we finish reading the contract without getting the output header
-/// returns multiline function header in form of one line
+/// returns multiline function header in the form of one line
 fn compose_function_header(
     line: String,
     iterator: &mut Iter<String>,
@@ -281,7 +290,9 @@ fn compose_function_header(
     return Err(ParserError::ContractCorrupted)
 }
 
-/// This function parses the statement in `line` into rust statement
+/// Parses the statement of a Solidity function
+///
+/// `line` the statement
 ///
 /// TODO: for now we only return the original statement and comment it
 ///
@@ -293,10 +304,10 @@ fn parse_statement(line: String) -> Statement {
 
 /// Parses parameters of a function
 ///
-/// `parameters` the String which contains the paramters of the function
+/// `parameters` the raw representation of the paramters of the function
 /// `imports` the Set of imports of the contract
 ///
-/// returns the vec of function parameters of this function
+/// returns the vec of function parameters of this function as `FunctionParam` struct
 fn parse_function_parameters(
     parameters: String,
     imports: &mut HashSet<String>,
@@ -340,7 +351,7 @@ fn parse_function_parameters(
 
 /// Parses attributes of a function like payable, external, view
 ///
-/// `attributes` the String which contains the attributes of the function
+/// `attributes` the raw representation of the attributes of the function
 ///
 /// returns 0. external 1. view 2. payable
 fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
@@ -399,11 +410,13 @@ fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) ->
     out
 }
 
-/// This function parses event
+/// Parses Solidity event
 ///
-/// `line` the Solidity event definition
+/// `line` the first line where we found event definition
+/// `imports` the set of imports of the contract
+/// `iterator` the iterator over lines of the contract file
 ///
-/// returns the event definition in ink! along with imports needed by this event
+/// returns the event definition as `Event` struct
 fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<String>) -> Event {
     let event_raw = if line.contains(";") {
         line
@@ -454,19 +467,23 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
     Event { name, fields }
 }
 
-/// This function parses the Solidity structure
+/// Parses Solidity structure
 ///
-/// `line` the Solidity struct definition
-/// `imports` the HashSet of imports of the contract
-/// `iterator` the iterator over the Solidity code
+/// `line` the first line where we found struct definition
+/// `imports` the set of imports of the contract
+/// `iterator` the iterator over lines of the contract file
 ///
-/// returns the struct definition in form of `Struct` struct
+/// returns the struct definition as `Struct` struct
 fn parse_struct(
     line: String,
     imports: &mut HashSet<String>,
     iterator: &mut Iter<String>,
 ) -> Result<Struct, ParserError> {
-    let struct_name = parse_struct_name(line);
+    let struct_name = line
+        .split(" ")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>()[1]
+        .to_owned();
     let mut struct_fields = Vec::<StructField>::new();
 
     while let Some(raw_line) = iterator.next() {
@@ -485,24 +502,12 @@ fn parse_struct(
     Err(ParserError::ContractCorrupted)
 }
 
-/// This function parses struct name
+/// Parses struct fields
 ///
-/// `line` the Solidity struct definition
+/// `line` the Solidity definition of the struct field
+/// `imports` the HashSet of imports of the contract
 ///
-/// returns the struct name
-fn parse_struct_name(line: String) -> String {
-    let tokens = line
-        .split(" ")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
-    tokens[1].to_owned()
-}
-
-/// This function parses struct fields
-///
-/// `line` the Solidity definition of the struct fields
-///
-/// returns the field in form of `StructField` struct
+/// returns the struct field as `StructField` struct
 fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructField {
     let tokens = line
         .split(" ")
@@ -514,11 +519,11 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
     StructField { name, field_type }
 }
 
-/// This function parses enum
+/// Parses Solidity enum
 ///
 /// `line` the Solidity definition of enum
 ///
-/// returns the enum in form of `Enum` struct
+/// returns the enum as `Enum` struct
 fn parse_enum(line: String) -> Enum {
     let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
     let name = tokens[1].to_owned();
@@ -536,12 +541,12 @@ fn parse_enum(line: String) -> Enum {
     Enum { name, values }
 }
 
-/// this function looks for `contract Contract` or `interface Interface` definition in solidity file
+/// Looks for `contract Contract` or `interface Interface` definition in solidity file
 ///
 /// `lines` the lines of original solidity code
 ///
 /// returns `NoContractDefinitionFound` if no definition of a contract nor interface was found
-/// return the definition of the contract
+/// returns the definition of the contract
 pub fn parse_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, ParserError> {
     for i in 0..lines.len() {
         let line = lines[i].trim();
@@ -567,10 +572,10 @@ pub fn parse_contract_definition(lines: &Vec<String>) -> Result<ContractDefiniti
     Err(ParserError::NoContractDefinitionFound)
 }
 
-/// converts solidity argument type to ink! argument type (eg. address -> AccountId, uint -> u128)
+/// Converts solidity variable type to ink! variable type (eg. address -> AccountId, uint -> u128, ...)
 ///
 /// `arg_type` solidity argument type
-/// `imports` the set of imports
+/// `imports` the set of imports of the contract
 ///
 /// return the converted type
 fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> String {
