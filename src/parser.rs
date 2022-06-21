@@ -29,10 +29,12 @@ impl From<std::io::Error> for ParserError {
     }
 }
 
-/// This function will build the code of an ink! interface (trait)
+/// This function will parse the code of an ink! interface (trait)
 ///
 /// `contract_definition` the definition of the interfacet
 /// `lines` the solidity code of the interface
+///
+/// returns the definition of the interface in form of `Interface` struct
 pub fn parse_interface(
     contract_definition: ContractDefinition,
     lines: Vec<String>,
@@ -68,22 +70,7 @@ pub fn parse_interface(
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
-            let struct_name = parse_struct_name(line);
-            let mut struct_fields = Vec::<StructField>::new();
-
-            while let Some(raw_line) = iterator.next() {
-                let line = raw_line.trim().to_owned();
-
-                if line == "}" {
-                    structs.push(Struct {
-                        name: struct_name.to_owned(),
-                        fields: struct_fields,
-                    });
-                    break
-                } else {
-                    struct_fields.push(parse_struct_field(line, &mut imports));
-                }
-            }
+            structs.push(parse_struct(line, &mut imports, &mut iterator)?);
         } else if line == "}" {
             // end of contract
             continue
@@ -134,22 +121,7 @@ pub fn parse_contract(
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
-            let struct_name = parse_struct_name(line);
-            let mut struct_fields = Vec::<StructField>::new();
-
-            while let Some(raw_line) = iterator.next() {
-                let line = raw_line.trim().to_owned();
-
-                if line == "}" {
-                    structs.push(Struct {
-                        name: struct_name.to_owned(),
-                        fields: struct_fields,
-                    });
-                    break
-                } else {
-                    struct_fields.push(parse_struct_field(line, &mut imports));
-                }
-            }
+            structs.push(parse_struct(line, &mut imports, &mut iterator)?);
         } else if line == "}" {
             // end of contract
             continue
@@ -480,6 +452,37 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
     }
 
     Event { name, fields }
+}
+
+/// This function parses the Solidity structure
+///
+/// `line` the Solidity struct definition
+/// `imports` the HashSet of imports of the contract
+/// `iterator` the iterator over the Solidity code
+///
+/// returns the struct definition in form of `Struct` struct
+fn parse_struct(
+    line: String,
+    imports: &mut HashSet<String>,
+    iterator: &mut Iter<String>,
+) -> Result<Struct, ParserError> {
+    let struct_name = parse_struct_name(line);
+    let mut struct_fields = Vec::<StructField>::new();
+
+    while let Some(raw_line) = iterator.next() {
+        let line = raw_line.trim().to_owned();
+
+        if line == "}" {
+            return Ok(Struct {
+                name: struct_name.to_owned(),
+                fields: struct_fields,
+            })
+        } else {
+            struct_fields.push(parse_struct_field(line, imports));
+        }
+    }
+
+    Err(ParserError::ContractCorrupted)
 }
 
 /// This function parses struct name
