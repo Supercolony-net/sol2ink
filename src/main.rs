@@ -38,7 +38,7 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
 
     match contract_definition.contract_type {
         structures::ContractType::INTERFACE => {
-            let interface = parser::parse_interface(contract_definition, lines);
+            let interface = parser::parse_interface(contract_definition, lines)?;
             let ink_trait = assembler::assemble_interface(interface);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(&ink_trait, Some(file_name))?;
@@ -46,7 +46,7 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
             Ok(())
         }
         structures::ContractType::CONTRACT => {
-            let contract = parser::parse_contract(contract_definition, lines);
+            let contract = parser::parse_contract(contract_definition, lines)?;
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(&ink_contract, Some(file_name))?;

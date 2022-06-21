@@ -6,6 +6,7 @@ use convert_case::{
 use std::{
     collections::HashSet,
     lazy::Lazy,
+    slice::Iter,
 };
 use substring::Substring;
 
@@ -18,6 +19,7 @@ enum ArgsReader {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ParserError {
     FileError(String),
+    ContractCorrupted,
     NoContractDefinitionFound,
 }
 
@@ -27,11 +29,14 @@ impl From<std::io::Error> for ParserError {
     }
 }
 
-/// This function will build the code of a ink! interface (trait) without function bodies
+/// This function will build the code of an ink! interface (trait)
 ///
 /// `contract_definition` the definition of the interfacet
 /// `lines` the solidity code of the interface
-pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<String>) -> Interface {
+pub fn parse_interface(
+    contract_definition: ContractDefinition,
+    lines: Vec<String>,
+) -> Result<Interface, ParserError> {
     let name = contract_definition.contract_name;
 
     let mut events = Vec::<Event>::new();
@@ -51,22 +56,12 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
             // TODO parse comments
         } else if line.substring(0, 8) == "function" {
             if line.contains(";") {
-                function_headers.push(parse_function_header(line.clone(), &mut imports));
+                function_headers.push(parse_function_header(line, &mut imports));
             } else {
-                let mut buffer = line.to_owned();
-
-                while let Some(raw_line) = iterator.next() {
-                    let line = raw_line.trim().to_owned();
-                    if line.contains(";") {
-                        buffer.push_str(line.as_str());
-                        buffer = buffer.replace(",", ", ");
-                        buffer = buffer.replace("  ", " ");
-                        function_headers.push(parse_function_header(buffer.clone(), &mut imports));
-                        break
-                    } else {
-                        buffer.push_str(line.as_str());
-                    }
-                }
+                function_headers.push(parse_function_header(
+                    compose_function_header(line, &mut iterator)?,
+                    &mut imports,
+                ));
             }
         } else if line.substring(0, 5) == "event" {
             if line.contains(";") {
@@ -110,17 +105,20 @@ pub fn parse_interface(contract_definition: ContractDefinition, lines: Vec<Strin
         }
     }
 
-    Interface {
+    Ok(Interface {
         name,
         events,
         enums,
         structs,
         function_headers,
         imports,
-    }
+    })
 }
 
-pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String>) -> Contract {
+pub fn parse_contract(
+    contract_definition: ContractDefinition,
+    lines: Vec<String>,
+) -> Result<Contract, ParserError> {
     let name = contract_definition.contract_name;
 
     let mut fields = Vec::<ContractField>::new();
@@ -188,34 +186,15 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
                 body: statements,
             };
         } else if line.substring(0, 8) == "function" {
-            let mut statements = Vec::<Statement>::new();
-            let mut function_header = FunctionHeader::default();
-
-            let mut open_braces = 0;
-            let mut close_braces = 0;
-
-            if line.contains("{") {
-                function_header = parse_function_header(line.clone(), &mut imports);
-                open_braces += line.matches("{").count();
-                close_braces += line.matches("}").count();
+            let function_header_raw = if line.contains("{") {
+                line
             } else {
-                let mut buffer = line.to_owned();
-
-                while let Some(raw_line) = iterator.next() {
-                    let line = raw_line.trim().to_owned();
-                    buffer.push_str(line.as_str());
-                    buffer = buffer.replace(",", ", ");
-                    buffer = buffer.replace("  ", " ");
-
-                    open_braces += line.matches("{").count();
-                    close_braces += line.matches("}").count();
-
-                    if line.contains("{") {
-                        function_header = parse_function_header(buffer.clone(), &mut imports);
-                        break
-                    }
-                }
-            }
+                compose_function_header(line, &mut iterator)?
+            };
+            let mut open_braces = function_header_raw.matches("{").count();
+            let mut close_braces = function_header_raw.matches("}").count();
+            let mut statements = Vec::<Statement>::new();
+            let function_header = parse_function_header(function_header_raw, &mut imports);
 
             while let Some(raw_line) = iterator.next() {
                 let line = raw_line.trim().to_owned();
@@ -264,7 +243,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         }
     }
 
-    Contract {
+    Ok(Contract {
         name,
         fields,
         constructor,
@@ -273,7 +252,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         structs,
         functions,
         imports,
-    }
+    })
 }
 
 /// This function parses the field of a contract represented by `line`
@@ -342,6 +321,35 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
         payable,
         return_params,
     }
+}
+
+/// This function will compose one line of a function header in case the header is
+/// divided into multiple lines
+///
+/// `line` the starting line
+/// `iterator` the iterator of file lines
+///
+/// returns `ParserError::ContractCorrupted` if we finish reading the contract without getting the output header
+/// returns multiline function header in form of one line
+fn compose_function_header(
+    line: String,
+    iterator: &mut Iter<String>,
+) -> Result<String, ParserError> {
+    let mut buffer = line;
+
+    while let Some(raw_line) = iterator.next() {
+        let line = raw_line.trim().to_owned();
+        if line.contains(";") || line.contains("{") {
+            buffer.push_str(line.as_str());
+            buffer = buffer.replace(",", ", ");
+            buffer = buffer.replace("  ", " ");
+            return Ok(buffer)
+        } else {
+            buffer.push_str(line.as_str());
+        }
+    }
+
+    return Err(ParserError::ContractCorrupted)
 }
 
 /// This function parses the statement in `line` into rust statement
