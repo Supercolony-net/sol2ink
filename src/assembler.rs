@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     formatter::append_and_tab,
     structures::*,
@@ -23,7 +25,7 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
     ));
 
     // imports
-    append_and_tab(&mut output_vec, Vec::from_iter(contract.imports));
+    append_and_tab(&mut output_vec, assemble_imports(contract.imports));
     output_vec.push(String::from("\n"));
     // enums
     append_and_tab(&mut output_vec, assemble_events(contract.events));
@@ -53,7 +55,7 @@ pub fn assemble_interface(interface: Interface) -> Vec<String> {
 
     output_vec.append(signature().as_mut());
     // imports
-    output_vec.append(Vec::from_iter(interface.imports).as_mut());
+    output_vec.append(assemble_imports(interface.imports).as_mut());
     output_vec.push(String::from("\n"));
 
     // events
@@ -76,6 +78,13 @@ pub fn assemble_interface(interface: Interface) -> Vec<String> {
     output_vec.append(assemble_function_headers(interface.function_headers).as_mut());
     output_vec.push(String::from("}\n"));
 
+    output_vec
+}
+
+/// This function will assemble imports -> sort them and return as Vec
+fn assemble_imports(imports: HashSet<String>) -> Vec<String> {
+    let mut output_vec = Vec::from_iter(imports);
+    output_vec.sort();
     output_vec
 }
 

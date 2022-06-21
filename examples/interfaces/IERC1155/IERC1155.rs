@@ -2,8 +2,8 @@
 // https://github.com/Supercolony-net/sol2ink
 
 use brush::traits::AccountId;
-use ink::prelude::vec::Vec;
 use ink::prelude::string::String;
+use ink::prelude::vec::Vec;
 
 #[ink(event)]
 pub struct TransferSingle {
