@@ -616,9 +616,9 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         };
         return format!("Mapping<{}, {}>", from, to)
     }
-    let output_type = match no_array_arg_type {
-        "uint8" => String::from("u8"),
-        "uint256" | "uint" => String::from("u128"),
+    let output_type = match convert_int(no_array_arg_type.to_string()).as_str() {
+        str if str.contains("uint") => str.replace("uint", "u"),
+        str if str.contains("int") => str.replace("int", "i"),
         "bytes" => {
             imports.insert(String::from("use ink::prelude::vec::Vec;\n"));
             String::from("Vec<u8>")
@@ -640,4 +640,38 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
     } else {
         output_type
     }
+}
+
+fn convert_int(arg_type: String) -> String {
+    if arg_type.contains("int") {
+        let int_size = if arg_type == "int" || arg_type == "uint" {
+            128
+        } else {
+            let original_size = arg_type
+                .substring(
+                    if arg_type.substring(0, 3) == "int" {
+                        3
+                    } else {
+                        4
+                    },
+                    arg_type.len(),
+                )
+                .parse::<i32>()
+                .unwrap();
+
+            match original_size {
+                i if i <= 8 => 8,
+                i if i <= 16 => 16,
+                i if i <= 32 => 32,
+                i if i <= 64 => 64,
+                _ => 128,
+            }
+        };
+        return if arg_type.contains("uint") {
+            format!("uint{}", int_size)
+        } else {
+            format!("int{}", int_size)
+        }
+    }
+    arg_type
 }

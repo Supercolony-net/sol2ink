@@ -1,5 +1,6 @@
 #![feature(once_cell)]
 #![feature(string_remove_matches)]
+#![feature(exclusive_range_pattern)]
 
 pub mod assembler;
 pub mod file_utils;
