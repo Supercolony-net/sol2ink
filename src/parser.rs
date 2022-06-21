@@ -158,25 +158,50 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
-            // TODO parse constructor
-            function_reader = FunctionReader::CONSTRUCTOR;
+            let mut statements = Vec::<Statement>::new();
+            let mut function_header = FunctionHeader::default();
+
+            let mut open_braces = 0;
+            let mut close_braces = 0;
+
             if line.contains("{") {
-                statements = Vec::<Statement>::new();
                 function_header = parse_function_header(line.clone(), &mut imports);
+                open_braces += line.matches("{").count();
+                close_braces += line.matches("}").count();
             } else {
-                buffer = line.to_owned();
+                let mut buffer = line.to_owned();
+
+                while let Some(raw_line) = iterator.next() {
+                    let line = raw_line.trim().to_owned();
+                    buffer.push_str(line.as_str());
+                    open_braces += line.matches("{").count();
+                    close_braces += line.matches("}").count();
+
+                    if line.contains("{") {
+                        function_header = parse_function_header(buffer.clone(), &mut imports);
+                        break
+                    }
+                }
             }
-            let function_maybe = update_in_function(
-                line,
-                &mut open_braces,
-                &mut close_braces,
-                &mut function_reader,
-                Some(function_header.clone()),
-                Some(statements.clone()),
-            );
-            if function_maybe.is_some() {
-                constructor = function_maybe.unwrap();
+
+            while let Some(raw_line) = iterator.next() {
+                let line = raw_line.trim().to_owned();
+
+                open_braces += line.matches("{").count();
+                close_braces += line.matches("}").count();
+
+                if line == "}" && open_braces == close_braces {
+                    break
+                }
+
+                statements.push(parse_statement(line.to_owned()));
             }
+
+            constructor = Function {
+                header: function_header,
+                constructor: true,
+                body: statements,
+            };
         } else if line.substring(0, 8) == "function" {
             function_reader = FunctionReader::FUNCTION;
             if line.contains("{") {
@@ -234,7 +259,7 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
             );
             if function_maybe.is_some() {
                 let function = function_maybe.unwrap();
-                if function.cosntructor {
+                if function.constructor {
                     constructor = function;
                 } else {
                     functions.push(function);
@@ -276,7 +301,7 @@ fn update_in_function(
         if header.is_some() {
             output = Some(Function {
                 header: header.unwrap(),
-                cosntructor: *function_reader == FunctionReader::CONSTRUCTOR,
+                constructor: *function_reader == FunctionReader::CONSTRUCTOR,
                 body: statements.unwrap(),
             });
         }

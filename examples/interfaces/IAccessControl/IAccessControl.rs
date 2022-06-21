@@ -8,9 +8,9 @@ pub struct RoleAdminChanged {
 	#[ink(topic)]
 	role: [u8; 32],
 	#[ink(topic)]
-	previousAdminRole: [u8; 32],
+	previous_admin_role: [u8; 32],
 	#[ink(topic)]
-	newAdminRole: [u8; 32],
+	new_admin_role: [u8; 32],
 }
 
 #[ink(event)]

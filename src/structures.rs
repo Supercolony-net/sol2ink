@@ -72,7 +72,7 @@ pub struct StructField {
 #[derive(Default, Clone)]
 pub struct Function {
     pub header: FunctionHeader,
-    pub cosntructor: bool,
+    pub constructor: bool,
     pub body: Vec<Statement>,
 }
 

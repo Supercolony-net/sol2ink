@@ -1,8 +1,8 @@
 // Generated with Sol2Ink v0.2.2
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
 use ink::prelude::vec::Vec;
+use brush::traits::AccountId;
 
 #[ink(event)]
 pub struct Transfer {
@@ -11,7 +11,7 @@ pub struct Transfer {
 	#[ink(topic)]
 	to: AccountId,
 	#[ink(topic)]
-	tokenId: u128,
+	token_id: u128,
 }
 
 #[ink(event)]
@@ -21,7 +21,7 @@ pub struct Approval {
 	#[ink(topic)]
 	approved: AccountId,
 	#[ink(topic)]
-	tokenId: u128,
+	token_id: u128,
 }
 
 #[ink(event)]
