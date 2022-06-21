@@ -6,7 +6,9 @@ use std::{
     },
 };
 
-/// This function reads the file to be transpiled and returns it as string
+/// Reads the file to be transpiled and returns it as string
+/// 
+/// `path` the path to the file
 pub fn read_file(path: &String) -> std::io::Result<String> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
