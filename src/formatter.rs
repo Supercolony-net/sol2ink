@@ -1,5 +1,4 @@
-/// This function will append `appended` vec of Strings to `output` vec of strings
-/// and add a tab to the front
+/// Appends `appended` vec of Strings to `output` vec of strings and adds a tab to the front
 pub fn append_and_tab(output: &mut Vec<String>, appended: Vec<String>) {
     output.append(
         appended
