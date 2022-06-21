@@ -141,63 +141,9 @@ pub fn parse_contract(
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
-            let function_header_raw = if line.contains("{") {
-                line
-            } else {
-                compose_function_header(line, &mut iterator)?
-            };
-            let mut open_braces = function_header_raw.matches("{").count();
-            let mut close_braces = function_header_raw.matches("}").count();
-            let mut statements = Vec::<Statement>::new();
-            let function_header = parse_function_header(function_header_raw, &mut imports);
-
-            while let Some(raw_line) = iterator.next() {
-                let line = raw_line.trim().to_owned();
-
-                open_braces += line.matches("{").count();
-                close_braces += line.matches("}").count();
-
-                if line == "}" && open_braces == close_braces {
-                    break
-                }
-
-                statements.push(parse_statement(line.to_owned()));
-            }
-
-            constructor = Function {
-                header: function_header,
-                constructor: true,
-                body: statements,
-            };
+            constructor = parse_function(line, &mut imports, &mut iterator)?;
         } else if line.substring(0, 8) == "function" {
-            let function_header_raw = if line.contains("{") {
-                line
-            } else {
-                compose_function_header(line, &mut iterator)?
-            };
-            let mut open_braces = function_header_raw.matches("{").count();
-            let mut close_braces = function_header_raw.matches("}").count();
-            let mut statements = Vec::<Statement>::new();
-            let function_header = parse_function_header(function_header_raw, &mut imports);
-
-            while let Some(raw_line) = iterator.next() {
-                let line = raw_line.trim().to_owned();
-
-                open_braces += line.matches("{").count();
-                close_braces += line.matches("}").count();
-
-                if line == "}" && open_braces == close_braces {
-                    break
-                }
-
-                statements.push(parse_statement(line.to_owned()));
-            }
-
-            functions.push(Function {
-                header: function_header,
-                constructor: false,
-                body: statements,
-            });
+            functions.push(parse_function(line, &mut imports, &mut iterator)?);
         } else if line.substring(0, 5) == "event" {
             events.push(parse_event(line, &mut imports));
         } else if line.substring(0, 4) == "enum" {
@@ -305,6 +251,48 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
         payable,
         return_params,
     }
+}
+
+/// This function parses the function from solidity file
+///
+/// `line` the first line where we found function or contract definition
+/// `imports` the set of imports of the contract
+/// `iterator` the iterator over lines of the contract file
+///
+/// returns the function definition in form of `Function` struct
+fn parse_function(
+    line: String,
+    imports: &mut HashSet<String>,
+    iterator: &mut Iter<String>,
+) -> Result<Function, ParserError> {
+    let function_header_raw = if line.contains("{") {
+        line
+    } else {
+        compose_function_header(line, iterator)?
+    };
+    let mut open_braces = function_header_raw.matches("{").count();
+    let mut close_braces = function_header_raw.matches("}").count();
+    let function_header = parse_function_header(function_header_raw, imports);
+    let mut statements = Vec::<Statement>::new();
+
+    while let Some(raw_line) = iterator.next() {
+        let line = raw_line.trim().to_owned();
+
+        open_braces += line.matches("{").count();
+        close_braces += line.matches("}").count();
+
+        if line == "}" && open_braces == close_braces {
+            break
+        }
+
+        statements.push(parse_statement(line.to_owned()));
+    }
+
+    Ok(Function {
+        header: function_header,
+        constructor: false,
+        body: statements,
+    })
 }
 
 /// This function will compose one line of a function header in case the header is
