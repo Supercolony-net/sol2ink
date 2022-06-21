@@ -64,22 +64,7 @@ pub fn parse_interface(
                 ));
             }
         } else if line.substring(0, 5) == "event" {
-            if line.contains(";") {
-                events.push(parse_event(line, &mut imports));
-            } else {
-                let mut buffer = line;
-
-                while let Some(raw_line) = iterator.next() {
-                    let line = raw_line.trim().to_owned();
-                    buffer.push_str(line.as_str());
-                    if line.contains(";") {
-                        buffer = buffer.replace(",", ", ");
-                        buffer = buffer.replace("  ", " ");
-                        events.push(parse_event(buffer.to_owned(), &mut imports));
-                        break
-                    }
-                }
-            }
+            events.push(parse_event(line, &mut imports, &mut iterator));
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
@@ -145,7 +130,7 @@ pub fn parse_contract(
         } else if line.substring(0, 8) == "function" {
             functions.push(parse_function(line, &mut imports, &mut iterator)?);
         } else if line.substring(0, 5) == "event" {
-            events.push(parse_event(line, &mut imports));
+            events.push(parse_event(line, &mut imports, &mut iterator));
         } else if line.substring(0, 4) == "enum" {
             enums.push(parse_enum(line));
         } else if line.substring(0, 6) == "struct" {
@@ -447,9 +432,25 @@ fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) ->
 /// `line` the Solidity event definition
 ///
 /// returns the event definition in ink! along with imports needed by this event
-fn parse_event(line: String, imports: &mut HashSet<String>) -> Event {
-    let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
+fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<String>) -> Event {
+    let event_raw = if line.contains(";") {
+        line
+    } else {
+        let mut buffer = line;
 
+        while let Some(raw_line) = iterator.next() {
+            let line = raw_line.trim().to_owned();
+            buffer.push_str(line.as_str());
+            if line.contains(";") {
+                buffer = buffer.replace(",", ", ");
+                buffer = buffer.replace("  ", " ");
+                break
+            }
+        }
+        buffer
+    };
+
+    let tokens: Vec<String> = event_raw.split(' ').map(|s| s.to_owned()).collect();
     let mut args_reader = ArgsReader::ARGNAME;
     let mut indexed = false;
     // we assume Approval(address, didnt get split by white space
