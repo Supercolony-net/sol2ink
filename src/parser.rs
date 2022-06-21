@@ -15,13 +15,6 @@ enum ArgsReader {
     ARGNAME,
 }
 
-#[derive(Debug, PartialEq)]
-enum FunctionReader {
-    FUNCTION,
-    CONSTRUCTOR,
-    NONE,
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub enum ParserError {
     FileError(String),
@@ -135,17 +128,11 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
     let mut enums = Vec::<Enum>::new();
     let mut structs = Vec::<Struct>::new();
     let mut functions = Vec::<Function>::new();
-    let mut statements = Vec::<Statement>::new();
     let mut imports = HashSet::<String>::new();
     let mut constructor = Function::default();
 
-    let mut function_reader = FunctionReader::NONE;
     let mut struct_name: Option<String> = None;
     let mut struct_fields = Vec::<StructField>::new();
-    let mut function_header = FunctionHeader::default();
-    let mut open_braces = 0;
-    let mut close_braces = 0;
-    let mut buffer = String::new();
     // read body of contract
     let mut iterator = lines.iter();
     while let Some(raw_line) = iterator.next() {
@@ -203,24 +190,53 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
                 body: statements,
             };
         } else if line.substring(0, 8) == "function" {
-            function_reader = FunctionReader::FUNCTION;
+            let mut statements = Vec::<Statement>::new();
+            let mut function_header = FunctionHeader::default();
+
+            let mut open_braces = 0;
+            let mut close_braces = 0;
+
             if line.contains("{") {
-                statements = Vec::<Statement>::new();
                 function_header = parse_function_header(line.clone(), &mut imports);
+                open_braces += line.matches("{").count();
+                close_braces += line.matches("}").count();
             } else {
-                buffer = line.to_owned();
+                let mut buffer = line.to_owned();
+
+                while let Some(raw_line) = iterator.next() {
+                    let line = raw_line.trim().to_owned();
+                    buffer.push_str(line.as_str());
+                    buffer = buffer.replace(",", ", ");
+                    buffer = buffer.replace("  ", " ");
+
+                    open_braces += line.matches("{").count();
+                    close_braces += line.matches("}").count();
+
+                    if line.contains("{") {
+                        function_header = parse_function_header(buffer.clone(), &mut imports);
+                        break
+                    }
+                }
             }
-            let function_maybe = update_in_function(
-                line,
-                &mut open_braces,
-                &mut close_braces,
-                &mut function_reader,
-                Some(function_header.clone()),
-                Some(statements.clone()),
-            );
-            if function_maybe.is_some() {
-                functions.push(function_maybe.unwrap());
+
+            while let Some(raw_line) = iterator.next() {
+                let line = raw_line.trim().to_owned();
+
+                open_braces += line.matches("{").count();
+                close_braces += line.matches("}").count();
+
+                if line == "}" && open_braces == close_braces {
+                    break
+                }
+
+                statements.push(parse_statement(line.to_owned()));
             }
+
+            functions.push(Function {
+                header: function_header,
+                constructor: false,
+                body: statements,
+            });
         } else if line.substring(0, 5) == "event" {
             events.push(parse_event(line, &mut imports));
         } else if line.substring(0, 4) == "enum" {
@@ -237,33 +253,6 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
                 struct_fields = Vec::<StructField>::new();
             } else {
                 struct_fields.push(parse_struct_field(line, &mut imports));
-            }
-        } else if function_reader != FunctionReader::NONE {
-            if open_braces == 0 && line.contains("{") {
-                buffer.push_str(line.as_str());
-                buffer = buffer.replace(",", ", ");
-                function_header = parse_function_header(buffer.clone(), &mut imports);
-                statements = Vec::<Statement>::new();
-            } else if open_braces == 0 {
-                buffer.push_str(line.as_str());
-            } else if !line.contains("}") || open_braces != close_braces + 1 {
-                statements.push(parse_statement(line.clone()));
-            }
-            let function_maybe = update_in_function(
-                line,
-                &mut open_braces,
-                &mut close_braces,
-                &mut function_reader,
-                Some(function_header.clone()),
-                Some(statements.clone()),
-            );
-            if function_maybe.is_some() {
-                let function = function_maybe.unwrap();
-                if function.constructor {
-                    constructor = function;
-                } else {
-                    functions.push(function);
-                }
             }
         } else if line == "}" {
             // end of contract
@@ -283,33 +272,6 @@ pub fn parse_contract(contract_definition: ContractDefinition, lines: Vec<String
         functions,
         imports,
     }
-}
-
-/// This function updates the count of opne and close braces and ends reading of function if conditions are met
-fn update_in_function(
-    line: String,
-    open_braces: &mut usize,
-    close_braces: &mut usize,
-    function_reader: &mut FunctionReader,
-    header: Option<FunctionHeader>,
-    statements: Option<Vec<Statement>>,
-) -> Option<Function> {
-    *open_braces += line.matches("{").count();
-    *close_braces += line.matches("}").count();
-    let mut output = None;
-    if *open_braces == *close_braces && *open_braces > 0 {
-        if header.is_some() {
-            output = Some(Function {
-                header: header.unwrap(),
-                constructor: *function_reader == FunctionReader::CONSTRUCTOR,
-                body: statements.unwrap(),
-            });
-        }
-        *function_reader = FunctionReader::NONE;
-        *open_braces = 0;
-        *close_braces = 0;
-    }
-    output
 }
 
 /// This function parses the field of a contract represented by `line`

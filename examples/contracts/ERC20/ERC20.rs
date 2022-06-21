@@ -7,8 +7,8 @@
 #[brush::contract]
 pub mod erc_20 {
 	use brush::traits::AccountId;
-	use ink_storage::Mapping;
 	use ink::prelude::string::String;
+	use ink_storage::Mapping;
 
 	#[ink(event)]
 	pub struct Transfer {
@@ -136,6 +136,7 @@ pub mod erc_20 {
 			// unchecked {
 			// _approve(owner, spender, currentAllowance - subtractedValue);
 			// }
+			// 
 			// return true;
 			todo!()
 		}
@@ -143,38 +144,49 @@ pub mod erc_20 {
 		fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
 			// require(from != address(0), "ERC20: transfer from the zero address");
 			// require(to != address(0), "ERC20: transfer to the zero address");
+			// 
 			// _beforeTokenTransfer(from, to, amount);
+			// 
 			// uint256 fromBalance = _balances[from];
 			// require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
 			// unchecked {
 			// _balances[from] = fromBalance - amount;
 			// }
 			// _balances[to] += amount;
+			// 
 			// emit Transfer(from, to, amount);
+			// 
 			// _afterTokenTransfer(from, to, amount);
 			todo!()
 		}
 	
 		fn _mint(&mut self, account: AccountId, amount: u128) {
 			// require(account != address(0), "ERC20: mint to the zero address");
+			// 
 			// _beforeTokenTransfer(address(0), account, amount);
+			// 
 			// _totalSupply += amount;
 			// _balances[account] += amount;
 			// emit Transfer(address(0), account, amount);
+			// 
 			// _afterTokenTransfer(address(0), account, amount);
 			todo!()
 		}
 	
 		fn _burn(&mut self, account: AccountId, amount: u128) {
 			// require(account != address(0), "ERC20: burn from the zero address");
+			// 
 			// _beforeTokenTransfer(account, address(0), amount);
+			// 
 			// uint256 accountBalance = _balances[account];
 			// require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
 			// unchecked {
 			// _balances[account] = accountBalance - amount;
 			// }
 			// _totalSupply -= amount;
+			// 
 			// emit Transfer(account, address(0), amount);
+			// 
 			// _afterTokenTransfer(account, address(0), amount);
 			todo!()
 		}
@@ -182,6 +194,7 @@ pub mod erc_20 {
 		fn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
 			// require(owner != address(0), "ERC20: approve from the zero address");
 			// require(spender != address(0), "ERC20: approve to the zero address");
+			// 
 			// _allowances[owner][spender] = amount;
 			// emit Approval(owner, spender, amount);
 			todo!()
@@ -199,10 +212,27 @@ pub mod erc_20 {
 		}
 	
 		fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
-			todo!()
-		}
-	
-		fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+			// 
+			// /**
+			// * @dev Hook that is called after any transfer of tokens. This includes
+			// * minting and burning.
+			// *
+			// * Calling conditions:
+			// *
+			// * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+			// * has been transferred to `to`.
+			// * - when `from` is zero, `amount` tokens have been minted for `to`.
+			// * - when `to` is zero, `amount` of ``from``'s tokens have been burned.
+			// * - `from` and `to` are never both zero.
+			// *
+			// * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+			// */
+			// function _afterTokenTransfer(
+			// address from,
+			// address to,
+			// uint256 amount
+			// ) internal virtual {}
+			// }
 			todo!()
 		}
 	
