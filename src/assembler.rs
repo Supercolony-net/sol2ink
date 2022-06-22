@@ -262,7 +262,7 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
                         } else {
                             String::from("")
                         },
-                        function.header.return_params[i]
+                        function.header.return_params[i].param_type
                     )
                     .as_str(),
                 );
@@ -335,7 +335,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> Vec<Strin
                         } else {
                             String::from("")
                         },
-                        function.return_params[i]
+                        function.return_params[i].param_type
                     )
                     .as_str(),
                 );

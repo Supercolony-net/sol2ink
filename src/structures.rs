@@ -83,7 +83,7 @@ pub struct FunctionHeader {
     pub external: bool,
     pub view: bool,
     pub payable: bool,
-    pub return_params: Vec<String>,
+    pub return_params: Vec<FunctionParam>,
 }
 
 #[derive(Clone)]

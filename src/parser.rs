@@ -206,7 +206,7 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
             imports,
         )
     } else {
-        Vec::<String>::new()
+        Vec::<FunctionParam>::new()
     };
 
     // TODO parse statements
@@ -388,8 +388,11 @@ fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
 /// `imports` the Set of imports of the contract
 ///
 /// returns the vec of function return parameters of this function
-fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) -> Vec<String> {
-    let mut out = Vec::<String>::new();
+fn parse_return_parameters(
+    parameters: String,
+    imports: &mut HashSet<String>,
+) -> Vec<FunctionParam> {
+    let mut out = Vec::<FunctionParam>::new();
     let mut updated_parameters = parameters.to_owned();
     updated_parameters.remove_matches(" memory");
     updated_parameters.remove_matches(" calldata");
@@ -398,13 +401,19 @@ fn parse_return_parameters(parameters: String, imports: &mut HashSet<String>) ->
         .map(|s| s.to_owned())
         .collect();
 
-    for i in 0..tokens.len() {
-        if i % 2 == 1 && tokens.len() >= (parameters.matches(",").count() + 1) * 2 {
-            continue
-        }
-        let mut param = tokens[i].to_owned();
-        param.remove_matches(",");
-        out.push(convert_variable_type(param, imports));
+    let mut iterator = tokens.iter();
+    while let Some(token) = iterator.next() {
+        token.to_owned().remove_matches(",");
+        let param_type = convert_variable_type(token.to_owned(), imports);
+        let name = if tokens.len() >= (parameters.matches(",").count() + 1) * 2 {
+            iterator.next().unwrap()
+        } else {
+            "_"
+        };
+        out.push(FunctionParam {
+            name: name.to_owned(),
+            param_type,
+        })
     }
 
     out
