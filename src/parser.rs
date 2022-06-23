@@ -1,8 +1,4 @@
 use crate::structures::*;
-use convert_case::{
-    Case,
-    Casing,
-};
 use std::{
     collections::HashSet,
     lazy::Lazy,
@@ -167,8 +163,7 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
     let name = tokens[name_index]
         .substring(0, tokens[name_index].len() - 1)
-        .to_owned()
-        .to_case(Case::Snake);
+        .to_owned();
     ContractField { field_type, name }
 }
 
@@ -185,7 +180,7 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
         .collect::<Vec<String>>();
     let name = split_by_left_brace[0]
         .substring(9, split_by_left_brace[0].len())
-        .to_case(Case::Snake);
+        .to_owned();
     let split_by_right_brace = split_by_left_brace[1]
         .split(")")
         .map(|s| s.to_owned())
@@ -331,7 +326,7 @@ fn parse_function_parameters(
                 param_type = convert_variable_type(tokens[j].to_owned(), imports);
                 mode = ArgsReader::ARGNAME;
             } else if mode == ArgsReader::ARGNAME {
-                let name = tokens[j].to_case(Case::Snake);
+                let name = tokens[j].to_owned();
 
                 if name == "memory" || name == "calldata" {
                     continue
@@ -369,7 +364,7 @@ fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
         .collect::<Vec<String>>();
 
     for i in 0..tokens.len() {
-        let attribute = tokens[i].to_case(Case::Snake);
+        let attribute = tokens[i].to_owned();
         if attribute == "external" || attribute == "public" {
             external = true;
         } else if attribute == "view" {
@@ -523,7 +518,7 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
         .map(|s| s.to_owned())
         .collect::<Vec<String>>();
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
-    let mut name = tokens[1].to_case(Case::Snake);
+    let mut name = tokens[1].to_owned();
     name.remove_matches(";");
     StructField { name, field_type }
 }

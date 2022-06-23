@@ -135,7 +135,11 @@ fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> Vec<St
 
     output_vec.push(format!("pub struct {} {{\n", contract_name));
     for field in fields.iter() {
-        output_vec.push(format!("\t{}: {},\n", field.name, field.field_type));
+        output_vec.push(format!(
+            "\t{}: {},\n",
+            field.name.to_case(Case::Snake),
+            field.field_type
+        ));
     }
 
     output_vec.push(String::from("}\n"));
@@ -157,7 +161,8 @@ fn assemble_structs(structs: Vec<Struct>) -> Vec<String> {
         for struct_field in structure.fields.iter() {
             output_vec.push(format!(
                 "\tpub {}: {},\n",
-                struct_field.name, struct_field.field_type
+                struct_field.name.to_case(Case::Snake),
+                struct_field.field_type
             ));
         }
         output_vec.push(String::from("}\n\n"));
@@ -180,7 +185,7 @@ fn assemble_constructor(constructor: Function) -> Vec<String> {
             .header
             .params
             .iter()
-            .map(|param| format!("{}: {}", param.name, param.param_type))
+            .map(|param| format!("{}: {}", param.name.to_case(Case::Snake), param.param_type))
             .collect::<Vec<String>>()
             .join(", ")
             .as_str(),
@@ -244,7 +249,14 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
             .as_str(),
         );
         for param in function.header.params.iter() {
-            header.push_str(format!(", {}: {}", param.name, param.param_type).as_str());
+            header.push_str(
+                format!(
+                    ", {}: {}",
+                    param.name.to_case(Case::Snake),
+                    param.param_type
+                )
+                .as_str(),
+            );
         }
         header.push_str(")");
         // return params
@@ -317,7 +329,14 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> Vec<Strin
             .as_str(),
         );
         for param in function.params.iter() {
-            header.push_str(format!(", {}: {}", param.name, param.param_type).as_str());
+            header.push_str(
+                format!(
+                    ", {}: {}",
+                    param.name.to_case(Case::Snake),
+                    param.param_type
+                )
+                .as_str(),
+            );
         }
         header.push_str(")");
         // return params
