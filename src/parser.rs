@@ -1,4 +1,7 @@
-use crate::structures::*;
+use crate::{
+    formatter::split,
+    structures::*,
+};
 use convert_case::{
     Case,
     Casing,
@@ -190,11 +193,7 @@ pub fn parse_contract(
 fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
     // most mappings are written as `type => type`
     // we will make it `type=>type`
-    let tokens = line
-        .replace(" => ", "=>")
-        .split(" ")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
+    let tokens = split(line.replace(" => ", "=>"), " ", None);
     let name_index = if tokens.len() > 2 { 2 } else { 1 };
 
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
@@ -211,17 +210,11 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
 ///
 /// returns the representation of the function header as `FunctionHeader` struct
 fn parse_function_header(line: String, imports: &mut HashSet<String>) -> FunctionHeader {
-    let split_by_left_brace = line
-        .split("(")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
+    let split_by_left_brace = split(line, "(", None);
     let name = split_by_left_brace[0]
         .substring(9, split_by_left_brace[0].len())
         .to_owned();
-    let split_by_right_brace = split_by_left_brace[1]
-        .split(")")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
+    let split_by_right_brace = split(split_by_left_brace[1].clone(), ")", None);
 
     let params_raw = split_by_right_brace[0].to_owned();
     let params = parse_function_parameters(params_raw, imports);
@@ -230,11 +223,7 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
 
     let return_params = if split_by_left_brace.len() == 3 {
         parse_return_parameters(
-            split_by_left_brace[2]
-                .split(")")
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>()[0]
-                .to_owned(),
+            split(split_by_left_brace[2].clone(), ")", None)[0].to_owned(),
             imports,
         )
     } else {
@@ -407,24 +396,12 @@ fn parse_assignment(
         .as_str(),
     );
     line.remove_matches(";");
-    let tokens = line
-        .split("=")
-        .map(|str| str.to_owned())
-        .collect::<Vec<String>>();
+    let tokens = split(line.clone(), "=", None);
     let left_raw = tokens[0].trim().to_owned();
     let right_raw = tokens[1].trim().to_owned();
-    let left_split = left_raw
-        .split("[")
-        .map(|str| str.to_owned())
-        .collect::<Vec<String>>();
+    let left_split = split(left_raw.clone(), "[", None);
     let left = left_split[0].to_owned();
-    let right = if right_raw
-        .split(" ")
-        .map(|str| str.to_owned())
-        .collect::<Vec<String>>()
-        .len()
-        > 1
-    {
+    let right = if split(right_raw.clone(), " ", None).len() > 1 {
         parse_statement(
             right_raw,
             constructor,
@@ -436,17 +413,8 @@ fn parse_assignment(
     } else {
         right_raw
     };
-    if left_raw
-        .split(" ")
-        .map(|str| str.to_owned())
-        .collect::<Vec<String>>()
-        .len()
-        > 1
-    {
-        let tokens_left = left_raw
-            .split(" ")
-            .map(|str| str.to_owned())
-            .collect::<Vec<String>>();
+    if split(left_raw.clone(), " ", None).len() > 1 {
+        let tokens_left = split(left_raw, " ", None);
         let field_type = convert_variable_type(tokens_left[0].to_owned(), imports);
         let field_name = tokens_left[1].to_owned();
         storage_variables.insert(field_name.to_owned(), "".to_owned());
@@ -504,14 +472,7 @@ fn parse_function_parameters(
     let mut out = Vec::<FunctionParam>::new();
 
     if !parameters.is_empty() {
-        let tokens = parameters
-            .split(" ")
-            .map(|s| {
-                let mut out = s.to_owned();
-                out.remove_matches(",");
-                out
-            })
-            .collect::<Vec<String>>();
+        let tokens = split(parameters, " ", Some(remove_commas()));
         let mut mode = ArgsReader::ARGNAME;
         let mut param_type = convert_variable_type(tokens[0].to_owned(), imports);
 
@@ -548,14 +509,7 @@ fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
     let mut view = false;
     let mut payable = false;
 
-    let tokens = attributes
-        .split(" ")
-        .map(|s| {
-            let mut out = s.to_owned();
-            out.remove_matches(",");
-            out
-        })
-        .collect::<Vec<String>>();
+    let tokens = split(attributes, " ", Some(remove_commas()));
 
     for i in 0..tokens.len() {
         let attribute = tokens[i].to_owned();
@@ -585,10 +539,7 @@ fn parse_return_parameters(
     let mut updated_parameters = parameters.to_owned();
     updated_parameters.remove_matches(" memory");
     updated_parameters.remove_matches(" calldata");
-    let tokens: Vec<String> = updated_parameters
-        .split(' ')
-        .map(|s| s.to_owned())
-        .collect();
+    let tokens: Vec<String> = split(updated_parameters, " ", None);
 
     let mut iterator = tokens.iter();
     while let Some(token) = iterator.next() {
@@ -633,11 +584,11 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
         buffer
     };
 
-    let tokens: Vec<String> = event_raw.split(' ').map(|s| s.to_owned()).collect();
+    let tokens = split(event_raw, " ", None);
     let mut args_reader = ArgsReader::ARGNAME;
     let mut indexed = false;
     // we assume Approval(address, didnt get split by white space
-    let split_brace: Vec<String> = tokens[1].split('(').map(|s| s.to_owned()).collect();
+    let split_brace = split(tokens[1].clone(), "(", None);
     let name = split_brace[0].to_owned();
     let mut field_type = convert_variable_type(split_brace[1].to_owned(), imports);
     let mut fields = Vec::<EventField>::new();
@@ -677,11 +628,7 @@ fn parse_struct(
     imports: &mut HashSet<String>,
     iterator: &mut Iter<String>,
 ) -> Result<Struct, ParserError> {
-    let struct_name = line
-        .split(" ")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>()[1]
-        .to_owned();
+    let struct_name = split(line, " ", None)[1].to_owned();
     let mut struct_fields = Vec::<StructField>::new();
 
     while let Some(raw_line) = iterator.next() {
@@ -707,10 +654,7 @@ fn parse_struct(
 ///
 /// returns the struct field as `StructField` struct
 fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructField {
-    let tokens = line
-        .split(" ")
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>();
+    let tokens = split(line, " ", None);
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
     let mut name = tokens[1].to_owned();
     name.remove_matches(";");
@@ -723,7 +667,7 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 ///
 /// returns the enum as `Enum` struct
 fn parse_enum(line: String) -> Enum {
-    let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
+    let tokens = split(line, " ", None);
     let name = tokens[1].to_owned();
     let mut values = Vec::<String>::new();
 
@@ -751,7 +695,7 @@ pub fn parse_contract_definition(lines: &Vec<String>) -> Result<ContractDefiniti
         if line.is_empty() {
             continue
         }
-        let tokens: Vec<String> = line.split(' ').map(|s| s.to_owned()).collect();
+        let tokens = split(line.to_owned(), " ", None);
         let contract_name = Lazy::new(|| tokens[1].to_owned());
         if tokens[0] == "interface" {
             return Ok(ContractDefinition {
@@ -786,11 +730,11 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         };
     if arg_type.substring(0, 7) == "mapping" {
         imports.insert(String::from("use ink_storage::Mapping;\n"));
-        let type_args = arg_type
-            .substring(8, arg_type.len() - 1)
-            .split("=>")
-            .map(|s| s.to_owned())
-            .collect::<Vec<String>>();
+        let type_args = split(
+            arg_type.substring(8, arg_type.len() - 1).to_owned(),
+            "=>",
+            None,
+        );
         let to = convert_variable_type(
             {
                 let mut arg_type_no_braces = type_args.last().unwrap().to_owned();
@@ -872,4 +816,12 @@ fn convert_int(arg_type: String) -> String {
         }
     }
     arg_type
+}
+
+fn remove_commas() -> fn(&str) -> String {
+    move |s: &str| {
+        let mut out = s.to_owned();
+        out.remove_matches(",");
+        out
+    }
 }
