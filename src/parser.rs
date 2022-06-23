@@ -161,6 +161,13 @@ pub fn parse_contract(
             &mut imports,
         );
     }
+    parse_statements(
+        &mut constructor,
+        true,
+        &mut storage_variables,
+        functions_map,
+        &mut imports,
+    );
 
     Ok(Contract {
         name,
@@ -361,10 +368,6 @@ fn parse_statement(
         // TODO
     } else if line.contains("++") {
         // TODO
-    } else if line.contains("-") {
-        // TODO
-    } else if line.contains("+") {
-        // TODO
     } else if line.contains("!=") {
         // TODO
     } else if line.contains(">=") {
@@ -376,6 +379,10 @@ fn parse_statement(
     } else if line.contains("=") {
         // assignment
         return parse_assignment(line, constructor, storage_variables, functions, imports)
+    } else if line.contains("-") {
+        // TODO
+    } else if line.contains("+") {
+        // TODO
     }
     // TODO actual parsing
     Statement {
@@ -405,15 +412,30 @@ fn parse_assignment(
         .map(|str| str.to_owned())
         .collect::<Vec<String>>();
     let left_raw = tokens[0].trim().to_owned();
-    let right_raw = parse_statement(
-        tokens[1].trim().to_owned(),
-        constructor,
-        storage_variables,
-        functions,
-        imports,
-    )
-    .content;
-    println!("right_raw = {}", right_raw);
+    let right_raw = tokens[1].trim().to_owned();
+    let left_split = left_raw
+        .split("[")
+        .map(|str| str.to_owned())
+        .collect::<Vec<String>>();
+    let left = left_split[0].to_owned();
+    let right = if right_raw
+        .split(" ")
+        .map(|str| str.to_owned())
+        .collect::<Vec<String>>()
+        .len()
+        > 1
+    {
+        parse_statement(
+            right_raw,
+            constructor,
+            storage_variables,
+            functions,
+            imports,
+        )
+        .content
+    } else {
+        right_raw
+    };
     if left_raw
         .split(" ")
         .map(|str| str.to_owned())
@@ -433,21 +455,35 @@ fn parse_assignment(
                 "let {}: {} = {};",
                 field_name.to_case(Case::Snake),
                 field_type,
-                right_raw.to_case(Case::Snake)
+                right
             ),
             comment: false,
         }
-    } else if storage_variables.contains_key(&left_raw) {
-    } else {
+    } else if storage_variables.contains_key(&left) {
+        if left_raw.contains("[") {
+            let mut index = left_split[1].to_owned();
+            index.remove_matches("]");
+            return Statement {
+                content: format!(
+                    "{}.{}.insert({}, {});",
+                    if constructor { "instance" } else { "self" },
+                    left.to_case(Case::Snake),
+                    index,
+                    right
+                ),
+                comment: false,
+            }
+        }
         return Statement {
             content: format!(
                 "{}.{} = {};",
                 if constructor { "instance" } else { "self" },
                 left_raw.to_case(Case::Snake),
-                right_raw.to_case(Case::Snake)
+                right
             ),
             comment: false,
         }
+    } else {
     }
     Statement {
         content: line,
