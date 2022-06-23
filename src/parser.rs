@@ -262,20 +262,22 @@ fn parse_function(
     let function_header = parse_function_header(function_header_raw, imports);
     let mut statements = Vec::<Statement>::new();
 
-    while let Some(raw_line) = iterator.next() {
-        let line = raw_line.trim().to_owned();
+    if open_braces > close_braces {
+        while let Some(raw_line) = iterator.next() {
+            let line = raw_line.trim().to_owned();
 
-        open_braces += line.matches("{").count();
-        close_braces += line.matches("}").count();
+            open_braces += line.matches("{").count();
+            close_braces += line.matches("}").count();
 
-        if line == "}" && open_braces == close_braces {
-            break
+            if line == "}" && open_braces == close_braces {
+                break
+            }
+
+            statements.push(Statement {
+                content: line,
+                comment: true,
+            })
         }
-
-        statements.push(Statement {
-            content: line,
-            comment: true,
-        })
     }
 
     Ok(Function {
@@ -369,6 +371,7 @@ fn parse_statement(
         // assignment
         return parse_assignment(line, constructor, storage_variables, functions, imports)
     } else if line.contains("-") {
+        println!("subtract: {}", line);
         // TODO
     } else if line.contains("+") {
         // TODO
