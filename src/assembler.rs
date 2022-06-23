@@ -197,8 +197,11 @@ fn assemble_constructor(constructor: Function) -> Vec<String> {
         "\t\tink_lang::codegen::initialize_contract(|instance: &mut Self| {\n",
     ));
     for statement in constructor.body.iter() {
-        // TODO remove comments
-        output_vec.push(format!("\t\t\t// {}\n", statement.content));
+        output_vec.push(format!(
+            "\t\t\t{}{}\n",
+            if statement.comment { "// " } else { "" },
+            statement.content
+        ));
     }
     output_vec.push(String::from("\t\t})\n"));
     output_vec.push(String::from("\t}\n\n"));
@@ -287,8 +290,11 @@ fn assemble_functions(functions: Vec<Function>) -> Vec<String> {
         output_vec.push(header.to_owned());
         // body
         for statement in function.body.iter() {
-            // TODO remove comments
-            output_vec.push(format!("\t\t// {}\n", statement.content));
+            output_vec.push(format!(
+                "\t\t{}{}\n",
+                if statement.comment { "// " } else { "" },
+                statement.content
+            ));
         }
         // TODO remove todo
         output_vec.push(String::from("\t\ttodo!()\n"));

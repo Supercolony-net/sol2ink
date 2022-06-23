@@ -1,6 +1,13 @@
 use crate::structures::*;
+use convert_case::{
+    Case,
+    Casing,
+};
 use std::{
-    collections::HashSet,
+    collections::{
+        HashMap,
+        HashSet,
+    },
     lazy::Lazy,
     slice::Iter,
 };
@@ -115,9 +122,9 @@ pub fn parse_contract(
         } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
             // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
-            constructor = parse_function(line, &mut imports, &mut iterator)?;
+            constructor = parse_function(line, true, &mut imports, &mut iterator)?;
         } else if line.substring(0, 8) == "function" {
-            functions.push(parse_function(line, &mut imports, &mut iterator)?);
+            functions.push(parse_function(line, false, &mut imports, &mut iterator)?);
         } else if line.substring(0, 5) == "event" {
             events.push(parse_event(line, &mut imports, &mut iterator));
         } else if line.substring(0, 4) == "enum" {
@@ -224,6 +231,7 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
 /// returns the function definition as `Function` struct
 fn parse_function(
     line: String,
+    constructor: bool,
     imports: &mut HashSet<String>,
     iterator: &mut Iter<String>,
 ) -> Result<Function, ParserError> {
@@ -237,6 +245,14 @@ fn parse_function(
     let function_header = parse_function_header(function_header_raw, imports);
     let mut statements = Vec::<Statement>::new();
 
+    let mut local_variables = HashMap::<String, String>::new();
+    for param in function_header.clone().params {
+        local_variables.insert(param.name.to_owned(), param.name.to_case(Case::Snake));
+    }
+    for param in function_header.clone().return_params {
+        local_variables.insert(param.name.to_owned(), param.name.to_case(Case::Snake));
+    }
+
     while let Some(raw_line) = iterator.next() {
         let line = raw_line.trim().to_owned();
 
@@ -247,12 +263,15 @@ fn parse_function(
             break
         }
 
-        statements.push(parse_statement(line.to_owned()));
+        statements.push(parse_statement(
+            line.to_owned(),
+            constructor,
+            local_variables.clone(),
+        ));
     }
 
     Ok(Function {
         header: function_header,
-        constructor: false,
         body: statements,
     })
 }
@@ -292,9 +311,71 @@ fn compose_function_header(
 /// TODO: for now we only return the original statement and comment it
 ///
 /// returns the statement as `Statement` struct
-fn parse_statement(line: String) -> Statement {
+fn parse_statement(
+    line: String,
+    constructor: bool,
+    local_variables: HashMap<String, String>,
+) -> Statement {
+    if line.contains("+=") {
+        // TODO
+    } else if line.contains("-=") {
+        // TODO
+    } else if line.contains("!=") {
+        // TODO
+    } else if line.contains(">=") {
+        // TODO
+    } else if line.contains("<=") {
+        // TODO
+    } else if line.contains("==") {
+        // TODO
+    } else if line.contains("=") {
+        // assignment
+        return parse_assignment(line, constructor, local_variables)
+    }
     // TODO actual parsing
-    Statement { content: line }
+    Statement {
+        content: line,
+        comment: true,
+    }
+}
+
+fn parse_assignment(
+    raw_line: String,
+    constructor: bool,
+    local_variables: HashMap<String, String>,
+) -> Statement {
+    let mut line = raw_line;
+    line.remove_matches(";");
+    let tokens = line
+        .split("=")
+        .map(|str| str.to_owned())
+        .collect::<Vec<String>>();
+    let left = tokens[0].trim().to_owned();
+    let right = tokens[1].trim().to_owned();
+    if left
+        .split(" ")
+        .map(|str| str.to_owned())
+        .collect::<Vec<String>>()
+        .len()
+        > 1
+    {
+        // declare variable
+    } else if local_variables.contains_key(&left) {
+    } else {
+        return Statement {
+            content: format!(
+                "{}.{} = {};",
+                if constructor { "instance" } else { "self" },
+                left.to_case(Case::Snake),
+                right.to_case(Case::Snake)
+            ),
+            comment: false,
+        }
+    }
+    Statement {
+        content: line,
+        comment: true,
+    }
 }
 
 /// Parses parameters of a function
