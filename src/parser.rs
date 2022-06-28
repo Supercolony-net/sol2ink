@@ -6,6 +6,7 @@ use convert_case::{
     Case,
     Casing,
 };
+use regex::Regex;
 use std::{
     collections::{
         HashMap,
@@ -255,7 +256,7 @@ fn parse_contract(
 
     while let Some(ch) = chars.next() {
         match ch {
-            SPACE | NEW_LINE if action == Action::None || action == Action::Contract => {}
+            NEW_LINE if action == Action::None || action == Action::Contract => {}
             SLASH if action == Action::Contract => action = Action::Slash,
             SLASH if action == Action::Slash => {
                 let comment = parse_comment(chars);
@@ -283,30 +284,28 @@ fn parse_contract(
             }
             _ if action == Action::ContractName || action == Action::Contract => {
                 buffer.push(ch);
-                if buffer == "event" {
+                if buffer.trim() == "event" {
                     events.push(parse_event(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
-                } else if buffer == "enum" {
+                } else if buffer.trim() == "enum" {
                     enums.push(parse_enum(chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
-                } else if buffer == "struct" {
+                } else if buffer.trim() == "struct" {
                     structs.push(parse_struct(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
-                } else if buffer == "constructor" {
+                } else if buffer.trim() == "constructor" {
                     constructor = parse_function(&mut imports, chars)?;
-                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
-                } else if buffer == "function" {
+                } else if buffer.trim() == "function" {
                     functions.push(parse_function(&mut imports, chars)?);
-                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
                 } else if ch == SEMICOLON {
-                    fields.push(parse_contract_field(buffer.clone(), &mut imports));
+                    fields.push(parse_contract_field(buffer.trim().to_owned(), &mut imports));
                     buffer.clear();
                 }
             }
@@ -399,12 +398,11 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
 /// returns the representation of the function header as `FunctionHeader` struct
 fn parse_function_header(line: String, imports: &mut HashSet<String>) -> FunctionHeader {
     let split_by_left_brace = split(line, "(", None);
-    let name = split_by_left_brace[0]
-        .substring(9, split_by_left_brace[0].len())
-        .to_owned();
-    let split_by_right_brace = split(split_by_left_brace[1].clone(), ")", None);
+    let name = split_by_left_brace[0].to_owned();
 
-    let params_raw = split_by_right_brace[0].to_owned();
+    let split_by_right_brace = split(split_by_left_brace[1].trim().to_owned(), ")", None);
+
+    let params_raw = split_by_right_brace[0].trim().to_owned();
     let params = parse_function_parameters(params_raw, imports);
     let attributes_raw = split_by_right_brace[1].to_owned();
     let (external, view, payable) = parse_function_attributes(attributes_raw);
@@ -439,7 +437,7 @@ fn parse_function(
     imports: &mut HashSet<String>,
     chars: &mut Chars,
 ) -> Result<Function, ParserError> {
-    let function_header_raw = compose_function_header(chars)?;
+    let function_header_raw = compose_function_header(chars)?.trim().to_owned();
     let mut open_braces = function_header_raw.matches("{").count();
     let mut close_braces = 0;
     let function_header = parse_function_header(function_header_raw, imports);
@@ -489,6 +487,8 @@ fn compose_function_header(chars: &mut Chars) -> Result<String, ParserError> {
         match ch {
             SEMICOLON | CURLY_OPEN => {
                 buffer.push(ch);
+                let regex = Regex::new(r"\s+").unwrap();
+                buffer = regex.replace_all(buffer.as_str(), " ").to_string();
                 return Ok(buffer)
             }
             NEW_LINE => {
@@ -560,7 +560,6 @@ fn parse_statement(
         // assignment
         return parse_assignment(line, constructor, storage_variables, functions, imports)
     } else if line.contains("-") {
-        println!("subtract: {}", line);
         // TODO
     } else if line.contains("+") {
         // TODO
@@ -663,8 +662,9 @@ fn parse_function_parameters(
 ) -> Vec<FunctionParam> {
     let mut out = Vec::<FunctionParam>::new();
 
-    if !parameters.is_empty() {
+    if parameters.len() > 0 {
         let tokens = split(parameters, " ", Some(remove_commas()));
+
         let mut mode = ArgsReader::ARGNAME;
         let mut param_type = convert_variable_type(tokens[0].to_owned(), imports);
 
@@ -771,6 +771,8 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<S
             }
         }
     }
+    let regex = Regex::new(r"\s+").unwrap();
+    event_raw = regex.replace_all(event_raw.as_str(), " ").to_string();
 
     let tokens = split(event_raw, " ", None);
     let mut args_reader = ArgsReader::ARGNAME;
@@ -828,6 +830,8 @@ fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<
             }
         }
     }
+    let regex = Regex::new(r"\s+").unwrap();
+    struct_raw = regex.replace_all(struct_raw.as_str(), " ").to_string();
 
     let split_brace = split(struct_raw, "{", None);
     let fields = split(split_brace[1].trim().to_owned(), ";", None);
@@ -869,25 +873,26 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 ///
 /// returns the enum as `Enum` struct
 fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
-    let mut line_raw = String::new();
-
+    let mut enum_raw = String::new();
     while let Some(ch) = chars.next() {
         match ch {
             NEW_LINE => {
-                line_raw.push(SPACE);
+                enum_raw.push(SPACE);
             }
             CURLY_CLOSE => break,
             _ => {
-                line_raw.push(ch);
+                enum_raw.push(ch);
             }
         }
     }
+    let regex = Regex::new(r"\s+").unwrap();
+    enum_raw = regex.replace_all(enum_raw.as_str(), " ").trim().to_string();
 
-    let tokens = split(line_raw, " ", None);
-    let name = tokens[1].to_owned();
+    let tokens = split(enum_raw, " ", None);
+    let name = tokens[0].to_owned();
     let mut values = Vec::<String>::new();
 
-    for i in 2..tokens.len() {
+    for i in 1..tokens.len() {
         let mut token = tokens[i].to_owned();
         if token == "{" {
             continue
