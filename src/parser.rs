@@ -13,6 +13,7 @@ use std::{
     },
     lazy::Lazy,
     slice::Iter,
+    str::Chars,
 };
 use substring::Substring;
 
@@ -91,6 +92,135 @@ pub fn parse_interface(
         function_headers,
         imports,
     })
+}
+
+#[derive(Eq, PartialEq)]
+enum Action {
+    None,
+    Slash,
+}
+
+const ASTERISK: char = '*';
+const NEW_LINE: char = '\n';
+const SEMI_COLON: char = ';';
+const SLASH: char = '/';
+const SPACE: char = ' ';
+
+pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>), ParserError> {
+    let mut chars = string.chars();
+    let mut comments = Vec::<String>::new();
+    let mut action = Action::None;
+    let mut buffer = String::new();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            SLASH if action == Action::None => action = Action::Slash,
+            SLASH if action == Action::Slash => {
+                let comment = parse_comment(&mut chars);
+                if comment.len() > 0 {
+                    comments.push(comment);
+                    action = Action::None;
+                }
+            }
+            ASTERISK if action == Action::Slash => {
+                let mut new_comments = parse_multiline_comment(&mut chars);
+                comments.append(&mut new_comments);
+            }
+            NEW_LINE | SPACE => {}
+            _ => {
+                buffer.push(ch);
+                if buffer == "pragma" {
+                    skip_pragma(&mut chars);
+                    buffer = String::new();
+                } else if buffer == "contract" {
+                    todo!()
+                } else if buffer == "interface" {
+                    todo!()
+                }
+            }
+        }
+    }
+
+    Ok((None, None))
+}
+
+fn parse_comment(chars: &mut Chars) -> String {
+    let mut buffer = String::new();
+    let mut reading = false;
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            SLASH if !reading => {
+                reading = true;
+            }
+            NEW_LINE => return buffer.trim().to_owned(),
+            _ if !reading => {
+                buffer.push(ch);
+                reading = true;
+            }
+            _ => {
+                buffer.push(ch);
+            }
+        }
+    }
+
+    buffer
+}
+
+fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
+    let mut comments = Vec::<String>::new();
+    let mut buffer = String::new();
+    let mut reading = false;
+    let mut new_line = false;
+    let mut asterisk = false;
+
+    while let Some(ch) = chars.next() {
+        if ch == SLASH && asterisk {
+            break
+        } else {
+            asterisk = false;
+        }
+        match ch {
+            ASTERISK if !reading => {
+                reading = true;
+            }
+            ASTERISK if new_line => {
+                new_line = false;
+            }
+            NEW_LINE => {
+                if buffer.trim().len() > 0 {
+                    comments.push(buffer.trim().to_owned());
+                }
+                new_line = true;
+            }
+            _ if !reading => {
+                buffer.push(ch);
+                reading = true;
+            }
+            SPACE if new_line => {}
+            _ if new_line => {
+                buffer.push(ch);
+                new_line = false;
+            }
+            _ => {
+                buffer.push(ch);
+            }
+        }
+        if ch == ASTERISK {
+            asterisk = true;
+        }
+    }
+
+    comments
+}
+
+fn skip_pragma(chars: &mut Chars) {
+    while let Some(ch) = chars.next() {
+        match ch {
+            SEMI_COLON => return,
+            _ => {}
+        }
+    }
 }
 
 /// Parses the code of a Solidity contract
