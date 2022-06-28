@@ -26,6 +26,7 @@ pub struct Contract {
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
     pub imports: HashSet<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct Interface {
@@ -45,6 +46,7 @@ pub struct ContractField {
 pub struct Event {
     pub name: String,
     pub fields: Vec<EventField>,
+    pub comments: Vec<String>,
 }
 
 pub struct EventField {
@@ -56,11 +58,13 @@ pub struct EventField {
 pub struct Enum {
     pub name: String,
     pub values: Vec<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct Struct {
     pub name: String,
     pub fields: Vec<StructField>,
+    pub comments: Vec<String>,
 }
 
 #[derive(Default, Clone)]

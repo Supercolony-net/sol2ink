@@ -12,7 +12,6 @@ use std::{
         HashSet,
     },
     lazy::Lazy,
-    slice::Iter,
     str::Chars,
 };
 use substring::Substring;
@@ -26,6 +25,7 @@ enum ArgsReader {
 #[derive(Debug, Eq, PartialEq)]
 pub enum ParserError {
     FileError(String),
+    FileCorrupted,
     ContractCorrupted,
     NoContractDefinitionFound,
 }
@@ -65,19 +65,19 @@ pub fn parse_interface(
             // TODO parse comments
         } else if line.substring(0, 8) == "function" {
             if line.contains(";") {
-                function_headers.push(parse_function_header(line, &mut imports));
+                // function_headers.push(parse_function_header(line, &mut imports));
             } else {
-                function_headers.push(parse_function_header(
-                    compose_function_header(line, &mut iterator)?,
-                    &mut imports,
-                ));
+                // function_headers.push(parse_function_header(
+                //     compose_function_header(line, &mut iterator)?,
+                //     &mut imports,
+                // ));
             }
         } else if line.substring(0, 5) == "event" {
-            events.push(parse_event(line, &mut imports, &mut iterator));
+            // TODO
         } else if line.substring(0, 4) == "enum" {
-            enums.push(parse_enum(line));
+            // TODO
         } else if line.substring(0, 6) == "struct" {
-            structs.push(parse_struct(line, &mut imports, &mut iterator)?);
+            // TODO
         } else if line == "}" {
             // end of contract
             continue
@@ -97,12 +97,17 @@ pub fn parse_interface(
 #[derive(Eq, PartialEq)]
 enum Action {
     None,
+    ContractName,
+    Contract,
+
     Slash,
 }
 
 const ASTERISK: char = '*';
+const CURLY_CLOSE: char = '}';
+const CURLY_OPEN: char = '{';
 const NEW_LINE: char = '\n';
-const SEMI_COLON: char = ';';
+const SEMICOLON: char = ';';
 const SLASH: char = '/';
 const SPACE: char = ' ';
 
@@ -119,12 +124,13 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
                 let comment = parse_comment(&mut chars);
                 if comment.len() > 0 {
                     comments.push(comment);
-                    action = Action::None;
                 }
+                action = Action::None;
             }
             ASTERISK if action == Action::Slash => {
                 let mut new_comments = parse_multiline_comment(&mut chars);
                 comments.append(&mut new_comments);
+                action = Action::None;
             }
             NEW_LINE | SPACE => {}
             _ => {
@@ -133,7 +139,8 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
                     skip_pragma(&mut chars);
                     buffer = String::new();
                 } else if buffer == "contract" {
-                    todo!()
+                    let contract = parse_contract(&mut chars, comments)?;
+                    return Ok((Some(contract), None))
                 } else if buffer == "interface" {
                     todo!()
                 }
@@ -217,7 +224,7 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
 fn skip_pragma(chars: &mut Chars) {
     while let Some(ch) = chars.next() {
         match ch {
-            SEMI_COLON => return,
+            SEMICOLON => return,
             _ => {}
         }
     }
@@ -229,12 +236,15 @@ fn skip_pragma(chars: &mut Chars) {
 /// `lines` the solidity code of the contract
 ///
 /// returns the representation of the contract as `Contract` struct
-pub fn parse_contract(
-    contract_definition: ContractDefinition,
-    lines: Vec<String>,
+fn parse_contract(
+    chars: &mut Chars,
+    contract_comments: Vec<String>,
 ) -> Result<Contract, ParserError> {
-    let name = contract_definition.contract_name;
+    let mut buffer = String::new();
+    let mut action = Action::None;
 
+    let mut name = String::new();
+    let mut comments = Vec::<String>::new();
     let mut fields = Vec::<ContractField>::new();
     let mut events = Vec::<Event>::new();
     let mut enums = Vec::<Enum>::new();
@@ -243,32 +253,83 @@ pub fn parse_contract(
     let mut imports = HashSet::<String>::new();
     let mut constructor = Function::default();
 
+    while let Some(ch) = chars.next() {
+        match ch {
+            SPACE | NEW_LINE if action == Action::None || action == Action::Contract => {}
+            SLASH if action == Action::Contract => action = Action::Slash,
+            SLASH if action == Action::Slash => {
+                let comment = parse_comment(chars);
+                if comment.len() > 0 {
+                    comments.push(comment);
+                }
+                action = Action::Contract;
+            }
+            ASTERISK if action == Action::Slash => {
+                let mut new_comments = parse_multiline_comment(chars);
+                comments.append(&mut new_comments);
+                action = Action::Contract;
+            }
+            CURLY_OPEN if action == Action::None => {
+                action = Action::Contract;
+            }
+            SPACE if action == Action::ContractName => {
+                name = buffer.clone();
+                buffer = String::new();
+                action = Action::None;
+            }
+            _ if action == Action::None => {
+                buffer.push(ch);
+                action = Action::ContractName;
+            }
+            _ if action == Action::ContractName || action == Action::Contract => {
+                buffer.push(ch);
+                if buffer == "event" {
+                    events.push(parse_event(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer == "enum" {
+                    enums.push(parse_enum(chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer == "struct" {
+                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer == "constructor" {
+                    constructor = parse_function(&mut imports, chars)?;
+
+                    // TODO
+                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer == "function" {
+                    // TODO
+                    functions.push(parse_function(&mut imports, chars)?);
+
+                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if ch == SEMICOLON {
+                    fields.push(parse_contract_field(buffer.clone(), &mut imports));
+                    buffer.clear();
+                }
+            }
+            _ => {}
+        }
+    }
+
     // read body of contract
-    let mut iterator = lines.iter();
-    while let Some(raw_line) = iterator.next() {
-        let line = raw_line.trim().to_owned();
+    while let Some(raw_line) = chars.next() {
+        let line = raw_line.to_string();
 
         if line.is_empty() {
             continue
-        } else if line.substring(0, 8) == "contract" || line.substring(0, 6) == "pragma" {
-            continue
-        } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
-            // TODO parse comments
         } else if line.substring(0, 11) == "constructor" {
-            constructor = parse_function(line, &mut imports, &mut iterator)?;
         } else if line.substring(0, 8) == "function" {
-            functions.push(parse_function(line, &mut imports, &mut iterator)?);
-        } else if line.substring(0, 5) == "event" {
-            events.push(parse_event(line, &mut imports, &mut iterator));
-        } else if line.substring(0, 4) == "enum" {
-            enums.push(parse_enum(line));
-        } else if line.substring(0, 6) == "struct" {
-            structs.push(parse_struct(line, &mut imports, &mut iterator)?);
         } else if line == "}" {
             // end of contract
             continue
         } else {
-            fields.push(parse_contract_field(line, &mut imports));
         }
     }
 
@@ -311,6 +372,7 @@ pub fn parse_contract(
         structs,
         functions,
         imports,
+        comments: contract_comments,
     })
 }
 
@@ -378,35 +440,36 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
 ///
 /// returns the function definition as `Function` struct
 fn parse_function(
-    line: String,
     imports: &mut HashSet<String>,
-    iterator: &mut Iter<String>,
+    chars: &mut Chars,
 ) -> Result<Function, ParserError> {
-    let function_header_raw = if line.contains("{") {
-        line
-    } else {
-        compose_function_header(line, iterator)?
-    };
+    let function_header_raw = compose_function_header(chars)?;
     let mut open_braces = function_header_raw.matches("{").count();
-    let mut close_braces = function_header_raw.matches("}").count();
+    let mut close_braces = 0;
     let function_header = parse_function_header(function_header_raw, imports);
     let mut statements = Vec::<Statement>::new();
+    let mut buffer = String::new();
 
-    if open_braces > close_braces {
-        while let Some(raw_line) = iterator.next() {
-            let line = raw_line.trim().to_owned();
+    while let Some(ch) = chars.next() {
+        if ch == CURLY_OPEN {
+            open_braces += 1;
+        } else if ch == CURLY_CLOSE {
+            close_braces += 1
+        }
 
-            open_braces += line.matches("{").count();
-            close_braces += line.matches("}").count();
-
-            if line == "}" && open_braces == close_braces {
+        if ch == NEW_LINE {
+            buffer.push(SPACE);
+        } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
+            if open_braces == close_braces {
                 break
             }
-
             statements.push(Statement {
-                content: line,
+                content: buffer.clone(),
                 comment: true,
-            })
+            });
+            buffer.clear();
+        } else {
+            buffer.push(ch);
         }
     }
 
@@ -423,21 +486,21 @@ fn parse_function(
 ///
 /// returns `ParserError::ContractCorrupted` if we finish reading the contract without getting the output header
 /// returns multiline function header in the form of one line
-fn compose_function_header(
-    line: String,
-    iterator: &mut Iter<String>,
-) -> Result<String, ParserError> {
-    let mut buffer = line;
+fn compose_function_header(chars: &mut Chars) -> Result<String, ParserError> {
+    let mut buffer = String::new();
 
-    while let Some(raw_line) = iterator.next() {
-        let line = raw_line.trim().to_owned();
-        if line.contains(";") || line.contains("{") {
-            buffer.push_str(line.as_str());
-            buffer = buffer.replace(",", ", ");
-            buffer = buffer.replace("  ", " ");
-            return Ok(buffer)
-        } else {
-            buffer.push_str(line.as_str());
+    while let Some(ch) = chars.next() {
+        match ch {
+            SEMICOLON | CURLY_OPEN => {
+                buffer.push(ch);
+                return Ok(buffer)
+            }
+            NEW_LINE => {
+                buffer.push(SPACE);
+            }
+            _ => {
+                buffer.push(ch);
+            }
         }
     }
 
@@ -699,23 +762,19 @@ fn parse_return_parameters(
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the event definition as `Event` struct
-fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<String>) -> Event {
-    let event_raw = if line.contains(";") {
-        line
-    } else {
-        let mut buffer = line;
-
-        while let Some(raw_line) = iterator.next() {
-            let line = raw_line.trim().to_owned();
-            buffer.push_str(line.as_str());
-            if line.contains(";") {
-                buffer = buffer.replace(",", ", ");
-                buffer = buffer.replace("  ", " ");
-                break
+fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Event {
+    let mut event_raw = String::new();
+    while let Some(ch) = chars.next() {
+        match ch {
+            NEW_LINE => {
+                event_raw.push(SPACE);
+            }
+            SEMICOLON => break,
+            _ => {
+                event_raw.push(ch);
             }
         }
-        buffer
-    };
+    }
 
     let tokens = split(event_raw, " ", None);
     let mut args_reader = ArgsReader::ARGNAME;
@@ -735,7 +794,7 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
             field_type = convert_variable_type(token, imports);
             args_reader = ArgsReader::ARGNAME;
         } else {
-            token.remove_matches(&[',', ')', ';'][..]);
+            token.remove_matches(&[',', ')'][..]);
             fields.push(EventField {
                 indexed,
                 field_type: field_type.to_owned(),
@@ -746,7 +805,11 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
         }
     }
 
-    Event { name, fields }
+    Event {
+        name,
+        fields,
+        comments,
+    }
 }
 
 /// Parses Solidity structure
@@ -756,28 +819,34 @@ fn parse_event(line: String, imports: &mut HashSet<String>, iterator: &mut Iter<
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the struct definition as `Struct` struct
-fn parse_struct(
-    line: String,
-    imports: &mut HashSet<String>,
-    iterator: &mut Iter<String>,
-) -> Result<Struct, ParserError> {
-    let struct_name = split(line, " ", None)[1].to_owned();
-    let mut struct_fields = Vec::<StructField>::new();
-
-    while let Some(raw_line) = iterator.next() {
-        let line = raw_line.trim().to_owned();
-
-        if line == "}" {
-            return Ok(Struct {
-                name: struct_name.to_owned(),
-                fields: struct_fields,
-            })
-        } else {
-            struct_fields.push(parse_struct_field(line, imports));
+fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Struct {
+    let mut struct_raw = String::new();
+    while let Some(ch) = chars.next() {
+        match ch {
+            NEW_LINE => {
+                struct_raw.push(SPACE);
+            }
+            CURLY_CLOSE => break,
+            _ => {
+                struct_raw.push(ch);
+            }
         }
     }
 
-    Err(ParserError::ContractCorrupted)
+    let split_brace = split(struct_raw, "{", None);
+    let fields = split(split_brace[1].to_owned(), ";", None);
+    let struct_name = split_brace[0].to_owned();
+    let mut struct_fields = Vec::<StructField>::new();
+
+    for field in fields.iter() {
+        struct_fields.push(parse_struct_field(field.trim().to_owned(), imports));
+    }
+
+    Struct {
+        name: struct_name.to_owned(),
+        fields: struct_fields,
+        comments,
+    }
 }
 
 /// Parses struct fields
@@ -799,21 +868,39 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 /// `line` the Solidity definition of enum
 ///
 /// returns the enum as `Enum` struct
-fn parse_enum(line: String) -> Enum {
-    let tokens = split(line, " ", None);
+fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
+    let mut line_raw = String::new();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            NEW_LINE => {
+                line_raw.push(SPACE);
+            }
+            CURLY_CLOSE => break,
+            _ => {
+                line_raw.push(ch);
+            }
+        }
+    }
+
+    let tokens = split(line_raw, " ", None);
     let name = tokens[1].to_owned();
     let mut values = Vec::<String>::new();
 
     for i in 2..tokens.len() {
         let mut token = tokens[i].to_owned();
-        if token == "{" || token == "}" {
+        if token == "{" {
             continue
         } else {
             token.remove_matches(",");
             values.push(token);
         }
     }
-    Enum { name, values }
+    Enum {
+        name,
+        values,
+        comments,
+    }
 }
 
 /// Looks for `contract Contract` or `interface Interface` definition in solidity file

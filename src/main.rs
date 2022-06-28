@@ -10,6 +10,8 @@ pub mod structures;
 
 use std::env;
 
+use crate::parser::ParserError;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -31,28 +33,18 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
     // read the file
     let content = file_utils::read_file(path)?;
 
-    let lines: Vec<String> = content.split('\n').map(|s| s.trim().to_owned()).collect();
-
-    // we skip all lines until the contract definition
-    let contract_definition: structures::ContractDefinition =
-        parser::parse_contract_definition(&lines)?;
-
-    match contract_definition.contract_type {
-        structures::ContractType::INTERFACE => {
-            let interface = parser::parse_interface(contract_definition, lines)?;
-            let ink_trait = assembler::assemble_interface(interface);
-            let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_trait, Some(file_name))?;
-            println!("File saved!");
-            Ok(())
-        }
-        structures::ContractType::CONTRACT => {
-            let contract = parser::parse_contract(contract_definition, lines)?;
+    let output = parser::parse_file(content)?;
+    match output {
+        (None, None) | (Some(_), Some(_)) => return Err(ParserError::FileCorrupted),
+        (Some(contract), None) => {
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(&ink_contract, Some(file_name))?;
             println!("File saved!");
-            Ok(())
+            return Ok(())
+        }
+        (None, Some(_)) => {
+            unimplemented!()
         }
     }
 }
