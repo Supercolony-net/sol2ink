@@ -297,15 +297,11 @@ fn parse_contract(
                     buffer.clear();
                 } else if buffer == "constructor" {
                     constructor = parse_function(&mut imports, chars)?;
-
-                    // TODO
                     structs.push(parse_struct(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
                 } else if buffer == "function" {
-                    // TODO
                     functions.push(parse_function(&mut imports, chars)?);
-
                     structs.push(parse_struct(&mut imports, chars, comments.clone()));
                     comments.clear();
                     buffer.clear();
@@ -834,11 +830,15 @@ fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<
     }
 
     let split_brace = split(struct_raw, "{", None);
-    let fields = split(split_brace[1].to_owned(), ";", None);
+    let fields = split(split_brace[1].trim().to_owned(), ";", None);
     let struct_name = split_brace[0].to_owned();
+
     let mut struct_fields = Vec::<StructField>::new();
 
     for field in fields.iter() {
+        if field.is_empty() {
+            continue
+        }
         struct_fields.push(parse_struct_field(field.trim().to_owned(), imports));
     }
 
