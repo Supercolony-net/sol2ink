@@ -306,7 +306,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                         } else {
                             String::from("")
                         },
-                        function.header.return_params[i]
+                        function.header.return_params[i].param_type
                     )
                     .as_str(),
                 );
@@ -319,8 +319,11 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         output_vec.push(header.to_owned());
         // body
         for statement in function.body.iter() {
-            // TODO remove comments
-            output_vec.push(format!("\t\t// {}\n", statement.content));
+            output_vec.push(format!(
+                "\t\t{}{}\n",
+                if statement.comment { "// " } else { "" },
+                statement.content
+            ));
         }
         // TODO remove todo
         output_vec.push(String::from("\t\ttodo!()\n"));
@@ -361,7 +364,14 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
             .as_str(),
         );
         for param in function.params.iter() {
-            header.push_str(format!(", {}: {}", param.name, param.param_type).as_str());
+            header.push_str(
+                format!(
+                    ", {}: {}",
+                    param.name.to_case(Case::Snake),
+                    param.param_type
+                )
+                .as_str(),
+            );
         }
         header.push_str(")");
         // return params
@@ -379,7 +389,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
                         } else {
                             String::from("")
                         },
-                        function.return_params[i]
+                        function.return_params[i].param_type
                     )
                     .as_str(),
                 );

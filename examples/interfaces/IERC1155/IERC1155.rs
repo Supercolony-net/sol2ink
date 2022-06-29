@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.2.4
+// Generated with Sol2Ink v0.3.0
 // https://github.com/Supercolony-net/sol2ink
 
 use brush::traits::AccountId;
@@ -46,15 +46,15 @@ pub struct URI {
 }
 
 #[brush::wrapper]
-pub type IERC1155Ref = dyn IERC1155;
+pub type ERC1155Ref = dyn ERC1155;
 
 #[brush::trait_definition]
-pub trait IERC1155 {
+pub trait ERC1155 {
 	#[ink(message)]
 	fn balance_of(&self, account: AccountId, id: u128) -> u128;
 
 	#[ink(message)]
-	fn balance_of_batch(&mut self, accounts: Vec<AccountId>, ids: Vec<u128>) -> Vec<u128>;
+	fn balance_of_batch(&self, accounts: Vec<AccountId>, ids: Vec<u128>) -> Vec<u128>;
 
 	#[ink(message)]
 	fn set_approval_for_all(&mut self, operator: AccountId, approved: bool);

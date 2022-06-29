@@ -7,16 +7,6 @@ pub enum ContractType {
     CONTRACT,
 }
 
-/// `contract_name` the name of the contract
-/// `next_line` n-th line where we found contract definition
-/// `contract_type` type of parsed contract (contract/interface)
-#[derive(Debug, Default)]
-pub struct ContractDefinition {
-    pub contract_name: String,
-    pub next_line: usize,
-    pub contract_type: ContractType,
-}
-
 pub struct Contract {
     pub name: String,
     pub fields: Vec<ContractField>,
@@ -26,6 +16,7 @@ pub struct Contract {
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
     pub imports: HashSet<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct Interface {
@@ -35,6 +26,7 @@ pub struct Interface {
     pub structs: Vec<Struct>,
     pub function_headers: Vec<FunctionHeader>,
     pub imports: HashSet<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct ContractField {
@@ -45,6 +37,7 @@ pub struct ContractField {
 pub struct Event {
     pub name: String,
     pub fields: Vec<EventField>,
+    pub comments: Vec<String>,
 }
 
 pub struct EventField {
@@ -56,11 +49,13 @@ pub struct EventField {
 pub struct Enum {
     pub name: String,
     pub values: Vec<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct Struct {
     pub name: String,
     pub fields: Vec<StructField>,
+    pub comments: Vec<String>,
 }
 
 #[derive(Default, Clone)]
@@ -72,7 +67,6 @@ pub struct StructField {
 #[derive(Default, Clone)]
 pub struct Function {
     pub header: FunctionHeader,
-    pub constructor: bool,
     pub body: Vec<Statement>,
 }
 
@@ -83,7 +77,8 @@ pub struct FunctionHeader {
     pub external: bool,
     pub view: bool,
     pub payable: bool,
-    pub return_params: Vec<String>,
+    pub return_params: Vec<FunctionParam>,
+    pub comments: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -95,4 +90,5 @@ pub struct FunctionParam {
 #[derive(Clone, Debug)]
 pub struct Statement {
     pub content: String,
+    pub comment: bool,
 }

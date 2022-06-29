@@ -1,1 +1,210 @@
-# [doc = "// Generated with Sol2Ink v0.2.4\n"] # [doc = "// https://github.com/Supercolony-net/sol2ink\n\n"] # ! [cfg_attr (not (feature = "std") , no_std)] # ! [feature (min_specialization)] # [brush :: contract] pub mod "erc_20" { "use brush::traits::AccountId;\n" "\n" "use ink::prelude::string::String;\n" "\n" "use ink_storage::Mapping;\n" "#[ink(event)]\n" "pub struct Transfer {\n" "\t#[ink(topic)]\n" "\tfrom: AccountId,\n" "\t#[ink(topic)]\n" "\tto: AccountId,\n" "\tvalue: u128,\n" "}\n\n" "#[ink(event)]\n" "pub struct Approval {\n" "\t#[ink(topic)]\n" "\towner: AccountId,\n" "\t#[ink(topic)]\n" "\tspender: AccountId,\n" "\tvalue: u128,\n" "}\n\n" "pub enum Enum {\n" "\tFIRST, \n" "\tSECOND, \n" "}\n\n" "#[derive(Default, Encode, Decode)]\n" "#[cfg_attr(feature = \"std\", derive(scale_info::TypeInfo))]\n" "pub struct Struct {\n" "\tpub field_1: u128,\n" "\tpub field_2: u128,\n" "}\n\n" "#[ink(storage)]\n" "#[derive(Default, SpreadAllocate)]\n" "pub struct ERC20 {\n" "\tbalances: Mapping<AccountId, u128>,\n" "\tallowances: Mapping<(AccountId, AccountId), u128>,\n" "\ttotal_supply: u128,\n" "\tname: String,\n" "\tsymbol: String,\n" "}\n" "\n" impl "erc_20" { "\t#[ink(constructor)]\n" "\tpub fn new(name: String, symbol: String) -> Self {\n" "\t\tink_lang::codegen::initialize_contract(|instance: &mut Self| {\n" "\t\t\t// _name = name_;\n" "\t\t\t// _symbol = symbol_;\n" "\t\t})\n" "\t}\n\n" "\t#[ink(message)]\n" "\tpub fn name(&self) -> String {\n" "\t\t// return _name;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn symbol(&self) -> String {\n" "\t\t// return _symbol;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn decimals(&self) -> u8 {\n" "\t\t// return 18;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn total_supply(&self) -> u128 {\n" "\t\t// return _totalSupply;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn balance_of(&self, account: AccountId) -> u128 {\n" "\t\t// return _balances[account];\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {\n" "\t\t// address owner = msg.sender;\n" "\t\t// _transfer(owner, to, amount);\n" "\t\t// return true;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {\n" "\t\t// return _allowances[owner][spender];\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {\n" "\t\t// address owner = msg.sender;\n" "\t\t// _approve(owner, spender, amount);\n" "\t\t// return true;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool {\n" "\t\t// address spender = msg.sender;\n" "\t\t// _spendAllowance(from, spender, amount);\n" "\t\t// _transfer(from, to, amount);\n" "\t\t// return true;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {\n" "\t\t// address owner = msg.sender;\n" "\t\t// _approve(owner, spender, allowance(owner, spender) + addedValue);\n" "\t\t// return true;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\t#[ink(message)]\n" "\tpub fn decrease_allowance(&mut self, spender: AccountId, subtracted_value: u128) -> bool {\n" "\t\t// address owner = msg.sender;\n" "\t\t// uint256 currentAllowance = allowance(owner, spender);\n" "\t\t// require(currentAllowance >= subtractedValue, \"ERC20: decreased allowance below zero\");\n" "\t\t// unchecked {\n" "\t\t// _approve(owner, spender, currentAllowance - subtractedValue);\n" "\t\t// }\n" "\t\t// \n" "\t\t// return true;\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {\n" "\t\t// require(from != address(0), \"ERC20: transfer from the zero address\");\n" "\t\t// require(to != address(0), \"ERC20: transfer to the zero address\");\n" "\t\t// \n" "\t\t// _beforeTokenTransfer(from, to, amount);\n" "\t\t// \n" "\t\t// uint256 fromBalance = _balances[from];\n" "\t\t// require(fromBalance >= amount, \"ERC20: transfer amount exceeds balance\");\n" "\t\t// unchecked {\n" "\t\t// _balances[from] = fromBalance - amount;\n" "\t\t// }\n" "\t\t// _balances[to] += amount;\n" "\t\t// \n" "\t\t// emit Transfer(from, to, amount);\n" "\t\t// \n" "\t\t// _afterTokenTransfer(from, to, amount);\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _mint(&mut self, account: AccountId, amount: u128) {\n" "\t\t// require(account != address(0), \"ERC20: mint to the zero address\");\n" "\t\t// \n" "\t\t// _beforeTokenTransfer(address(0), account, amount);\n" "\t\t// \n" "\t\t// _totalSupply += amount;\n" "\t\t// _balances[account] += amount;\n" "\t\t// emit Transfer(address(0), account, amount);\n" "\t\t// \n" "\t\t// _afterTokenTransfer(address(0), account, amount);\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _burn(&mut self, account: AccountId, amount: u128) {\n" "\t\t// require(account != address(0), \"ERC20: burn from the zero address\");\n" "\t\t// \n" "\t\t// _beforeTokenTransfer(account, address(0), amount);\n" "\t\t// \n" "\t\t// uint256 accountBalance = _balances[account];\n" "\t\t// require(accountBalance >= amount, \"ERC20: burn amount exceeds balance\");\n" "\t\t// unchecked {\n" "\t\t// _balances[account] = accountBalance - amount;\n" "\t\t// }\n" "\t\t// _totalSupply -= amount;\n" "\t\t// \n" "\t\t// emit Transfer(account, address(0), amount);\n" "\t\t// \n" "\t\t// _afterTokenTransfer(account, address(0), amount);\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {\n" "\t\t// require(owner != address(0), \"ERC20: approve from the zero address\");\n" "\t\t// require(spender != address(0), \"ERC20: approve to the zero address\");\n" "\t\t// \n" "\t\t// _allowances[owner][spender] = amount;\n" "\t\t// emit Approval(owner, spender, amount);\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {\n" "\t\t// uint256 currentAllowance = allowance(owner, spender);\n" "\t\t// if (currentAllowance != type(uint256).max) {\n" "\t\t// require(currentAllowance >= amount, \"ERC20: insufficient allowance\");\n" "\t\t// unchecked {\n" "\t\t// _approve(owner, spender, currentAllowance - amount);\n" "\t\t// }\n" "\t\t// }\n" "\t\ttodo!()\n" "\t}\n" "\n" "\tfn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {\n" "\t\t// \n" "\t\t// /**\n" "\t\t// * @dev Hook that is called after any transfer of tokens. This includes\n" "\t\t// * minting and burning.\n" "\t\t// *\n" "\t\t// * Calling conditions:\n" "\t\t// *\n" "\t\t// * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens\n" "\t\t// * has been transferred to `to`.\n" "\t\t// * - when `from` is zero, `amount` tokens have been minted for `to`.\n" "\t\t// * - when `to` is zero, `amount` of ``from``'s tokens have been burned.\n" "\t\t// * - `from` and `to` are never both zero.\n" "\t\t// *\n" "\t\t// * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].\n" "\t\t// */\n" "\t\t// function _afterTokenTransfer(\n" "\t\t// address from,\n" "\t\t// address to,\n" "\t\t// uint256 amount\n" "\t\t// ) internal virtual {}\n" "\t\t// }\n" "\t\ttodo!()\n" "\t}\n" "\n" } }
+// Generated with Sol2Ink v0.3.0
+// https://github.com/Supercolony-net/sol2ink
+
+#![cfg_attr(not(feature = "std"), no_std)]
+#![feature(min_specialization)]
+
+#[brush::contract]
+pub mod erc_20 {
+	use brush::traits::AccountId;
+	use ink::prelude::string::String;
+	use ink_storage::Mapping;
+
+	#[ink(event)]
+	pub struct Transfer {
+		#[ink(topic)]
+		from: AccountId,
+		#[ink(topic)]
+		to: AccountId,
+		value: u128,
+	}
+
+	#[ink(event)]
+	pub struct Approval {
+		#[ink(topic)]
+		owner: AccountId,
+		#[ink(topic)]
+		spender: AccountId,
+		value: u128,
+	}
+
+	pub enum Enum {
+		FIRST, 
+		SECOND, 
+	}
+
+	#[derive(Default, Encode, Decode)]
+	#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+	pub struct Struct  {
+		pub field_1: u128,
+		pub field_2: u128,
+	}
+
+	#[ink(storage)]
+	#[derive(Default, SpreadAllocate)]
+	pub struct  ERC20 {
+		balances: Mapping<AccountId, u128>,
+		allowances: Mapping<(AccountId, AccountId), u128>,
+		total_supply: u128,
+		name: String,
+		symbol: String,
+	}
+	
+	impl  ERC20 {
+		#[ink(constructor)]
+		pub fn new(name: String, symbol: String) -> Self {
+			ink_lang::codegen::initialize_contract(|instance: &mut Self| {
+				// _name = name_
+				// _symbol = symbol_
+			})
+		}
+
+		#[ink(message)]
+		pub fn name(&self) -> String {
+			// return _name
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn symbol(&self) -> String {
+			// return _symbol
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn decimals(&self) -> u8 {
+			// return 18
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn total_supply(&self) -> u128 {
+			// return _totalSupply
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn balance_of(&self, account: AccountId) -> u128 {
+			// return _balances[account]
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {
+			// address owner = msg.sender
+			// _transfer(owner, to, amount)
+			// return true
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {
+			// return _allowances[owner][spender]
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {
+			// address owner = msg.sender
+			// _approve(owner, spender, amount)
+			// return true
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool {
+			// address spender = msg.sender
+			// _spendAllowance(from, spender, amount)
+			// _transfer(from, to, amount)
+			// return true
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {
+			// address owner = msg.sender
+			// _approve(owner, spender, allowance(owner, spender) + addedValue)
+			// return true
+			todo!()
+		}
+	
+		#[ink(message)]
+		pub fn decrease_allowance(&mut self, spender: AccountId, subtracted_value: u128) -> bool {
+			// address owner = msg.sender
+			// uint256 currentAllowance = allowance(owner, spender)
+			// require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero")
+			// unchecked
+			// _approve(owner, spender, currentAllowance - subtractedValue)
+			// 
+			// return true
+			todo!()
+		}
+	
+		fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+			// require(from != address(0), "ERC20: transfer from the zero address")
+			// require(to != address(0), "ERC20: transfer to the zero address")
+			// _beforeTokenTransfer(from, to, amount)
+			// uint256 fromBalance = _balances[from]
+			// require(fromBalance >= amount, "ERC20: transfer amount exceeds balance")
+			// unchecked
+			// _balances[from] = fromBalance - amount
+			// 
+			// _balances[to] += amount
+			// emit Transfer(from, to, amount)
+			// _afterTokenTransfer(from, to, amount)
+			todo!()
+		}
+	
+		fn _mint(&mut self, account: AccountId, amount: u128) {
+			// require(account != address(0), "ERC20: mint to the zero address")
+			// _beforeTokenTransfer(address(0), account, amount)
+			// _totalSupply += amount
+			// _balances[account] += amount
+			// emit Transfer(address(0), account, amount)
+			// _afterTokenTransfer(address(0), account, amount)
+			todo!()
+		}
+	
+		fn _burn(&mut self, account: AccountId, amount: u128) {
+			// require(account != address(0), "ERC20: burn from the zero address")
+			// _beforeTokenTransfer(account, address(0), amount)
+			// uint256 accountBalance = _balances[account]
+			// require(accountBalance >= amount, "ERC20: burn amount exceeds balance")
+			// unchecked
+			// _balances[account] = accountBalance - amount
+			// 
+			// _totalSupply -= amount
+			// emit Transfer(account, address(0), amount)
+			// _afterTokenTransfer(account, address(0), amount)
+			todo!()
+		}
+	
+		fn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
+			// require(owner != address(0), "ERC20: approve from the zero address")
+			// require(spender != address(0), "ERC20: approve to the zero address")
+			// _allowances[owner][spender] = amount
+			// emit Approval(owner, spender, amount)
+			todo!()
+		}
+	
+		fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
+			// uint256 currentAllowance = allowance(owner, spender)
+			// if (currentAllowance != type(uint256).max)
+			// require(currentAllowance >= amount, "ERC20: insufficient allowance")
+			// unchecked
+			// _approve(owner, spender, currentAllowance - amount)
+			// 
+			// 
+			todo!()
+		}
+	
+		fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+			todo!()
+		}
+	
+		fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
+			todo!()
+		}
+	
+	}
+}

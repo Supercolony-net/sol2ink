@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.2.4
+// Generated with Sol2Ink v0.3.0
 // https://github.com/Supercolony-net/sol2ink
 
 use brush::traits::AccountId;
@@ -34,10 +34,10 @@ pub struct RoleRevoked {
 }
 
 #[brush::wrapper]
-pub type IAccessControlRef = dyn IAccessControl;
+pub type AccessControlRef = dyn AccessControl;
 
 #[brush::trait_definition]
-pub trait IAccessControl {
+pub trait AccessControl {
 	#[ink(message)]
 	fn has_role(&self, role: [u8; 32], account: AccountId) -> bool;
 
