@@ -8,6 +8,8 @@ use convert_case::{
     Case,
     Casing,
 };
+use proc_macro2::TokenStream;
+use quote::quote;
 
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
 pub fn assemble_contract(contract: Contract) -> Vec<String> {
@@ -24,8 +26,14 @@ pub fn assemble_contract(contract: Contract) -> Vec<String> {
         contract.name.to_case(Case::Snake)
     ));
 
+    let imports = assemble_imports(contract.imports);
+
+    let out = quote!{
+        #imports
+    };
+
     // imports
-    append_and_tab(&mut output_vec, assemble_imports(contract.imports));
+    // append_and_tab(&mut output_vec, assemble_imports(contract.imports));
     output_vec.push(String::from("\n"));
     // enums
     append_and_tab(&mut output_vec, assemble_events(contract.events));
@@ -82,10 +90,13 @@ pub fn assemble_interface(interface: Interface) -> Vec<String> {
 }
 
 /// Sorts the imports inside the HashSet and return it as a Vec of Strings
-fn assemble_imports(imports: HashSet<String>) -> Vec<String> {
+fn assemble_imports(imports: HashSet<String>) -> TokenStream {
     let mut output_vec = Vec::from_iter(imports);
     output_vec.sort();
-    output_vec
+
+    quote!{
+        #(#output_vec)*
+    }
 }
 
 /// Assembles ink! enums from the vec of parsed Enum structs and return them as a vec of Strings
