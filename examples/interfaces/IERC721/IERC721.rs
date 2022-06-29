@@ -34,10 +34,10 @@ pub struct ApprovalForAll {
 }
 
 #[brush::wrapper]
-pub type IERC721Ref = dyn IERC721;
+pub type ERC721Ref = dyn ERC721;
 
 #[brush::trait_definition]
-pub trait IERC721 {
+pub trait ERC721 {
 	#[ink(message)]
 	fn balance_of(&self, owner: AccountId) -> u128;
 

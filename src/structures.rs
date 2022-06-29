@@ -36,6 +36,7 @@ pub struct Interface {
     pub structs: Vec<Struct>,
     pub function_headers: Vec<FunctionHeader>,
     pub imports: HashSet<String>,
+    pub comments: Vec<String>,
 }
 
 pub struct ContractField {
@@ -87,6 +88,7 @@ pub struct FunctionHeader {
     pub view: bool,
     pub payable: bool,
     pub return_params: Vec<FunctionParam>,
+    pub comments: Vec<String>,
 }
 
 #[derive(Clone)]

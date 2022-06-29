@@ -37,68 +37,11 @@ impl From<std::io::Error> for ParserError {
     }
 }
 
-/// Parses the code of a Solidity interface
-///
-/// `contract_definition` the definition of the interface
-/// `lines` the solidity code of the interface
-///
-/// returns the representation of the interface as `Interface` struct
-pub fn parse_interface(
-    contract_definition: ContractDefinition,
-    lines: Vec<String>,
-) -> Result<Interface, ParserError> {
-    let name = contract_definition.contract_name;
-
-    let mut events = Vec::<Event>::new();
-    let mut enums = Vec::<Enum>::new();
-    let mut structs = Vec::<Struct>::new();
-    let mut function_headers = Vec::<FunctionHeader>::new();
-    let mut imports = HashSet::<String>::new();
-
-    let mut iterator = lines.iter();
-    // read body of contract
-    while let Some(raw_line) = iterator.next() {
-        let line = raw_line.trim().to_owned();
-
-        if line.is_empty() {
-            continue
-        } else if line.chars().nth(0).unwrap() == '/' || line.chars().nth(0).unwrap() == '*' {
-            // TODO parse comments
-        } else if line.substring(0, 8) == "function" {
-            if line.contains(";") {
-                // function_headers.push(parse_function_header(line, &mut imports));
-            } else {
-                // function_headers.push(parse_function_header(
-                //     compose_function_header(line, &mut iterator)?,
-                //     &mut imports,
-                // ));
-            }
-        } else if line.substring(0, 5) == "event" {
-            // TODO
-        } else if line.substring(0, 4) == "enum" {
-            // TODO
-        } else if line.substring(0, 6) == "struct" {
-            // TODO
-        } else if line == "}" {
-            // end of contract
-            continue
-        }
-    }
-
-    Ok(Interface {
-        name,
-        events,
-        enums,
-        structs,
-        function_headers,
-        imports,
-    })
-}
-
 #[derive(Eq, PartialEq)]
 enum Action {
     None,
     ContractName,
+    ContractNamed,
     Contract,
 
     Slash,
@@ -136,14 +79,15 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
             NEW_LINE | SPACE => {}
             _ => {
                 buffer.push(ch);
-                if buffer == "pragma" {
-                    skip_pragma(&mut chars);
+                if buffer == "pragma" || buffer == "import" {
+                    skip(&mut chars);
                     buffer = String::new();
                 } else if buffer == "contract" {
                     let contract = parse_contract(&mut chars, comments)?;
                     return Ok((Some(contract), None))
                 } else if buffer == "interface" {
-                    todo!()
+                    let interface = parse_interface(&mut chars, comments)?;
+                    return Ok((None, Some(interface)))
                 }
             }
         }
@@ -222,7 +166,7 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
     comments
 }
 
-fn skip_pragma(chars: &mut Chars) {
+fn skip(chars: &mut Chars) {
     while let Some(ch) = chars.next() {
         match ch {
             SEMICOLON => return,
@@ -297,11 +241,11 @@ fn parse_contract(
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "constructor" {
-                    constructor = parse_function(&mut imports, chars)?;
+                    constructor = parse_function(&mut imports, chars, comments.clone())?;
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "function" {
-                    functions.push(parse_function(&mut imports, chars)?);
+                    functions.push(parse_function(&mut imports, chars, comments.clone())?);
                     comments.clear();
                     buffer.clear();
                 } else if ch == SEMICOLON {
@@ -310,21 +254,6 @@ fn parse_contract(
                 }
             }
             _ => {}
-        }
-    }
-
-    // read body of contract
-    while let Some(raw_line) = chars.next() {
-        let line = raw_line.to_string();
-
-        if line.is_empty() {
-            continue
-        } else if line.substring(0, 11) == "constructor" {
-        } else if line.substring(0, 8) == "function" {
-        } else if line == "}" {
-            // end of contract
-            continue
-        } else {
         }
     }
 
@@ -371,6 +300,93 @@ fn parse_contract(
     })
 }
 
+/// Parses the code of a Solidity interface
+///
+/// `contract_definition` the definition of the interface
+/// `lines` the solidity code of the interface
+///
+/// returns the representation of the interface as `Interface` struct
+pub fn parse_interface(
+    chars: &mut Chars,
+    contract_comments: Vec<String>,
+) -> Result<Interface, ParserError> {
+    let mut buffer = String::new();
+    let mut action = Action::None;
+
+    let mut name = String::new();
+    let mut comments = Vec::<String>::new();
+    let mut events = Vec::<Event>::new();
+    let mut enums = Vec::<Enum>::new();
+    let mut structs = Vec::<Struct>::new();
+    let mut function_headers = Vec::<FunctionHeader>::new();
+    let mut imports = HashSet::<String>::new();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            NEW_LINE if action == Action::None || action == Action::Contract => {}
+            SLASH if action == Action::Contract => action = Action::Slash,
+            SLASH if action == Action::Slash => {
+                let comment = parse_comment(chars);
+                if comment.len() > 0 {
+                    comments.push(comment);
+                }
+                action = Action::Contract;
+            }
+            ASTERISK if action == Action::Slash => {
+                let mut new_comments = parse_multiline_comment(chars);
+                comments.append(&mut new_comments);
+                action = Action::Contract;
+            }
+            CURLY_OPEN => {
+                action = Action::Contract;
+            }
+            SPACE if action == Action::ContractName => {
+                name = buffer.trim().substring(1, buffer.len()).to_owned();
+                buffer = String::new();
+                action = Action::ContractNamed;
+            }
+            _ if action == Action::None => {
+                buffer.push(ch);
+                action = Action::ContractName;
+            }
+            _ if action == Action::ContractName || action == Action::Contract => {
+                buffer.push(ch);
+                if buffer.trim() == "event" {
+                    events.push(parse_event(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer.trim() == "enum" {
+                    enums.push(parse_enum(chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer.trim() == "struct" {
+                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    comments.clear();
+                    buffer.clear();
+                } else if buffer.trim() == "function" {
+                    let function_header_raw = compose_function_header(chars)?.trim().to_owned();
+                    let function_header =
+                        parse_function_header(function_header_raw, &mut imports, comments.clone());
+                    function_headers.push(function_header);
+                    comments.clear();
+                    buffer.clear();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(Interface {
+        name,
+        events,
+        enums,
+        structs,
+        function_headers,
+        imports,
+        comments: contract_comments,
+    })
+}
+
 /// Parses a field of the contract
 ///
 /// `line` the raw representation of the field
@@ -396,7 +412,11 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
 /// `imports` the set of imports of the contract
 ///
 /// returns the representation of the function header as `FunctionHeader` struct
-fn parse_function_header(line: String, imports: &mut HashSet<String>) -> FunctionHeader {
+fn parse_function_header(
+    line: String,
+    imports: &mut HashSet<String>,
+    comments: Vec<String>,
+) -> FunctionHeader {
     let split_by_left_brace = split(line, "(", None);
     let name = split_by_left_brace[0].to_owned();
 
@@ -423,6 +443,7 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
         view,
         payable,
         return_params,
+        comments,
     }
 }
 
@@ -436,11 +457,12 @@ fn parse_function_header(line: String, imports: &mut HashSet<String>) -> Functio
 fn parse_function(
     imports: &mut HashSet<String>,
     chars: &mut Chars,
+    comments: Vec<String>,
 ) -> Result<Function, ParserError> {
     let function_header_raw = compose_function_header(chars)?.trim().to_owned();
     let mut open_braces = function_header_raw.matches("{").count();
     let mut close_braces = 0;
-    let function_header = parse_function_header(function_header_raw, imports);
+    let function_header = parse_function_header(function_header_raw, imports, comments);
     let mut statements = Vec::<Statement>::new();
     let mut buffer = String::new();
 
@@ -772,18 +794,23 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<S
         }
     }
     let regex = Regex::new(r"\s+").unwrap();
-    event_raw = regex.replace_all(event_raw.as_str(), " ").to_string();
+    event_raw = regex
+        .replace_all(event_raw.as_str(), " ")
+        .trim()
+        .replace("( ", "(")
+        .replace(" )", ")");
 
     let tokens = split(event_raw, " ", None);
     let mut args_reader = ArgsReader::ARGNAME;
     let mut indexed = false;
-    // we assume Approval(address, didnt get split by white space
-    let split_brace = split(tokens[1].clone(), "(", None);
+
+    let split_brace = split(tokens[0].clone(), "(", None);
+
     let name = split_brace[0].to_owned();
     let mut field_type = convert_variable_type(split_brace[1].to_owned(), imports);
     let mut fields = Vec::<EventField>::new();
 
-    for i in 2..tokens.len() {
+    for i in 1..tokens.len() {
         let mut token = tokens[i].to_owned();
         if token == "indexed" {
             indexed = true;

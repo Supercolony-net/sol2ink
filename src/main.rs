@@ -43,8 +43,12 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
             println!("File saved!");
             return Ok(())
         }
-        (None, Some(_)) => {
-            unimplemented!()
+        (None, Some(interface)) => {
+            let ink_trait = assembler::assemble_interface(interface);
+            let file_name = path.replace(".sol", ".rs");
+            file_utils::write_file(&ink_trait, Some(file_name))?;
+            println!("File saved!");
+            return Ok(())
         }
     }
 }

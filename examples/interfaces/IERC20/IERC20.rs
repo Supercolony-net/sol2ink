@@ -22,10 +22,10 @@ pub struct Approval {
 }
 
 #[brush::wrapper]
-pub type IERC20Ref = dyn IERC20;
+pub type ERC20Ref = dyn ERC20;
 
 #[brush::trait_definition]
-pub trait IERC20 {
+pub trait ERC20 {
 	#[ink(message)]
 	fn total_supply(&self) -> u128;
 
