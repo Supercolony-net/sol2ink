@@ -1,3 +1,4 @@
+use proc_macro2::TokenStream;
 use std::{
     fs::File,
     io::{
@@ -7,7 +8,7 @@ use std::{
 };
 
 /// Reads the file to be transpiled and returns it as string
-/// 
+///
 /// `path` the path to the file
 pub fn read_file(path: &String) -> std::io::Result<String> {
     let file = File::open(path)?;
@@ -21,11 +22,9 @@ pub fn read_file(path: &String) -> std::io::Result<String> {
 ///
 /// `lines` the transpiled file in the form of vec of strings
 /// each item in the vec represents a separate line in the output file
-pub fn write_file(lines: &Vec<String>, file_name: Option<String>) -> std::io::Result<()> {
+pub fn write_file(lines: TokenStream, file_name: Option<String>) -> std::io::Result<()> {
     let path = file_name.unwrap_or(String::from("output.rs"));
     let mut file = File::create(path)?;
-    for line in lines.iter() {
-        file.write_all(line.as_bytes())?;
-    }
+    file.write_all(lines.to_string().as_bytes())?;
     Ok(())
 }

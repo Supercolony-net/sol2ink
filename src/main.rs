@@ -42,7 +42,8 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
             let interface = parser::parse_interface(contract_definition, lines)?;
             let ink_trait = assembler::assemble_interface(interface);
             let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_trait, Some(file_name))?;
+            file_utils::write_file(ink_trait, Some(file_name))?;
+
             println!("File saved!");
             Ok(())
         }
@@ -50,7 +51,7 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
             let contract = parser::parse_contract(contract_definition, lines)?;
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_contract, Some(file_name))?;
+            file_utils::write_file(ink_contract, Some(file_name))?;
             println!("File saved!");
             Ok(())
         }
