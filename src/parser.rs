@@ -2,10 +2,6 @@ use crate::{
     formatter::split,
     structures::*,
 };
-use convert_case::{
-    Case,
-    Casing,
-};
 use regex::Regex;
 use std::{
     collections::{
@@ -271,21 +267,9 @@ fn parse_contract(
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(
-            function,
-            false,
-            &mut storage_variables,
-            functions_map.clone(),
-            &mut imports,
-        );
+        parse_statements(function);
     }
-    parse_statements(
-        &mut constructor,
-        true,
-        &mut storage_variables,
-        functions_map,
-        &mut imports,
-    );
+    parse_statements(&mut constructor);
 
     Ok(Contract {
         name,
@@ -525,25 +509,11 @@ fn compose_function_header(chars: &mut Chars) -> Result<String, ParserError> {
     return Err(ParserError::ContractCorrupted)
 }
 
-fn parse_statements(
-    function: &mut Function,
-    constructor: bool,
-    storage_variables: &mut HashMap<String, String>,
-    functions: HashMap<String, ()>,
-    imports: &mut HashSet<String>,
-) {
+fn parse_statements(function: &mut Function) {
     let statements = function
         .body
         .iter()
-        .map(|statement| {
-            parse_statement(
-                statement.content.clone(),
-                constructor,
-                storage_variables,
-                functions.clone(),
-                imports,
-            )
-        })
+        .map(|statement| parse_statement(statement.content.clone()))
         .collect::<Vec<Statement>>();
     function.body = statements;
 }
@@ -555,117 +525,8 @@ fn parse_statements(
 /// TODO: for now we only return the original statement and comment it
 ///
 /// returns the statement as `Statement` struct
-fn parse_statement(
-    line: String,
-    constructor: bool,
-    storage_variables: &mut HashMap<String, String>,
-    functions: HashMap<String, ()>,
-    imports: &mut HashSet<String>,
-) -> Statement {
-    if line.contains("+=") {
-        // TODO
-    } else if line.contains("-=") {
-        // TODO
-    } else if line.contains("--") {
-        // TODO
-    } else if line.contains("++") {
-        // TODO
-    } else if line.contains("!=") {
-        // TODO
-    } else if line.contains(">=") {
-        // TODO
-    } else if line.contains("<=") {
-        // TODO
-    } else if line.contains("==") {
-        // TODO
-    } else if line.contains("=") {
-        // assignment
-        return parse_assignment(line, constructor, storage_variables, functions, imports)
-    } else if line.contains("-") {
-        // TODO
-    } else if line.contains("+") {
-        // TODO
-    }
+fn parse_statement(line: String) -> Statement {
     // TODO actual parsing
-    Statement {
-        content: line,
-        comment: true,
-    }
-}
-
-fn parse_assignment(
-    raw_line: String,
-    constructor: bool,
-    storage_variables: &mut HashMap<String, String>,
-    functions: HashMap<String, ()>,
-    imports: &mut HashSet<String>,
-) -> Statement {
-    let mut line = raw_line.replace(
-        "msg.sender",
-        format!(
-            "{}.env().caller()",
-            if constructor { "instance" } else { "self" }
-        )
-        .as_str(),
-    );
-    line.remove_matches(";");
-    let tokens = split(line.clone(), "=", None);
-    let left_raw = tokens[0].trim().to_owned();
-    let right_raw = tokens[1].trim().to_owned();
-    let left_split = split(left_raw.clone(), "[", None);
-    let left = left_split[0].to_owned();
-    let right = if split(right_raw.clone(), " ", None).len() > 1 {
-        parse_statement(
-            right_raw,
-            constructor,
-            storage_variables,
-            functions,
-            imports,
-        )
-        .content
-    } else {
-        right_raw
-    };
-    if split(left_raw.clone(), " ", None).len() > 1 {
-        let tokens_left = split(left_raw, " ", None);
-        let field_type = convert_variable_type(tokens_left[0].to_owned(), imports);
-        let field_name = tokens_left[1].to_owned();
-        storage_variables.insert(field_name.to_owned(), "".to_owned());
-        return Statement {
-            content: format!(
-                "let {}: {} = {};",
-                field_name.to_case(Case::Snake),
-                field_type,
-                right
-            ),
-            comment: false,
-        }
-    } else if storage_variables.contains_key(&left) {
-        if left_raw.contains("[") {
-            let mut index = left_split[1].to_owned();
-            index.remove_matches("]");
-            return Statement {
-                content: format!(
-                    "{}.{}.insert({}, {});",
-                    if constructor { "instance" } else { "self" },
-                    left.to_case(Case::Snake),
-                    index,
-                    right
-                ),
-                comment: false,
-            }
-        }
-        return Statement {
-            content: format!(
-                "{}.{} = {};",
-                if constructor { "instance" } else { "self" },
-                left_raw.to_case(Case::Snake),
-                right
-            ),
-            comment: false,
-        }
-    } else {
-    }
     Statement {
         content: line,
         comment: true,
