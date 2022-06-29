@@ -347,9 +347,8 @@ pub fn parse_interface(
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "function" {
-                    let function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
                     let function_header =
-                        parse_function_header(function_header_raw, &mut imports, comments.clone());
+                        parse_function_header(chars, &mut imports, comments.clone());
                     function_headers.push(function_header);
                     comments.clear();
                     buffer.clear();
@@ -396,11 +395,16 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
 ///
 /// returns the representation of the function header as `FunctionHeader` struct
 fn parse_function_header(
-    line: String,
+    chars: &mut Chars,
     imports: &mut HashSet<String>,
     comments: Vec<String>,
 ) -> FunctionHeader {
-    let split_by_left_brace = split(line, "(", None);
+    let mut function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
+    function_header_raw.remove_matches(" memory");
+    function_header_raw.remove_matches(" storage");
+    function_header_raw.remove_matches(" calldata");
+
+    let split_by_left_brace = split(function_header_raw, "(", None);
     let name = split_by_left_brace[0].to_owned();
 
     let split_by_right_brace = split(split_by_left_brace[1].trim().to_owned(), ")", None);
@@ -442,14 +446,9 @@ fn parse_function(
     chars: &mut Chars,
     comments: Vec<String>,
 ) -> Result<Function, ParserError> {
-    let mut function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
-    function_header_raw.remove_matches(" memory");
-    function_header_raw.remove_matches(" storage");
-    function_header_raw.remove_matches(" calldata");
-
     let mut open_braces = 1;
     let mut close_braces = 0;
-    let function_header = parse_function_header(function_header_raw, imports, comments);
+    let function_header = parse_function_header(chars, imports, comments);
     let mut statements = Vec::<Statement>::new();
     let mut buffer = String::new();
 
@@ -580,10 +579,7 @@ fn parse_return_parameters(
     imports: &mut HashSet<String>,
 ) -> Vec<FunctionParam> {
     let mut out = Vec::<FunctionParam>::new();
-    let mut updated_parameters = parameters.to_owned();
-    updated_parameters.remove_matches(" memory");
-    updated_parameters.remove_matches(" calldata");
-    let tokens: Vec<String> = split(updated_parameters, " ", None);
+    let tokens: Vec<String> = split(parameters.to_owned(), " ", None);
 
     let mut iterator = tokens.iter();
     while let Some(token) = iterator.next() {
