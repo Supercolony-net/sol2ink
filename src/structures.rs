@@ -7,16 +7,6 @@ pub enum ContractType {
     CONTRACT,
 }
 
-/// `contract_name` the name of the contract
-/// `next_line` n-th line where we found contract definition
-/// `contract_type` type of parsed contract (contract/interface)
-#[derive(Debug, Default)]
-pub struct ContractDefinition {
-    pub contract_name: String,
-    pub next_line: usize,
-    pub contract_type: ContractType,
-}
-
 pub struct Contract {
     pub name: String,
     pub fields: Vec<ContractField>,

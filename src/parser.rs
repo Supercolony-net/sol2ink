@@ -8,7 +8,6 @@ use std::{
         HashMap,
         HashSet,
     },
-    lazy::Lazy,
     str::Chars,
 };
 use substring::Substring;
@@ -348,7 +347,7 @@ pub fn parse_interface(
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "function" {
-                    let function_header_raw = compose_function_header(chars)?.trim().to_owned();
+                    let function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
                     let function_header =
                         parse_function_header(function_header_raw, &mut imports, comments.clone());
                     function_headers.push(function_header);
@@ -443,8 +442,12 @@ fn parse_function(
     chars: &mut Chars,
     comments: Vec<String>,
 ) -> Result<Function, ParserError> {
-    let function_header_raw = compose_function_header(chars)?.trim().to_owned();
-    let mut open_braces = function_header_raw.matches("{").count();
+    let mut function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
+    function_header_raw.remove_matches(" memory");
+    function_header_raw.remove_matches(" storage");
+    function_header_raw.remove_matches(" calldata");
+
+    let mut open_braces = 1;
     let mut close_braces = 0;
     let function_header = parse_function_header(function_header_raw, imports, comments);
     let mut statements = Vec::<Statement>::new();
@@ -479,36 +482,6 @@ fn parse_function(
     })
 }
 
-/// Composes a function header in case the header is divided into multiple lines
-///
-/// `line` the line where we found the function definition
-/// `iterator` the iterator over lines of the contract file
-///
-/// returns `ParserError::ContractCorrupted` if we finish reading the contract without getting the output header
-/// returns multiline function header in the form of one line
-fn compose_function_header(chars: &mut Chars) -> Result<String, ParserError> {
-    let mut buffer = String::new();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            SEMICOLON | CURLY_OPEN => {
-                buffer.push(ch);
-                let regex = Regex::new(r"\s+").unwrap();
-                buffer = regex.replace_all(buffer.as_str(), " ").to_string();
-                return Ok(buffer)
-            }
-            NEW_LINE => {
-                buffer.push(SPACE);
-            }
-            _ => {
-                buffer.push(ch);
-            }
-        }
-    }
-
-    return Err(ParserError::ContractCorrupted)
-}
-
 fn parse_statements(function: &mut Function) {
     let statements = function
         .body
@@ -527,8 +500,9 @@ fn parse_statements(function: &mut Function) {
 /// returns the statement as `Statement` struct
 fn parse_statement(line: String) -> Statement {
     // TODO actual parsing
+    let regex = Regex::new(r"\s+").unwrap();
     Statement {
-        content: line,
+        content: regex.replace_all(line.as_str(), " ").trim().to_string(),
         comment: true,
     }
 }
@@ -557,11 +531,6 @@ fn parse_function_parameters(
                 mode = ArgsReader::ARGNAME;
             } else if mode == ArgsReader::ARGNAME {
                 let name = tokens[j].to_owned();
-
-                if name == "memory" || name == "calldata" {
-                    continue
-                }
-
                 out.push(FunctionParam {
                     name,
                     param_type: param_type.to_owned(),
@@ -642,21 +611,7 @@ fn parse_return_parameters(
 ///
 /// returns the event definition as `Event` struct
 fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Event {
-    let mut event_raw = String::new();
-    while let Some(ch) = chars.next() {
-        match ch {
-            NEW_LINE => {
-                event_raw.push(SPACE);
-            }
-            SEMICOLON => break,
-            _ => {
-                event_raw.push(ch);
-            }
-        }
-    }
-    let regex = Regex::new(r"\s+").unwrap();
-    event_raw = regex
-        .replace_all(event_raw.as_str(), " ")
+    let event_raw = read_until(chars, vec![SEMICOLON])
         .trim()
         .replace("( ", "(")
         .replace(" )", ")");
@@ -706,21 +661,7 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<S
 ///
 /// returns the struct definition as `Struct` struct
 fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Struct {
-    let mut struct_raw = String::new();
-    while let Some(ch) = chars.next() {
-        match ch {
-            NEW_LINE => {
-                struct_raw.push(SPACE);
-            }
-            CURLY_CLOSE => break,
-            _ => {
-                struct_raw.push(ch);
-            }
-        }
-    }
-    let regex = Regex::new(r"\s+").unwrap();
-    struct_raw = regex.replace_all(struct_raw.as_str(), " ").to_string();
-
+    let struct_raw = read_until(chars, vec![CURLY_CLOSE]);
     let split_brace = split(struct_raw, "{", None);
     let fields = split(split_brace[1].trim().to_owned(), ";", None);
     let struct_name = split_brace[0].to_owned();
@@ -761,21 +702,7 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 ///
 /// returns the enum as `Enum` struct
 fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
-    let mut enum_raw = String::new();
-    while let Some(ch) = chars.next() {
-        match ch {
-            NEW_LINE => {
-                enum_raw.push(SPACE);
-            }
-            CURLY_CLOSE => break,
-            _ => {
-                enum_raw.push(ch);
-            }
-        }
-    }
-    let regex = Regex::new(r"\s+").unwrap();
-    enum_raw = regex.replace_all(enum_raw.as_str(), " ").trim().to_string();
-
+    let enum_raw = read_until(chars, vec![CURLY_CLOSE]);
     let tokens = split(enum_raw, " ", None);
     let name = tokens[0].to_owned();
     let mut values = Vec::<String>::new();
@@ -794,37 +721,6 @@ fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
         values,
         comments,
     }
-}
-
-/// Looks for `contract Contract` or `interface Interface` definition in solidity file
-///
-/// `lines` the lines of original solidity code
-///
-/// returns `NoContractDefinitionFound` if no definition of a contract nor interface was found
-/// returns the definition of the contract
-pub fn parse_contract_definition(lines: &Vec<String>) -> Result<ContractDefinition, ParserError> {
-    for i in 0..lines.len() {
-        let line = lines[i].trim();
-        if line.is_empty() {
-            continue
-        }
-        let tokens = split(line.to_owned(), " ", None);
-        let contract_name = Lazy::new(|| tokens[1].to_owned());
-        if tokens[0] == "interface" {
-            return Ok(ContractDefinition {
-                contract_name: contract_name.to_owned(),
-                next_line: i + 1,
-                contract_type: ContractType::INTERFACE,
-            })
-        } else if tokens[0] == "contract" {
-            return Ok(ContractDefinition {
-                contract_name: contract_name.to_owned(),
-                next_line: i + 1,
-                contract_type: ContractType::CONTRACT,
-            })
-        }
-    }
-    Err(ParserError::NoContractDefinitionFound)
 }
 
 /// Converts solidity variable type to ink! variable type (eg. address -> AccountId, uint -> u128, ...)
@@ -937,4 +833,23 @@ fn remove_commas() -> fn(&str) -> String {
         out.remove_matches(",");
         out
     }
+}
+
+fn read_until(chars: &mut Chars, until: Vec<char>) -> String {
+    let mut buffer = String::new();
+    while let Some(ch) = chars.next() {
+        if until.contains(&ch) {
+            break
+        }
+        match ch {
+            NEW_LINE => {
+                buffer.push(SPACE);
+            }
+            _ => {
+                buffer.push(ch);
+            }
+        }
+    }
+    let regex = Regex::new(r"\s+").unwrap();
+    regex.replace_all(buffer.as_str(), " ").trim().to_string()
 }
