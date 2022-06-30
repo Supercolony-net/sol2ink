@@ -39,14 +39,14 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
         (Some(contract), None) => {
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_contract, Some(file_name))?;
+            file_utils::write_file(ink_contract, Some(file_name))?;
             println!("File saved!");
             return Ok(())
         }
         (None, Some(interface)) => {
             let ink_trait = assembler::assemble_interface(interface);
             let file_name = path.replace(".sol", ".rs");
-            file_utils::write_file(&ink_trait, Some(file_name))?;
+            file_utils::write_file(ink_trait, Some(file_name))?;
             println!("File saved!");
             return Ok(())
         }

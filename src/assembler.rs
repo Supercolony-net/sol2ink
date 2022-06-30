@@ -180,7 +180,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
     let mut output = TokenStream::new();
 
     for structure in structs.iter() {
-        let struct_name = format_ident!("{}", structure.name);
+        let struct_name = TokenStream::from_str(&structure.name).unwrap();
         let mut struct_fields = TokenStream::new();
 
         for struct_field in structure.fields.iter() {
@@ -242,42 +242,35 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     let mut output = TokenStream::new();
 
     for function in functions.iter() {
-        header = TokenStream::new();
+        let mut message = TokenStream::new();
+
         if function.header.external {
-            let msg = format!(
-                "\t#[ink(message{})]\n",
-                if function.header.payable {
-                    String::from(", payable")
-                } else {
-                    String::from("")
-                }
-            );
-            header.extend(TokenStream::from_str(&msg).unwrap());
+            if function.header.payable {
+                message.extend(quote! {
+                    #[ink(message, payable)]
+                });
+            } else {
+                message.extend(quote! {
+                    #[ink(message)]
+                });
+            }
         }
-        header.push_str(
-            format!(
-                "\t{}{}(",
-                if function.header.external {
-                    String::from("pub fn ")
-                } else {
-                    String::from("fn _")
-                },
-                function.header.name.to_case(Case::Snake)
-            )
-            .as_str(),
-        );
-        // arguments
-        header.push_str(
-            format!(
-                "&{}self",
-                if function.header.view {
-                    String::from("")
-                } else {
-                    String::from("mut ")
-                }
-            )
-            .as_str(),
-        );
+        let function_name = TokenStream::from_str(&format!(
+            "{}{}",
+            if function.header.external {
+                String::from("pub fn ")
+            } else {
+                String::from("fn _")
+            },
+            function.header.name.to_case(Case::Snake)
+        ))
+        .unwrap();
+
+        let view = TokenStream::from_str(match function.header.view {
+            true => "&self",
+            false => "&mut self",
+        })
+        .unwrap();
 
         let mut params = TokenStream::new();
 
@@ -286,133 +279,145 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
-                #param_name: #param_type,
+                , #param_name: #param_type
             });
         }
 
-        header.push_str(")");
+        let mut return_params = TokenStream::new();
+
         // return params
         if !function.header.return_params.is_empty() {
-            header.push_str(" -> ");
-            if function.header.return_params.len() > 1 {
-                header.push_str("(");
-            }
+            let mut params = TokenStream::new();
             for i in 0..function.header.return_params.len() {
-                header.push_str(
-                    format!(
-                        "{}{}",
-                        if i > 0 {
-                            String::from(", ")
-                        } else {
-                            String::from("")
-                        },
-                        function.header.return_params[i].param_type
-                    )
-                    .as_str(),
-                );
+                let param_type =
+                    TokenStream::from_str(&function.header.return_params[i].param_type).unwrap();
+
+                if i > 0 {
+                    params.extend(quote! {,});
+                }
+                params.extend(quote! {
+                    #param_type
+                });
             }
+
             if function.header.return_params.len() > 1 {
-                header.push_str(")");
+                return_params.extend(quote! {
+                    -> (#params)
+                });
+            } else {
+                return_params.extend(quote! {
+                    -> #params
+                });
             }
         }
-        header.push_str(" {\n");
-        output_vec.push(header.to_owned());
+
+        let mut body = TokenStream::new();
+
         // body
         for statement in function.body.iter() {
-            output_vec.push(format!(
-                "\t\t{}{}\n",
+            let content = format!(
+                "{}{}",
                 if statement.comment { "// " } else { "" },
                 statement.content
-            ));
+            );
+            body.extend(TokenStream::from_str(&content).unwrap());
         }
+
         // TODO remove todo
-        output_vec.push(String::from("\t\ttodo!()\n"));
-        output_vec.push(String::from("\t}\n"));
-        output_vec.push(String::from("\n"));
+        output.extend(quote! {
+            #message
+            #function_name(#view #params) #return_params {
+                #body
+                todo!()
+            }
+        });
     }
 
-    quote! {#(#output_vec)*}
+    output
 }
 
 /// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
 fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
-    let mut output_vec = Vec::<String>::new();
-    // we do this so we dont put tab between each string that we insert (function params)
-    let mut header: String;
+    let mut output = TokenStream::new();
 
     for function in function_headers.iter() {
-        header = String::new();
-        output_vec.push(format!(
-            "\t#[ink(message{})]\n",
+        let mut message = TokenStream::new();
+
+        if function.external {
             if function.payable {
-                String::from(", payable")
+                message.extend(quote! {
+                    #[ink(message, payable)]
+                });
             } else {
-                String::from("")
+                message.extend(quote! {
+                    #[ink(message)]
+                });
             }
-        ));
-        header.push_str(format!("\tfn {}(", function.name.to_case(Case::Snake)).as_str());
-        // arguments
-        header.push_str(
-            format!(
-                "&{}self",
-                if function.view {
-                    String::from("")
-                } else {
-                    String::from("mut ")
-                }
-            )
-            .as_str(),
-        );
-        for param in function.params.iter() {
-            header.push_str(
-                format!(
-                    ", {}: {}",
-                    param.name.to_case(Case::Snake),
-                    param.param_type
-                )
-                .as_str(),
-            );
         }
-        header.push_str(")");
+        let function_name =
+            TokenStream::from_str(&format!("fn {}", function.name.to_case(Case::Snake))).unwrap();
+
+        let view = TokenStream::from_str(match function.view {
+            true => "&self",
+            false => "&mut self",
+        })
+        .unwrap();
+
+        let mut params = TokenStream::new();
+
+        for param in function.params.iter() {
+            let param_name = format_ident!("{}", param.name);
+            let param_type = TokenStream::from_str(&param.param_type).unwrap();
+
+            params.extend(quote! {
+                , #param_name: #param_type
+            });
+        }
+
+        let mut return_params = TokenStream::new();
+
         // return params
         if !function.return_params.is_empty() {
-            header.push_str(" -> ");
-            if function.return_params.len() > 1 {
-                header.push_str("(");
-            }
+            let mut params = TokenStream::new();
             for i in 0..function.return_params.len() {
-                header.push_str(
-                    format!(
-                        "{}{}",
-                        if i > 0 {
-                            String::from(", ")
-                        } else {
-                            String::from("")
-                        },
-                        function.return_params[i].param_type
-                    )
-                    .as_str(),
-                );
+                let param_type =
+                    TokenStream::from_str(&function.return_params[i].param_type).unwrap();
+
+                if i > 0 {
+                    params.extend(quote! {,});
+                }
+                params.extend(quote! {
+                    #param_type
+                });
             }
+
             if function.return_params.len() > 1 {
-                header.push_str(")");
+                return_params.extend(quote! {
+                    -> (#params)
+                });
+            } else {
+                return_params.extend(quote! {
+                    -> #params
+                });
             }
         }
-        header.push_str(";\n\n");
-        output_vec.push(header.to_owned());
+
+        output.extend(quote! {
+            #message
+            #function_name(#view #params) #return_params;
+        });
     }
 
-    quote! {#(#output_vec)*}
+    output
 }
 
 /// Adds a signature to the beginning of the file :)
 fn signature() -> TokenStream {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
-    let version = format!("Generated with Sol2Ink v{}", VERSION);
-    let link = String::from("https://github.com/Supercolony-net/sol2ink");
+    let version = TokenStream::from_str(&format!("//Generated with Sol2Ink v{}", VERSION)).unwrap();
+    let link = TokenStream::from_str("// https://github.com/Supercolony-net/sol2ink").unwrap();
     quote! {
-        // Generated with Sol2Ink v\n
-        #[doc = #version]
-        #[doc = #link]
+        #version
+        #link
     }
 }
