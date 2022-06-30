@@ -23,11 +23,11 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let constructor = assemble_constructor(contract.constructor);
     let functions = assemble_functions(contract.functions);
 
-    let ink_contract = quote! {
+    // todo:
+    // #![cfg_attr(not(feature = "std"), no_std)]
+    // #![feature(min_specialization)]
+    let contract = quote! {
         #signature
-
-        #![cfg_attr(not(feature = "std"), no_std)]
-        #![feature(min_specialization)]
         #[brush::contract]
         pub mod #contract_name {
             #imports
@@ -42,13 +42,13 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
         }
     };
 
-    ink_contract
+    contract
 }
 
 /// Assembles ink! interface(trait) from the parsed interface struct and return it as a vec of Strings
 pub fn assemble_interface(interface: Interface) -> TokenStream {
-    let interface_name = format_ident!("{}", interface.name);
-    let interface_name_ref = format_ident!("{}Ref", interface.name);
+    let interface_name = TokenStream::from_str(&format!("{}", interface.name)).unwrap();
+    let interface_name_ref = TokenStream::from_str(&format!("{}Ref", interface.name)).unwrap();
     let signature = signature();
     let imports = assemble_imports(interface.imports);
     let events = assemble_events(interface.events);
@@ -56,23 +56,22 @@ pub fn assemble_interface(interface: Interface) -> TokenStream {
     let structs = assemble_structs(interface.structs);
     let function_headers = assemble_function_headers(interface.function_headers);
 
-    let ink_contract = quote! {
+    let interface = quote! {
         #signature
         #imports
         #events
         #enums
         #structs
-
         #[brush::wrapper]
         pub type #interface_name_ref = dyn #interface_name;
-
+        _blank_!();
         #[brush::trait_definition]
         pub trait #interface_name {
             #function_headers
         }
     };
 
-    ink_contract
+    interface
 }
 
 /// Sorts the imports inside the HashSet and return it as a Vec of Strings
@@ -85,6 +84,10 @@ fn assemble_imports(imports: HashSet<String>) -> TokenStream {
         output.extend(TokenStream::from_str(&import).unwrap());
     }
 
+    output.extend(quote! {
+        _blank_!();
+    });
+
     output
 }
 
@@ -92,8 +95,9 @@ fn assemble_imports(imports: HashSet<String>) -> TokenStream {
 fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for enumeration in enums.iter() {
-        let enum_name = format_ident!("{}", enumeration.name);
+    for i in 0..enums.len() {
+        let enumeration = &enums[i];
+        let enum_name = TokenStream::from_str(&format!("{}", enumeration.name)).unwrap();
         let mut values = TokenStream::new();
 
         for value in enumeration.values.iter() {
@@ -108,6 +112,7 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
             pub enum #enum_name {
                 #values
             }
+            _blank_!();
         });
     }
 
@@ -118,8 +123,9 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
 fn assemble_events(events: Vec<Event>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for event in events.iter() {
-        let event_name = format_ident!("{}", event.name);
+    for i in 0..events.len() {
+        let event = &events[i];
+        let event_name = TokenStream::from_str(&format!("{}", event.name)).unwrap();
         let mut event_fields = TokenStream::new();
 
         for event_field in event.fields.iter() {
@@ -129,7 +135,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
                 });
             }
 
-            let event_field_name = format_ident!("{}", event_field.name);
+            let event_field_name = format_ident!("{}", event_field.name.to_case(Case::Snake));
             let event_field_type = TokenStream::from_str(&event_field.field_type).unwrap();
 
             event_fields.extend(quote! {
@@ -143,6 +149,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
             {
                 #event_fields
             }
+            _blank_!();
         });
     }
 
@@ -157,7 +164,7 @@ fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenS
     let mut storage_fields = TokenStream::new();
 
     for field in fields.iter() {
-        let field_name = format_ident!("{}", field.name);
+        let field_name = format_ident!("{}", field.name.to_case(Case::Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
         storage_fields.extend(quote! {
             #field_name: #field_type,
@@ -170,6 +177,7 @@ fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenS
         pub struct #contract_name {
             #storage_fields
         }
+        _blank_!();
     });
 
     output
@@ -179,12 +187,13 @@ fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenS
 fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for structure in structs.iter() {
+    for i in 0..structs.len() {
+        let structure = &structs[i];
         let struct_name = TokenStream::from_str(&structure.name).unwrap();
         let mut struct_fields = TokenStream::new();
 
         for struct_field in structure.fields.iter() {
-            let struct_field_name = format_ident!("{}", struct_field.name);
+            let struct_field_name = format_ident!("{}", struct_field.name.to_case(Case::Snake));
             let struct_field_type = TokenStream::from_str(&struct_field.field_type).unwrap();
 
             struct_fields.extend(quote! {
@@ -198,6 +207,12 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
                 #struct_fields
             }
         });
+
+        if i != structs.len() - 1 {
+            output.extend(quote! {
+                _blank_!();
+            });
+        }
     }
 
     output
@@ -209,7 +224,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut params = TokenStream::new();
 
     for param in constructor.header.params.iter() {
-        let param_name = format_ident!("{}", param.name);
+        let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
         let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
         params.extend(quote! {
@@ -221,7 +236,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 
     for statement in constructor.body.iter() {
         // TODO remove comments
-        let content = format!("\t\t\t// {}\n", statement.content);
+        let content = format!("// {}", statement.content);
         body.extend(TokenStream::from_str(&content).unwrap());
     }
 
@@ -232,6 +247,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
                 #body
             })
         }
+        _blank_!();
     });
 
     output
@@ -241,7 +257,8 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for function in functions.iter() {
+    for i in 0..functions.len() {
+        let function = &functions[i];
         let mut message = TokenStream::new();
 
         if function.header.external {
@@ -275,7 +292,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         let mut params = TokenStream::new();
 
         for param in function.header.params.iter() {
-            let param_name = format_ident!("{}", param.name);
+            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -331,6 +348,12 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 todo!()
             }
         });
+
+        if i < functions.len() - 1 {
+            output.extend(quote! {
+                _blank_!();
+            });
+        }
     }
 
     output
@@ -340,7 +363,8 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for function in function_headers.iter() {
+    for i in 0..function_headers.len() {
+        let function = &function_headers[i];
         let mut message = TokenStream::new();
 
         if function.external {
@@ -366,7 +390,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         let mut params = TokenStream::new();
 
         for param in function.params.iter() {
-            let param_name = format_ident!("{}", param.name);
+            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -406,6 +430,12 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
             #message
             #function_name(#view #params) #return_params;
         });
+
+        if i < function_headers.len() - 1 {
+            output.extend(quote! {
+                _blank_!();
+            });
+        }
     }
 
     output
@@ -414,10 +444,11 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 /// Adds a signature to the beginning of the file :)
 fn signature() -> TokenStream {
     const VERSION: &str = env!("CARGO_PKG_VERSION");
-    let version = TokenStream::from_str(&format!("//Generated with Sol2Ink v{}", VERSION)).unwrap();
-    let link = TokenStream::from_str("// https://github.com/Supercolony-net/sol2ink").unwrap();
+    let version = &format!("Generated with Sol2Ink v{}\n", VERSION);
+    let link = "https://github.com/Supercolony-net/sol2ink\n";
     quote! {
-        #version
-        #link
+        _comment_!(#version);
+        _comment_!(#link);
+        _blank_!();
     }
 }

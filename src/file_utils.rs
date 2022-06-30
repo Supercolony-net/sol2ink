@@ -7,6 +7,13 @@ use std::{
     },
 };
 
+use rust_format::{
+    Config,
+    Formatter,
+    PostProcess,
+    RustFmt,
+};
+
 /// Reads the file to be transpiled and returns it as string
 ///
 /// `path` the path to the file
@@ -25,6 +32,13 @@ pub fn read_file(path: &String) -> std::io::Result<String> {
 pub fn write_file(lines: TokenStream, file_name: Option<String>) -> std::io::Result<()> {
     let path = file_name.unwrap_or(String::from("output.rs"));
     let mut file = File::create(path)?;
-    file.write_all(lines.to_string().as_bytes())?;
+
+    let config = Config::new_str().post_proc(PostProcess::ReplaceMarkersAndDocBlocks);
+    file.write_all(
+        RustFmt::from_config(config)
+            .format_tokens(lines)
+            .unwrap()
+            .as_bytes(),
+    )?;
     Ok(())
 }
