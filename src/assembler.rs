@@ -95,20 +95,29 @@ fn assemble_imports(imports: HashSet<String>) -> TokenStream {
 fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for i in 0..enums.len() {
-        let enumeration = &enums[i];
+    for enumeration in enums.iter() {
         let enum_name = TokenStream::from_str(&format!("{}", enumeration.name)).unwrap();
+        let mut enum_comments = TokenStream::new();
         let mut values = TokenStream::new();
 
+        // assemble comments
+        for comment in enumeration.comments.iter() {
+            enum_comments.extend(quote! {
+                _comment_!(#comment);
+            });
+        }
+
+        // assemble enum values
         for value in enumeration.values.iter() {
-            let value_ident = format_ident!("{}", value);
+            let value_name = TokenStream::from_str(value).unwrap();
 
             values.extend(quote! {
-                #value_ident,
+                #value_name,
             });
         }
 
         output.extend(quote! {
+            #enum_comments
             pub enum #enum_name {
                 #values
             }
@@ -126,8 +135,17 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
     for i in 0..events.len() {
         let event = &events[i];
         let event_name = TokenStream::from_str(&format!("{}", event.name)).unwrap();
+        let mut event_comments = TokenStream::new();
         let mut event_fields = TokenStream::new();
 
+        // assemble comments
+        for comment in event.comments.iter() {
+            event_comments.extend(quote! {
+                _comment_!(#comment);
+            });
+        }
+
+        // assemble event fields
         for event_field in event.fields.iter() {
             if event_field.indexed {
                 event_fields.extend(quote! {
@@ -144,6 +162,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
         }
 
         output.extend(quote! {
+            #event_comments
             #[ink(event)]
             pub struct #event_name
             {
@@ -160,9 +179,9 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
     let contract_name = format_ident!("{}", contract_name.to_case(Case::Snake));
-
     let mut storage_fields = TokenStream::new();
 
+    // assemble storage fields
     for field in fields.iter() {
         let field_name = format_ident!("{}", field.name.to_case(Case::Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
@@ -190,8 +209,17 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
     for i in 0..structs.len() {
         let structure = &structs[i];
         let struct_name = TokenStream::from_str(&structure.name).unwrap();
+        let mut struct_comments = TokenStream::new();
         let mut struct_fields = TokenStream::new();
 
+        // assemble comments
+        for comment in structure.comments.iter() {
+            struct_comments.extend(quote! {
+                _comment_!(#comment);
+            });
+        }
+
+        // assemble struct fields
         for struct_field in structure.fields.iter() {
             let struct_field_name = format_ident!("{}", struct_field.name.to_case(Case::Snake));
             let struct_field_type = TokenStream::from_str(&struct_field.field_type).unwrap();
@@ -200,7 +228,9 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
                 #struct_field_name: #struct_field_type,
             });
         }
+
         output.extend(quote! {
+            #struct_comments
             #[derive(Default, Encode, Decode)]
             #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
             pub struct #struct_name {
@@ -223,6 +253,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
 
+    // assemble params
     for param in constructor.header.params.iter() {
         let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
         let param_type = TokenStream::from_str(&param.param_type).unwrap();
@@ -234,6 +265,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 
     let mut body = TokenStream::new();
 
+    // assemble body
     for statement in constructor.body.iter() {
         // TODO remove comments
         let content = format!("// {}", statement.content);
@@ -260,7 +292,13 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     for i in 0..functions.len() {
         let function = &functions[i];
         let mut message = TokenStream::new();
+        let mut function_name = TokenStream::new();
+        let mut view = TokenStream::new();
+        let mut params = TokenStream::new();
+        let mut return_params = TokenStream::new();
+        let mut body = TokenStream::new();
 
+        // assemble message
         if function.header.external {
             if function.header.payable {
                 message.extend(quote! {
@@ -272,25 +310,31 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 });
             }
         }
-        let function_name = TokenStream::from_str(&format!(
-            "{}{}",
-            if function.header.external {
-                String::from("pub fn ")
-            } else {
-                String::from("fn _")
-            },
-            function.header.name.to_case(Case::Snake)
-        ))
-        .unwrap();
 
-        let view = TokenStream::from_str(match function.header.view {
-            true => "&self",
-            false => "&mut self",
-        })
-        .unwrap();
+        // assemble function name
+        function_name.extend(
+            TokenStream::from_str(&format!(
+                "{}{}",
+                if function.header.external {
+                    String::from("pub fn ")
+                } else {
+                    String::from("fn _")
+                },
+                function.header.name.to_case(Case::Snake)
+            ))
+            .unwrap(),
+        );
 
-        let mut params = TokenStream::new();
+        // assemble view
+        view.extend(
+            TokenStream::from_str(match function.header.view {
+                true => "&self",
+                false => "&mut self",
+            })
+            .unwrap(),
+        );
 
+        // assemble params
         for param in function.header.params.iter() {
             let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
@@ -300,9 +344,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             });
         }
 
-        let mut return_params = TokenStream::new();
-
-        // return params
+        // assemble return params
         if !function.header.return_params.is_empty() {
             let mut params = TokenStream::new();
             for i in 0..function.header.return_params.len() {
@@ -328,16 +370,16 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             }
         }
 
-        let mut body = TokenStream::new();
-
         // body
         for statement in function.body.iter() {
-            let content = format!(
-                "{}{}",
-                if statement.comment { "// " } else { "" },
-                statement.content
-            );
-            body.extend(TokenStream::from_str(&content).unwrap());
+            let content = &statement.content;
+            if statement.comment {
+                body.extend(quote! {
+                    _comment_!(#content);
+                });
+            } else {
+                body.extend(TokenStream::from_str(content).unwrap());
+            }
         }
 
         // TODO remove todo
@@ -365,8 +407,21 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
     for i in 0..function_headers.len() {
         let function = &function_headers[i];
+        let mut function_comments = TokenStream::new();
         let mut message = TokenStream::new();
+        let mut function_name = TokenStream::new();
+        let mut view = TokenStream::new();
+        let mut params = TokenStream::new();
+        let mut return_params = TokenStream::new();
 
+        // assemble comments
+        for comment in function.comments.iter() {
+            function_comments.extend(quote! {
+                _comment_!(#comment);
+            });
+        }
+
+        // assemble message
         if function.external {
             if function.payable {
                 message.extend(quote! {
@@ -378,17 +433,22 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
                 });
             }
         }
-        let function_name =
-            TokenStream::from_str(&format!("fn {}", function.name.to_case(Case::Snake))).unwrap();
 
-        let view = TokenStream::from_str(match function.view {
-            true => "&self",
-            false => "&mut self",
-        })
-        .unwrap();
+        // assemble function name
+        function_name.extend(
+            TokenStream::from_str(&format!("fn {}", function.name.to_case(Case::Snake))).unwrap(),
+        );
 
-        let mut params = TokenStream::new();
+        // assemble view
+        view.extend(
+            TokenStream::from_str(match function.view {
+                true => "&self",
+                false => "&mut self",
+            })
+            .unwrap(),
+        );
 
+        // assemble params
         for param in function.params.iter() {
             let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
@@ -398,9 +458,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
             });
         }
 
-        let mut return_params = TokenStream::new();
-
-        // return params
+        // assemble return params
         if !function.return_params.is_empty() {
             let mut params = TokenStream::new();
             for i in 0..function.return_params.len() {
@@ -427,6 +485,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         }
 
         output.extend(quote! {
+            #function_comments
             #message
             #function_name(#view #params) #return_params;
         });
