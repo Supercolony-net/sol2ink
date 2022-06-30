@@ -23,11 +23,11 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let constructor = assemble_constructor(contract.constructor);
     let functions = assemble_functions(contract.functions);
 
-    // todo:
-    // #![cfg_attr(not(feature = "std"), no_std)]
-    // #![feature(min_specialization)]
     let contract = quote! {
         #signature
+
+        #![cfg_attr(not(feature = "std"), no_std)]
+        #![feature(min_specialization)]
         #[brush::contract]
         pub mod #contract_name {
             #imports
