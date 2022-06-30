@@ -7,10 +7,10 @@ pub mod erc_20 {
     use ink::prelude::string::String;
     use ink_storage::Mapping;
 
-    // @dev Emitted when `value` tokens are moved from one account (`from`) to
-    // @dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
-    // @dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
-    // @dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`). Note that `value` may be zero.
+    ///@dev Emitted when `value` tokens are moved from one account (`from`) to
+    ///@dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
+    ///@dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
+    ///@dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`). Note that `value` may be zero.
     #[ink(event)]
     pub struct Transfer {
         #[ink(topic)]
@@ -20,8 +20,8 @@ pub mod erc_20 {
         value: u128,
     }
 
-    // @dev Emitted when the allowance of a `spender` for an `owner` is set by
-    // @dev Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.
+    ///@dev Emitted when the allowance of a `spender` for an `owner` is set by
+    ///@dev Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance.
     #[ink(event)]
     pub struct Approval {
         #[ink(topic)]
@@ -31,13 +31,13 @@ pub mod erc_20 {
         value: u128,
     }
 
-    // This enum is added just to test enum parsing
+    ///This enum is added just to test enum parsing
     pub enum Enum {
         FIRST,
         SECOND,
     }
 
-    // This struct is added just to test struct parsing
+    ///This struct is added just to test struct parsing
     #[derive(Default, Encode, Decode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct Struct {

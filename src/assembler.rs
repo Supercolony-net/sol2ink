@@ -103,7 +103,7 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
         // assemble comments
         for comment in enumeration.comments.iter() {
             enum_comments.extend(quote! {
-                _comment_!(#comment);
+                #[doc = #comment]
             });
         }
 
@@ -141,7 +141,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
         // assemble comments
         for comment in event.comments.iter() {
             event_comments.extend(quote! {
-                _comment_!(#comment);
+                #[doc = #comment]
             });
         }
 
@@ -215,7 +215,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
         // assemble comments
         for comment in structure.comments.iter() {
             struct_comments.extend(quote! {
-                _comment_!(#comment);
+                #[doc = #comment]
             });
         }
 
@@ -417,7 +417,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         // assemble comments
         for comment in function.comments.iter() {
             function_comments.extend(quote! {
-                _comment_!(#comment);
+                #[doc = #comment]
             });
         }
 
