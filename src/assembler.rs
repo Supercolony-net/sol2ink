@@ -280,9 +280,14 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 
     // assemble body
     for statement in constructor.body.iter() {
-        // TODO remove comments
-        let content = format!("// {}", statement.content);
-        body.extend(TokenStream::from_str(&content).unwrap());
+        let content = &statement.content;
+        if statement.comment {
+            body.extend(quote! {
+                _comment_!(#content);
+            });
+        } else {
+            body.extend(TokenStream::from_str(content).unwrap());
+        }
     }
 
     output.extend(quote! {
