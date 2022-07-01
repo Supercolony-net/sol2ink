@@ -213,7 +213,7 @@ fn parse_contract(
                 action = Action::Contract;
             }
             SPACE if action == Action::ContractName => {
-                name = buffer.clone();
+                name = buffer.trim().to_string();
                 buffer = String::new();
                 action = Action::None;
             }

@@ -13,7 +13,7 @@ use quote::*;
 
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
 pub fn assemble_contract(contract: Contract) -> TokenStream {
-    let contract_name = format_ident!("{}", contract.name.to_case(Case::Snake));
+    let mod_name = format_ident!("{}", contract.name.to_case(Case::Snake));
     let signature = signature();
     let imports = assemble_imports(contract.imports);
     let events = assemble_events(contract.events);
@@ -22,20 +22,22 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let storage = assemble_storage(contract.name.clone(), contract.fields);
     let constructor = assemble_constructor(contract.constructor);
     let functions = assemble_functions(contract.functions);
+    let comments = assemble_contract_comments(contract.comments);
 
     let contract = quote! {
-        #signature
-
         #![cfg_attr(not(feature = "std"), no_std)]
         #![feature(min_specialization)]
+        _blank_!();
+        #signature
+        #comments
         #[brush::contract]
-        pub mod #contract_name {
+        pub mod #mod_name {
             #imports
             #events
             #enums
             #structs
             #storage
-            impl #contract_name {
+            impl #mod_name {
                 #constructor
                 #functions
             }
@@ -72,6 +74,19 @@ pub fn assemble_interface(interface: Interface) -> TokenStream {
     };
 
     interface
+}
+
+fn assemble_contract_comments(comments: Vec<String>) -> TokenStream {
+    let mut output = TokenStream::new();
+
+    // assemble comments
+    for comment in comments.iter() {
+        output.extend(quote! {
+            #[doc = #comment]
+        });
+    }
+
+    output
 }
 
 /// Sorts the imports inside the HashSet and return it as a Vec of Strings
@@ -178,7 +193,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 /// Assembles ink! storage struct from the vec of parsed ContractField structs and return it as a vec of Strings
 fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
-    let contract_name = format_ident!("{}", contract_name.to_case(Case::Snake));
+    let contract_name = format_ident!("{}", contract_name);
     let mut storage_fields = TokenStream::new();
 
     // assemble storage fields
@@ -238,11 +253,9 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
             }
         });
 
-        if i != structs.len() - 1 {
-            output.extend(quote! {
-                _blank_!();
-            });
-        }
+        output.extend(quote! {
+            _blank_!();
+        });
     }
 
     output
