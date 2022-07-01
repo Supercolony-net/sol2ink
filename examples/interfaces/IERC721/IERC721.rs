@@ -4,7 +4,7 @@
 use brush::traits::AccountId;
 use ink::prelude::vec::Vec;
 
-///@dev Emitted when `tokenId` token is transferred from `from` to `to`.
+/// @dev Emitted when `tokenId` token is transferred from `from` to `to`.
 #[ink(event)]
 pub struct Transfer {
     #[ink(topic)]
@@ -15,7 +15,7 @@ pub struct Transfer {
     token_id: u128,
 }
 
-///@dev Emitted when `owner` enables `approved` to manage the `tokenId` token.
+/// @dev Emitted when `owner` enables `approved` to manage the `tokenId` token.
 #[ink(event)]
 pub struct Approval {
     #[ink(topic)]
@@ -26,7 +26,7 @@ pub struct Approval {
     token_id: u128,
 }
 
-///@dev Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets.
+/// @dev Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets.
 #[ink(event)]
 pub struct ApprovalForAll {
     #[ink(topic)]
@@ -41,98 +41,76 @@ pub type ERC721Ref = dyn ERC721;
 
 #[brush::trait_definition]
 pub trait ERC721 {
-    ///@dev Returns the number of tokens in ``owner``'s account.
+    /// @dev Returns the number of tokens in ``owner``'s account.
     #[ink(message)]
     fn balance_of(&self, owner: AccountId) -> u128;
 
-    ///@dev Returns the owner of the `tokenId` token.
-    ///@dev Returns the owner of the `tokenId` token.
-    ///@dev Returns the owner of the `tokenId` token. Requirements:
-    ///@dev Returns the owner of the `tokenId` token. Requirements:
-    ///@dev Returns the owner of the `tokenId` token. Requirements: - `tokenId` must exist.
+    /// @dev Returns the owner of the `tokenId` token.
+    /// Requirements:
+    /// - `tokenId` must exist.
     #[ink(message)]
     fn owner_of(&self, token_id: u128) -> AccountId;
 
-    ///@dev Safely transfers `tokenId` token from `from` to `to`.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements:
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements:
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer. Emits a {Transfer} event.
+    /// @dev Safely transfers `tokenId` token from `from` to `to`.
+    /// Requirements:
+    /// - `from` cannot be the zero address.
+    /// - `to` cannot be the zero address.
+    /// - `tokenId` token must exist and be owned by `from`.
+    /// - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
+    /// - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+    /// Emits a {Transfer} event.
     #[ink(message)]
     fn safe_transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128, data: Vec<u8>);
 
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements:
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements:
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must have been allowed to move this token by either {approve} or {setApprovalForAll}.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must have been allowed to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must have been allowed to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
-    ///@dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must have been allowed to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer. Emits a {Transfer} event.
+    /// @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
+    /// are aware of the ERC721 protocol to prevent tokens from being forever locked.
+    /// Requirements:
+    /// - `from` cannot be the zero address.
+    /// - `to` cannot be the zero address.
+    /// - `tokenId` token must exist and be owned by `from`.
+    /// - If the caller is not `from`, it must have been allowed to move this token by either {approve} or {setApprovalForAll}.
+    /// - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+    /// Emits a {Transfer} event.
     #[ink(message)]
     fn safe_transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128);
 
-    ///@dev Transfers `tokenId` token from `from` to `to`.
-    ///@dev Transfers `tokenId` token from `from` to `to`.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements:
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements:
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must be owned by `from`.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
-    ///@dev Transfers `tokenId` token from `from` to `to`. WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. Emits a {Transfer} event.
+    /// @dev Transfers `tokenId` token from `from` to `to`.
+    /// WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
+    /// Requirements:
+    /// - `from` cannot be the zero address.
+    /// - `to` cannot be the zero address.
+    /// - `tokenId` token must be owned by `from`.
+    /// - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
+    /// Emits a {Transfer} event.
     #[ink(message)]
     fn transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128);
 
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements:
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements:
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements: - The caller must own the token or be an approved operator.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements: - The caller must own the token or be an approved operator. - `tokenId` must exist.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements: - The caller must own the token or be an approved operator. - `tokenId` must exist.
-    ///@dev Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements: - The caller must own the token or be an approved operator. - `tokenId` must exist. Emits an {Approval} event.
+    /// @dev Gives permission to `to` to transfer `tokenId` token to another account.
+    /// The approval is cleared when the token is transferred.
+    /// Only a single account can be approved at a time, so approving the zero address clears previous approvals.
+    /// Requirements:
+    /// - The caller must own the token or be an approved operator.
+    /// - `tokenId` must exist.
+    /// Emits an {Approval} event.
     #[ink(message)]
     fn approve(&mut self, to: AccountId, token_id: u128);
 
-    ///@dev Approve or remove `operator` as an operator for the caller.
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements:
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements:
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements: - The `operator` cannot be the caller.
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements: - The `operator` cannot be the caller.
-    ///@dev Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements: - The `operator` cannot be the caller. Emits an {ApprovalForAll} event.
+    /// @dev Approve or remove `operator` as an operator for the caller.
+    /// Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
+    /// Requirements:
+    /// - The `operator` cannot be the caller.
+    /// Emits an {ApprovalForAll} event.
     #[ink(message)]
     fn set_approval_for_all(&mut self, operator: AccountId, approved: bool);
 
-    ///@dev Returns the account approved for `tokenId` token.
-    ///@dev Returns the account approved for `tokenId` token.
-    ///@dev Returns the account approved for `tokenId` token. Requirements:
-    ///@dev Returns the account approved for `tokenId` token. Requirements:
-    ///@dev Returns the account approved for `tokenId` token. Requirements: - `tokenId` must exist.
+    /// @dev Returns the account approved for `tokenId` token.
+    /// Requirements:
+    /// - `tokenId` must exist.
     #[ink(message)]
     fn get_approved(&self, token_id: u128) -> AccountId;
 
-    ///@dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
-    ///@dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
-    ///@dev Returns if the `operator` is allowed to manage all of the assets of `owner`. See {setApprovalForAll}
+    /// @dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
+    /// See {setApprovalForAll}
     #[ink(message)]
     fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool;
 }

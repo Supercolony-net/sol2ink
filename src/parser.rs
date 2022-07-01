@@ -136,7 +136,8 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
             }
             NEW_LINE => {
                 if buffer.trim().len() > 0 {
-                    comments.push(buffer.trim().to_owned());
+                    comments.push(format!(" {}", buffer.trim()));
+                    buffer.clear();
                 }
                 new_line = true;
             }
