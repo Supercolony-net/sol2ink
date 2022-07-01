@@ -88,54 +88,46 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn name(&self) -> String {
-            // return _name
-            todo!()
+            return self.name
         }
 
         #[ink(message)]
         pub fn symbol(&self) -> String {
-            // return _symbol
-            todo!()
+            return self.symbol
         }
 
         #[ink(message)]
         pub fn decimals(&self) -> u8 {
-            // return 18
-            todo!()
+            return 18
         }
 
         #[ink(message)]
         pub fn total_supply(&self) -> u128 {
-            // return _totalSupply
-            todo!()
+            return self.total_supply
         }
 
         #[ink(message)]
         pub fn balance_of(&self, account: AccountId) -> u128 {
-            // return _balances[account]
-            todo!()
+            return self.balances.get(&account)
         }
 
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {
             // address owner = msg.sender
             // _transfer(owner, to, amount)
-            // return true
-            todo!()
+            return true
         }
 
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {
-            // return _allowances[owner][spender]
-            todo!()
+            return self.allowances.get(&(owner, spender))
         }
 
         #[ink(message)]
         pub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {
             // address owner = msg.sender
             // _approve(owner, spender, amount)
-            // return true
-            todo!()
+            return true
         }
 
         #[ink(message)]
@@ -143,16 +135,14 @@ pub mod erc_20 {
             // address spender = msg.sender
             // _spendAllowance(from, spender, amount)
             // _transfer(from, to, amount)
-            // return true
-            todo!()
+            return true
         }
 
         #[ink(message)]
         pub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {
             // address owner = msg.sender
             // _approve(owner, spender, allowance(owner, spender) + addedValue)
-            // return true
-            todo!()
+            return true
         }
 
         #[ink(message)]
@@ -163,8 +153,7 @@ pub mod erc_20 {
             // unchecked
             // _approve(owner, spender, currentAllowance - subtractedValue)
             //
-            // return true
-            todo!()
+            return true
         }
 
         fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
@@ -179,7 +168,6 @@ pub mod erc_20 {
             // _balances[to] += amount
             // emit Transfer(from, to, amount)
             // _afterTokenTransfer(from, to, amount)
-            todo!()
         }
 
         fn _mint(&mut self, account: AccountId, amount: u128) {
@@ -189,7 +177,6 @@ pub mod erc_20 {
             // _balances[account] += amount
             // emit Transfer(address(0), account, amount)
             // _afterTokenTransfer(address(0), account, amount)
-            todo!()
         }
 
         fn _burn(&mut self, account: AccountId, amount: u128) {
@@ -203,7 +190,6 @@ pub mod erc_20 {
             // _totalSupply -= amount
             // emit Transfer(account, address(0), amount)
             // _afterTokenTransfer(account, address(0), amount)
-            todo!()
         }
 
         fn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
@@ -211,7 +197,6 @@ pub mod erc_20 {
             // require(spender != address(0), "ERC20: approve to the zero address")
             // _allowances[owner][spender] = amount
             // emit Approval(owner, spender, amount)
-            todo!()
         }
 
         fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
@@ -222,15 +207,10 @@ pub mod erc_20 {
             // _approve(owner, spender, currentAllowance - amount)
             //
             //
-            todo!()
         }
 
-        fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
-            todo!()
-        }
+        fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {}
 
-        fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
-            todo!()
-        }
+        fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {}
     }
 }

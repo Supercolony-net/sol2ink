@@ -2,6 +2,7 @@ use crate::{
     formatter::split,
     structures::*,
 };
+use convert_case::Casing;
 use regex::Regex;
 use std::{
     collections::{
@@ -49,6 +50,8 @@ const NEW_LINE: char = '\n';
 const SEMICOLON: char = ';';
 const SLASH: char = '/';
 const SPACE: char = ' ';
+const SQUARE_CLOSE: char = ']';
+const SQUARE_OPEN: char = '[';
 
 pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>), ParserError> {
     let mut chars = string.chars();
@@ -253,9 +256,9 @@ fn parse_contract(
         }
     }
 
-    let mut storage_variables = HashMap::<String, String>::new();
+    let mut storage = HashMap::<String, String>::new();
     for contract_field in fields.iter() {
-        storage_variables.insert(
+        storage.insert(
             contract_field.name.clone(),
             contract_field.field_type.clone(),
         );
@@ -267,9 +270,9 @@ fn parse_contract(
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(function);
+        parse_statements(function, storage.clone());
     }
-    parse_statements(&mut constructor);
+    parse_statements(&mut constructor, storage);
 
     Ok(Contract {
         name,
@@ -482,11 +485,17 @@ fn parse_function(
     })
 }
 
-fn parse_statements(function: &mut Function) {
+fn parse_statements(function: &mut Function, storage: HashMap<String, String>) {
     let statements = function
         .body
         .iter()
-        .map(|statement| parse_statement(statement.content.clone()))
+        .map(|statement| {
+            parse_statement(
+                statement.content.clone(),
+                function.header.name.is_empty(),
+                storage.clone(),
+            )
+        })
         .collect::<Vec<Statement>>();
     function.body = statements;
 }
@@ -498,13 +507,98 @@ fn parse_statements(function: &mut Function) {
 /// TODO: for now we only return the original statement and comment it
 ///
 /// returns the statement as `Statement` struct
-fn parse_statement(line: String) -> Statement {
+fn parse_statement(line: String, constructor: bool, storage: HashMap<String, String>) -> Statement {
+    if line.contains("return") {
+        return parse_return(line, constructor, storage)
+    }
     // TODO actual parsing
-    let regex = Regex::new(r"\s+").unwrap();
     Statement {
-        content: regex.replace_all(line.as_str(), " ").trim().to_string(),
+        content: trim(line),
         comment: true,
     }
+}
+
+fn parse_return(line: String, constructor: bool, storage: HashMap<String, String>) -> Statement {
+    let mut raw_content = line;
+    raw_content.remove_matches("return");
+    raw_content = trim(raw_content);
+    raw_content = raw_content.replace(", ", ",");
+
+    let tokens = split(raw_content.clone(), " ", None);
+    let output = if tokens.len() == 1 {
+        let (field, expression) = if raw_content.contains(SQUARE_OPEN) {
+            let mut mapping_name = String::new();
+            let mut chars = raw_content.chars();
+            while let Some(ch) = chars.next() {
+                match ch {
+                    SQUARE_OPEN => break,
+                    _ => mapping_name.push(ch),
+                }
+            }
+            let mut buffer = String::new();
+            let mut indices_raw = Vec::<String>::new();
+            let mut square_open = 1;
+            let mut square_close = 0;
+            while let Some(ch) = chars.next() {
+                match ch {
+                    SQUARE_OPEN => {
+                        square_open += 1;
+                    }
+                    SQUARE_CLOSE => {
+                        square_close += 1;
+                        if square_close == square_open {
+                            indices_raw.push(buffer.clone());
+                            buffer.clear();
+                        } else {
+                            buffer.push(ch)
+                        }
+                    }
+                    _ => buffer.push(ch),
+                }
+            }
+            let indices = if indices_raw.len() > 1 {
+                format!("({})", indices_raw.join(", "))
+            } else {
+                indices_raw[0].to_owned()
+            };
+            (
+                mapping_name.clone(),
+                format!(
+                    "{}.get(&{})",
+                    mapping_name.to_case(convert_case::Case::Snake),
+                    indices
+                ),
+            )
+        } else {
+            (
+                raw_content.clone(),
+                raw_content.to_case(convert_case::Case::Snake),
+            )
+        };
+        if is_literal(field.clone()) {
+            field
+        } else if storage.contains_key(&field) {
+            format!(
+                "{}.{}",
+                if constructor { "instance" } else { "self" },
+                expression
+            )
+        } else {
+            expression
+        }
+    } else {
+        // TODO
+        raw_content
+    };
+
+    Statement {
+        content: format!("return {}", output),
+        comment: false,
+    }
+}
+
+fn is_literal(line: String) -> bool {
+    return line.parse::<i32>().is_ok() || line.contains("\"") || line.contains("\'")
 }
 
 /// Parses parameters of a function
@@ -832,6 +926,11 @@ fn remove_commas() -> fn(&str) -> String {
     }
 }
 
+fn trim(line: String) -> String {
+    let regex = Regex::new(r"\s+").unwrap();
+    regex.replace_all(line.as_str(), " ").trim().to_string()
+}
+
 fn read_until(chars: &mut Chars, until: Vec<char>) -> String {
     let mut buffer = String::new();
     while let Some(ch) = chars.next() {
@@ -847,6 +946,5 @@ fn read_until(chars: &mut Chars, until: Vec<char>) -> String {
             }
         }
     }
-    let regex = Regex::new(r"\s+").unwrap();
-    regex.replace_all(buffer.as_str(), " ").trim().to_string()
+    trim(buffer)
 }

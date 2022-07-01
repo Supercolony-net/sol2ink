@@ -405,7 +405,6 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             #message
             #function_name(#view #params) #return_params {
                 #body
-                todo!()
             }
         });
 
