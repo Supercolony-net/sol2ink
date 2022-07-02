@@ -250,23 +250,23 @@ fn parse_contract(
             _ if action == Action::ContractName || action == Action::Contract => {
                 buffer.push(ch);
                 if buffer.trim() == "event" {
-                    events.push(parse_event(&mut imports, chars, comments.clone()));
+                    events.push(parse_event(&mut imports, chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "enum" {
-                    enums.push(parse_enum(chars, comments.clone()));
+                    enums.push(parse_enum(chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "struct" {
-                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    structs.push(parse_struct(&mut imports, chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "constructor" {
-                    constructor = parse_function(&mut imports, chars, comments.clone())?;
+                    constructor = parse_function(&mut imports, chars, &comments)?;
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "function" {
-                    functions.push(parse_function(&mut imports, chars, comments.clone())?);
+                    functions.push(parse_function(&mut imports, chars, &comments)?);
                     comments.clear();
                     buffer.clear();
                 } else if ch == SEMICOLON {
@@ -303,14 +303,9 @@ fn parse_contract(
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(
-            function,
-            storage.clone(),
-            &mut imports,
-            functions_map.clone(),
-        );
+        parse_statements(function, &storage, &mut imports, &functions_map);
     }
-    parse_statements(&mut constructor, storage, &mut imports, functions_map);
+    parse_statements(&mut constructor, &storage, &mut imports, &functions_map);
 
     Ok(Contract {
         name,
@@ -377,20 +372,19 @@ pub fn parse_interface(
             _ if action == Action::ContractName || action == Action::Contract => {
                 buffer.push(ch);
                 if buffer.trim() == "event" {
-                    events.push(parse_event(&mut imports, chars, comments.clone()));
+                    events.push(parse_event(&mut imports, chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "enum" {
-                    enums.push(parse_enum(chars, comments.clone()));
+                    enums.push(parse_enum(chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "struct" {
-                    structs.push(parse_struct(&mut imports, chars, comments.clone()));
+                    structs.push(parse_struct(&mut imports, chars, &comments));
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "function" {
-                    let function_header =
-                        parse_function_header(chars, &mut imports, comments.clone());
+                    let function_header = parse_function_header(chars, &mut imports, &comments);
                     function_headers.push(function_header);
                     comments.clear();
                     buffer.clear();
@@ -420,7 +414,7 @@ pub fn parse_interface(
 fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
     // most mappings are written as `type => type`
     // we will make it `type=>type`
-    let tokens = split(line.replace(" => ", "=>"), " ", None);
+    let tokens = split(&line.replace(" => ", "=>"), " ", None);
     let name_index = if tokens.len() > 2 { 2 } else { 1 };
 
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
@@ -439,17 +433,17 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
 fn parse_function_header(
     chars: &mut Chars,
     imports: &mut HashSet<String>,
-    comments: Vec<String>,
+    comments: &Vec<String>,
 ) -> FunctionHeader {
     let mut function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
     function_header_raw.remove_matches(" memory");
     function_header_raw.remove_matches(" storage");
     function_header_raw.remove_matches(" calldata");
 
-    let split_by_left_brace = split(function_header_raw, "(", None);
+    let split_by_left_brace = split(&function_header_raw, "(", None);
     let name = split_by_left_brace[0].to_owned();
 
-    let split_by_right_brace = split(split_by_left_brace[1].trim().to_owned(), ")", None);
+    let split_by_right_brace = split(&split_by_left_brace[1].trim().to_owned(), ")", None);
 
     let params_raw = split_by_right_brace[0].trim().to_owned();
     let params = parse_function_parameters(params_raw, imports);
@@ -458,7 +452,7 @@ fn parse_function_header(
 
     let return_params = if split_by_left_brace.len() == 3 {
         parse_return_parameters(
-            split(split_by_left_brace[2].clone(), ")", None)[0].to_owned(),
+            split(&split_by_left_brace[2], ")", None)[0].to_owned(),
             imports,
         )
     } else {
@@ -472,7 +466,7 @@ fn parse_function_header(
         view,
         payable,
         return_params,
-        comments,
+        comments: comments.to_vec(),
     }
 }
 
@@ -486,7 +480,7 @@ fn parse_function_header(
 fn parse_function(
     imports: &mut HashSet<String>,
     chars: &mut Chars,
-    comments: Vec<String>,
+    comments: &Vec<String>,
 ) -> Result<Function, ParserError> {
     let mut open_braces = 1;
     let mut close_braces = 0;
@@ -525,20 +519,20 @@ fn parse_function(
 
 fn parse_statements(
     function: &mut Function,
-    storage: HashMap<String, String>,
+    storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: HashMap<String, String>,
+    functions: &HashMap<String, String>,
 ) {
     let statements = function
         .body
         .iter()
         .map(|statement| {
             parse_statement(
-                statement.content.clone(),
+                &statement.content,
                 function.header.name.is_empty(),
-                storage.clone(),
+                &storage,
                 imports,
-                functions.clone(),
+                &functions,
             )
         })
         .collect::<Vec<Statement>>();
@@ -553,13 +547,13 @@ fn parse_statements(
 ///
 /// returns the statement as `Statement` struct
 fn parse_statement(
-    line: String,
+    line: &String,
     constructor: bool,
-    storage: HashMap<String, String>,
+    storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: HashMap<String, String>,
+    functions: &HashMap<String, String>,
 ) -> Statement {
-    let tokens = split(trim(line.clone()), " ", None);
+    let tokens = split(&trim(line), " ", None);
 
     if tokens[0] == "return" {
         return parse_return(line, storage)
@@ -581,13 +575,13 @@ fn is_type(line: String) -> bool {
     TYPES.contains_key(&line)
 }
 
-fn parse_return(line: String, storage: HashMap<String, String>) -> Statement {
-    let mut raw_content = line;
+fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
+    let mut raw_content = line.to_owned();
     raw_content.remove_matches("return");
-    raw_content = trim(raw_content);
+    raw_content = trim(&raw_content);
     raw_content = raw_content.replace(", ", ",");
 
-    let tokens = split(raw_content.clone(), " ", None);
+    let tokens = split(&raw_content, " ", None);
     let output = if tokens.len() == 1 {
         parse_expression(raw_content, false, storage)
     } else {
@@ -604,9 +598,9 @@ fn parse_return(line: String, storage: HashMap<String, String>) -> Statement {
 fn parse_declaration(
     tokens: Vec<String>,
     constructor: bool,
-    storage: HashMap<String, String>,
+    storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: HashMap<String, String>,
+    functions: &HashMap<String, String>,
 ) -> Statement {
     let var_type = convert_variable_type(tokens[0].to_owned(), imports);
     let var_name = tokens[1].to_owned();
@@ -662,7 +656,7 @@ struct FunctionCall {
 fn parse_expression_raw(
     line: String,
     constructor: bool,
-    storage: HashMap<String, String>,
+    storage: &HashMap<String, String>,
 ) -> Expression {
     let mut chars = line.chars();
     let mut buffer = String::new();
@@ -682,9 +676,9 @@ fn parse_expression_raw(
                 match expression {
                     Expression::FunctionCall(mut function_call) => {
                         function_call.args.push(parse_expression(
-                            trim(buffer.clone()),
+                            trim(&buffer),
                             constructor,
-                            storage.clone(),
+                            storage,
                         ));
                         buffer.clear();
                         if stack.is_empty() {
@@ -699,9 +693,9 @@ fn parse_expression_raw(
                 match expression {
                     Expression::FunctionCall(mut function_call) => {
                         function_call.args.push(parse_expression(
-                            trim(buffer.clone()),
+                            trim(&buffer),
                             constructor,
-                            storage.clone(),
+                            storage,
                         ));
                         stack.push_back(Expression::FunctionCall(function_call));
                         buffer.clear();
@@ -724,11 +718,11 @@ fn parse_expression_raw(
 fn parse_expression(
     expression_raw: String,
     constructor: bool,
-    storage: HashMap<String, String>,
+    storage: &HashMap<String, String>,
 ) -> String {
     if expression_raw == "msg.sender" {
         return String::from("self.env().caller()")
-    } else if is_literal(expression_raw.clone()) {
+    } else if is_literal(&expression_raw) {
         return expression_raw
     }
 
@@ -785,7 +779,7 @@ fn parse_expression(
     expression_raw
 }
 
-fn is_literal(line: String) -> bool {
+fn is_literal(line: &String) -> bool {
     return line.parse::<i32>().is_ok() || line.contains("\"") || line.contains("\'")
 }
 
@@ -802,7 +796,7 @@ fn parse_function_parameters(
     let mut out = Vec::<FunctionParam>::new();
 
     if parameters.len() > 0 {
-        let tokens = split(parameters, " ", Some(remove_commas()));
+        let tokens = split(&parameters, " ", Some(remove_commas()));
 
         let mut mode = ArgsReader::ARGNAME;
         let mut param_type = convert_variable_type(tokens[0].to_owned(), imports);
@@ -835,7 +829,7 @@ fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
     let mut view = false;
     let mut payable = false;
 
-    let tokens = split(attributes, " ", Some(remove_commas()));
+    let tokens = split(&attributes, " ", Some(remove_commas()));
 
     for i in 0..tokens.len() {
         let attribute = tokens[i].to_owned();
@@ -862,7 +856,7 @@ fn parse_return_parameters(
     imports: &mut HashSet<String>,
 ) -> Vec<FunctionParam> {
     let mut out = Vec::<FunctionParam>::new();
-    let tokens: Vec<String> = split(parameters.to_owned(), " ", None);
+    let tokens: Vec<String> = split(&parameters, " ", None);
 
     let mut iterator = tokens.iter();
     while let Some(token) = iterator.next() {
@@ -889,17 +883,17 @@ fn parse_return_parameters(
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the event definition as `Event` struct
-fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Event {
+fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &Vec<String>) -> Event {
     let event_raw = read_until(chars, vec![SEMICOLON])
         .trim()
         .replace("( ", "(")
         .replace(" )", ")");
 
-    let tokens = split(event_raw, " ", None);
+    let tokens = split(&event_raw, " ", None);
     let mut args_reader = ArgsReader::ARGNAME;
     let mut indexed = false;
 
-    let split_brace = split(tokens[0].clone(), "(", None);
+    let split_brace = split(&tokens[0], "(", None);
 
     let name = split_brace[0].to_owned();
     let mut field_type = convert_variable_type(split_brace[1].to_owned(), imports);
@@ -928,7 +922,7 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<S
     Event {
         name,
         fields,
-        comments,
+        comments: comments.to_vec(),
     }
 }
 
@@ -939,10 +933,14 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<S
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the struct definition as `Struct` struct
-fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<String>) -> Struct {
+fn parse_struct(
+    imports: &mut HashSet<String>,
+    chars: &mut Chars,
+    comments: &Vec<String>,
+) -> Struct {
     let struct_raw = read_until(chars, vec![CURLY_CLOSE]);
-    let split_brace = split(struct_raw, "{", None);
-    let fields = split(split_brace[1].trim().to_owned(), ";", None);
+    let split_brace = split(&struct_raw, "{", None);
+    let fields = split(&split_brace[1].trim().to_string(), ";", None);
     let struct_name = split_brace[0].to_owned();
 
     let mut struct_fields = Vec::<StructField>::new();
@@ -957,7 +955,7 @@ fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<
     Struct {
         name: struct_name.to_owned(),
         fields: struct_fields,
-        comments,
+        comments: comments.to_vec(),
     }
 }
 
@@ -968,7 +966,7 @@ fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: Vec<
 ///
 /// returns the struct field as `StructField` struct
 fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructField {
-    let tokens = split(line, " ", None);
+    let tokens = split(&line, " ", None);
     let field_type = convert_variable_type(tokens[0].to_owned(), imports);
     let mut name = tokens[1].to_owned();
     name.remove_matches(";");
@@ -980,9 +978,9 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 /// `line` the Solidity definition of enum
 ///
 /// returns the enum as `Enum` struct
-fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
+fn parse_enum(chars: &mut Chars, comments: &Vec<String>) -> Enum {
     let enum_raw = read_until(chars, vec![CURLY_CLOSE]);
-    let tokens = split(enum_raw, " ", None);
+    let tokens = split(&enum_raw, " ", None);
     let name = tokens[0].to_owned();
     let mut values = Vec::<String>::new();
 
@@ -998,7 +996,7 @@ fn parse_enum(chars: &mut Chars, comments: Vec<String>) -> Enum {
     Enum {
         name,
         values,
-        comments,
+        comments: comments.to_vec(),
     }
 }
 
@@ -1019,7 +1017,7 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
     if arg_type.substring(0, 7) == "mapping" {
         imports.insert(String::from("use ink_storage::Mapping;\n"));
         let type_args = split(
-            arg_type.substring(8, arg_type.len() - 1).to_owned(),
+            &arg_type.substring(8, arg_type.len() - 1).to_string(),
             "=>",
             None,
         );
@@ -1114,7 +1112,7 @@ fn remove_commas() -> fn(&str) -> String {
     }
 }
 
-fn trim(line: String) -> String {
+fn trim(line: &String) -> String {
     let regex = Regex::new(r"\s+").unwrap();
     regex.replace_all(line.as_str(), " ").trim().to_string()
 }
@@ -1134,5 +1132,5 @@ fn read_until(chars: &mut Chars, until: Vec<char>) -> String {
             }
         }
     }
-    trim(buffer)
+    trim(&buffer)
 }

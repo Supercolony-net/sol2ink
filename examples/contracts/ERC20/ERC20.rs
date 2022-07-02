@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
-// Generated with Sol2Ink v0.3.0
+// Generated with Sol2Ink v0.4.0
 // https://github.com/Supercolony-net/sol2ink
 
 ///SPDX-License-Identifier: MIT
