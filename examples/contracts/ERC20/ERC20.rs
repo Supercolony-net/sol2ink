@@ -113,7 +113,7 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {
-            // address owner = msg.sender
+            let owner: AccountId = self.env().caller();
             // _transfer(owner, to, amount)
             return true
         }
@@ -125,14 +125,14 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {
-            // address owner = msg.sender
+            let owner: AccountId = self.env().caller();
             // _approve(owner, spender, amount)
             return true
         }
 
         #[ink(message)]
         pub fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool {
-            // address spender = msg.sender
+            let spender: AccountId = self.env().caller();
             // _spendAllowance(from, spender, amount)
             // _transfer(from, to, amount)
             return true
@@ -140,15 +140,15 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {
-            // address owner = msg.sender
+            let owner: AccountId = self.env().caller();
             // _approve(owner, spender, allowance(owner, spender) + addedValue)
             return true
         }
 
         #[ink(message)]
         pub fn decrease_allowance(&mut self, spender: AccountId, subtracted_value: u128) -> bool {
-            // address owner = msg.sender
-            // uint256 currentAllowance = allowance(owner, spender)
+            let owner: AccountId = self.env().caller();
+            let current_allowance: u128 = self.allowance(owner, spender);
             // require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero")
             // unchecked
             // _approve(owner, spender, currentAllowance - subtractedValue)
@@ -160,7 +160,7 @@ pub mod erc_20 {
             // require(from != address(0), "ERC20: transfer from the zero address")
             // require(to != address(0), "ERC20: transfer to the zero address")
             // _beforeTokenTransfer(from, to, amount)
-            // uint256 fromBalance = _balances[from]
+            let from_balance: u128 = self.balances.get(&from);
             // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance")
             // unchecked
             // _balances[from] = fromBalance - amount
@@ -182,7 +182,7 @@ pub mod erc_20 {
         fn _burn(&mut self, account: AccountId, amount: u128) {
             // require(account != address(0), "ERC20: burn from the zero address")
             // _beforeTokenTransfer(account, address(0), amount)
-            // uint256 accountBalance = _balances[account]
+            let account_balance: u128 = self.balances.get(&account);
             // require(accountBalance >= amount, "ERC20: burn amount exceeds balance")
             // unchecked
             // _balances[account] = accountBalance - amount
@@ -200,7 +200,7 @@ pub mod erc_20 {
         }
 
         fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
-            // uint256 currentAllowance = allowance(owner, spender)
+            let current_allowance: u128 = self.allowance(owner, spender);
             // if (currentAllowance != type(uint256).max)
             // require(currentAllowance >= amount, "ERC20: insufficient allowance")
             // unchecked

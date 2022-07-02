@@ -2,12 +2,14 @@ use crate::{
     formatter::split,
     structures::*,
 };
-use convert_case::Casing;
+use convert_case::*;
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
     collections::{
         HashMap,
         HashSet,
+        VecDeque,
     },
     str::Chars,
 };
@@ -17,6 +19,23 @@ use substring::Substring;
 enum ArgsReader {
     ARGTYPE,
     ARGNAME,
+}
+
+lazy_static! {
+    static ref TYPES: HashMap<String, (String, Option<String>)> = {
+        let mut map = HashMap::new();
+        map.insert(
+            "mapping".to_string(),
+            ("Mapping".to_string(), Some("ink_storage".to_string())),
+        );
+        map.insert("uint".to_string(), ("u128".to_string(), None));
+        map.insert("uint256".to_string(), ("u128".to_string(), None));
+        map.insert(
+            "address".to_string(),
+            ("AccountId".to_string(), Some("brush::traits".to_string())),
+        );
+        map
+    };
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -44,6 +63,9 @@ enum Action {
 }
 
 const ASTERISK: char = '*';
+const BRACE_CLOSE: char = ')';
+const BRACE_OPEN: char = '(';
+const COMMA: char = ',';
 const CURLY_CLOSE: char = '}';
 const CURLY_OPEN: char = '{';
 const NEW_LINE: char = '\n';
@@ -263,16 +285,32 @@ fn parse_contract(
             contract_field.field_type.clone(),
         );
     }
-    let mut functions_map = HashMap::<String, ()>::new();
+    let mut functions_map = HashMap::<String, String>::new();
     for function in functions.iter() {
-        functions_map.insert(function.header.name.clone(), ());
+        functions_map.insert(
+            function.header.name.clone(),
+            format!(
+                "{}{}",
+                if function.header.external {
+                    String::from("")
+                } else {
+                    String::from("_")
+                },
+                function.header.name.to_case(Case::Snake)
+            ),
+        );
     }
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(function, storage.clone());
+        parse_statements(
+            function,
+            storage.clone(),
+            &mut imports,
+            functions_map.clone(),
+        );
     }
-    parse_statements(&mut constructor, storage);
+    parse_statements(&mut constructor, storage, &mut imports, functions_map);
 
     Ok(Contract {
         name,
@@ -485,7 +523,12 @@ fn parse_function(
     })
 }
 
-fn parse_statements(function: &mut Function, storage: HashMap<String, String>) {
+fn parse_statements(
+    function: &mut Function,
+    storage: HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: HashMap<String, String>,
+) {
     let statements = function
         .body
         .iter()
@@ -494,6 +537,8 @@ fn parse_statements(function: &mut Function, storage: HashMap<String, String>) {
                 statement.content.clone(),
                 function.header.name.is_empty(),
                 storage.clone(),
+                imports,
+                functions.clone(),
             )
         })
         .collect::<Vec<Statement>>();
@@ -507,10 +552,23 @@ fn parse_statements(function: &mut Function, storage: HashMap<String, String>) {
 /// TODO: for now we only return the original statement and comment it
 ///
 /// returns the statement as `Statement` struct
-fn parse_statement(line: String, constructor: bool, storage: HashMap<String, String>) -> Statement {
-    if line.contains("return") {
-        return parse_return(line, constructor, storage)
+fn parse_statement(
+    line: String,
+    constructor: bool,
+    storage: HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: HashMap<String, String>,
+) -> Statement {
+    let tokens = split(trim(line.clone()), " ", None);
+
+    if tokens[0] == "return" {
+        return parse_return(line, storage)
+    } else if is_type(tokens[0].to_owned()) {
+        return parse_declaration(tokens, constructor, storage, imports, functions)
     }
+    // Assignment
+    // Function call
+
     // TODO actual parsing
     Statement {
         content: trim(line),
@@ -518,7 +576,12 @@ fn parse_statement(line: String, constructor: bool, storage: HashMap<String, Str
     }
 }
 
-fn parse_return(line: String, constructor: bool, storage: HashMap<String, String>) -> Statement {
+#[inline(always)]
+fn is_type(line: String) -> bool {
+    TYPES.contains_key(&line)
+}
+
+fn parse_return(line: String, storage: HashMap<String, String>) -> Statement {
     let mut raw_content = line;
     raw_content.remove_matches("return");
     raw_content = trim(raw_content);
@@ -526,66 +589,7 @@ fn parse_return(line: String, constructor: bool, storage: HashMap<String, String
 
     let tokens = split(raw_content.clone(), " ", None);
     let output = if tokens.len() == 1 {
-        let (field, expression) = if raw_content.contains(SQUARE_OPEN) {
-            let mut mapping_name = String::new();
-            let mut chars = raw_content.chars();
-            while let Some(ch) = chars.next() {
-                match ch {
-                    SQUARE_OPEN => break,
-                    _ => mapping_name.push(ch),
-                }
-            }
-            let mut buffer = String::new();
-            let mut indices_raw = Vec::<String>::new();
-            let mut square_open = 1;
-            let mut square_close = 0;
-            while let Some(ch) = chars.next() {
-                match ch {
-                    SQUARE_OPEN => {
-                        square_open += 1;
-                    }
-                    SQUARE_CLOSE => {
-                        square_close += 1;
-                        if square_close == square_open {
-                            indices_raw.push(buffer.clone());
-                            buffer.clear();
-                        } else {
-                            buffer.push(ch)
-                        }
-                    }
-                    _ => buffer.push(ch),
-                }
-            }
-            let indices = if indices_raw.len() > 1 {
-                format!("({})", indices_raw.join(", "))
-            } else {
-                indices_raw[0].to_owned()
-            };
-            (
-                mapping_name.clone(),
-                format!(
-                    "{}.get(&{})",
-                    mapping_name.to_case(convert_case::Case::Snake),
-                    indices
-                ),
-            )
-        } else {
-            (
-                raw_content.clone(),
-                raw_content.to_case(convert_case::Case::Snake),
-            )
-        };
-        if is_literal(field.clone()) {
-            field
-        } else if storage.contains_key(&field) {
-            format!(
-                "{}.{}",
-                if constructor { "instance" } else { "self" },
-                expression
-            )
-        } else {
-            expression
-        }
+        parse_expression(raw_content, false, storage)
     } else {
         // TODO
         raw_content
@@ -595,6 +599,190 @@ fn parse_return(line: String, constructor: bool, storage: HashMap<String, String
         content: format!("return {}", output),
         comment: false,
     }
+}
+
+fn parse_declaration(
+    tokens: Vec<String>,
+    constructor: bool,
+    storage: HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: HashMap<String, String>,
+) -> Statement {
+    let var_type = convert_variable_type(tokens[0].to_owned(), imports);
+    let var_name = tokens[1].to_owned();
+    if tokens.len() > 2 {
+        let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
+        let expression = parse_expression_raw(expression_raw, constructor, storage);
+        return match expression {
+            Expression::Custom(exp) => {
+                Statement {
+                    content: format!(
+                        "let {} : {} = {};",
+                        var_name.to_case(Case::Snake),
+                        var_type,
+                        exp
+                    ),
+                    comment: false,
+                }
+            }
+            Expression::FunctionCall(function_call) => {
+                Statement {
+                    content: format!(
+                        "let {} : {} = {}.{}({});",
+                        var_name.to_case(Case::Snake),
+                        var_type,
+                        if constructor { "instance" } else { "self" },
+                        functions.get(&function_call.name).unwrap(),
+                        function_call.args.join(", ")
+                    ),
+                    comment: false,
+                }
+            }
+        }
+    }
+
+    Statement {
+        content: format!("let {} : {};", var_name.to_case(Case::Snake), var_type),
+        comment: false,
+    }
+}
+
+#[derive(Debug)]
+enum Expression {
+    FunctionCall(FunctionCall),
+    Custom(String),
+}
+
+#[derive(Debug)]
+struct FunctionCall {
+    pub name: String,
+    pub args: Vec<String>,
+}
+
+fn parse_expression_raw(
+    line: String,
+    constructor: bool,
+    storage: HashMap<String, String>,
+) -> Expression {
+    let mut chars = line.chars();
+    let mut buffer = String::new();
+    let mut stack = VecDeque::<Expression>::new();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            BRACE_OPEN => {
+                stack.push_back(Expression::FunctionCall(FunctionCall {
+                    name: buffer.clone(),
+                    args: Vec::new(),
+                }));
+                buffer.clear();
+            }
+            BRACE_CLOSE => {
+                let expression = stack.pop_back().unwrap();
+                match expression {
+                    Expression::FunctionCall(mut function_call) => {
+                        function_call.args.push(parse_expression(
+                            trim(buffer.clone()),
+                            constructor,
+                            storage.clone(),
+                        ));
+                        buffer.clear();
+                        if stack.is_empty() {
+                            return Expression::FunctionCall(function_call)
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            COMMA => {
+                let expression = stack.pop_back().unwrap();
+                match expression {
+                    Expression::FunctionCall(mut function_call) => {
+                        function_call.args.push(parse_expression(
+                            trim(buffer.clone()),
+                            constructor,
+                            storage.clone(),
+                        ));
+                        stack.push_back(Expression::FunctionCall(function_call));
+                        buffer.clear();
+                    }
+                    _ => {}
+                }
+            }
+            NEW_LINE => buffer.push(SPACE),
+            _ => buffer.push(ch),
+        }
+    }
+
+    if buffer.len() > 0 {
+        return Expression::Custom(parse_expression(buffer, constructor, storage))
+    }
+
+    return Expression::Custom(String::from(""))
+}
+
+fn parse_expression(
+    expression_raw: String,
+    constructor: bool,
+    storage: HashMap<String, String>,
+) -> String {
+    if expression_raw == "msg.sender" {
+        return String::from("self.env().caller()")
+    } else if is_literal(expression_raw.clone()) {
+        return expression_raw
+    }
+
+    let (field, expression) = if expression_raw.contains(SQUARE_OPEN) {
+        let mut mapping_name = String::new();
+        let mut chars = expression_raw.chars();
+        while let Some(ch) = chars.next() {
+            match ch {
+                SQUARE_OPEN => break,
+                _ => mapping_name.push(ch),
+            }
+        }
+        let mut buffer = String::new();
+        let mut indices_raw = Vec::<String>::new();
+        let mut square_open = 1;
+        let mut square_close = 0;
+        while let Some(ch) = chars.next() {
+            match ch {
+                SQUARE_OPEN => {
+                    square_open += 1;
+                }
+                SQUARE_CLOSE => {
+                    square_close += 1;
+                    if square_close == square_open {
+                        indices_raw.push(buffer.clone());
+                        buffer.clear();
+                    } else {
+                        buffer.push(ch)
+                    }
+                }
+                _ => buffer.push(ch),
+            }
+        }
+        let indices = if indices_raw.len() > 1 {
+            format!("({})", indices_raw.join(", "))
+        } else {
+            indices_raw[0].to_owned()
+        };
+        (
+            mapping_name.clone(),
+            format!("{}.get(&{})", mapping_name.to_case(Case::Snake), indices),
+        )
+    } else {
+        (expression_raw.clone(), expression_raw.to_case(Case::Snake))
+    };
+
+    if storage.contains_key(&field) {
+        return format!(
+            "{}.{}",
+            if constructor { "instance" } else { "self" },
+            expression
+        )
+    }
+    expression_raw
 }
 
 fn is_literal(line: String) -> bool {
