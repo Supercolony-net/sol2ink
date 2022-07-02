@@ -595,6 +595,26 @@ fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
     }
 }
 
+impl ToString for Expression {
+    fn to_string(&self) -> String {
+        return match self {
+            Expression::Custom(exp) => exp.to_owned(),
+            Expression::FunctionCall(function_call) => {
+                format!(
+                    "{}.{}({})",
+                    if function_call.constructor {
+                        "instance"
+                    } else {
+                        "self"
+                    },
+                    function_call.name,
+                    function_call.args.join(", ")
+                )
+            }
+        }
+    }
+}
+
 fn parse_declaration(
     tokens: Vec<String>,
     constructor: bool,
@@ -606,32 +626,15 @@ fn parse_declaration(
     let var_name = tokens[1].to_owned();
     if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
-        let expression = parse_expression_raw(expression_raw, constructor, storage);
-        return match expression {
-            Expression::Custom(exp) => {
-                Statement {
-                    content: format!(
-                        "let {} : {} = {};",
-                        var_name.to_case(Case::Snake),
-                        var_type,
-                        exp
-                    ),
-                    comment: false,
-                }
-            }
-            Expression::FunctionCall(function_call) => {
-                Statement {
-                    content: format!(
-                        "let {} : {} = {}.{}({});",
-                        var_name.to_case(Case::Snake),
-                        var_type,
-                        if constructor { "instance" } else { "self" },
-                        functions.get(&function_call.name).unwrap(),
-                        function_call.args.join(", ")
-                    ),
-                    comment: false,
-                }
-            }
+        let expression = parse_expression_raw(expression_raw, constructor, storage, functions);
+        return Statement {
+            content: format!(
+                "let {} : {} = {};",
+                var_name.to_case(Case::Snake),
+                var_type,
+                expression.to_string()
+            ),
+            comment: false,
         }
     }
 
@@ -651,12 +654,14 @@ enum Expression {
 struct FunctionCall {
     pub name: String,
     pub args: Vec<String>,
+    pub constructor: bool,
 }
 
 fn parse_expression_raw(
     line: String,
     constructor: bool,
     storage: &HashMap<String, String>,
+    functions: &HashMap<String, String>,
 ) -> Expression {
     let mut chars = line.chars();
     let mut buffer = String::new();
@@ -666,8 +671,9 @@ fn parse_expression_raw(
         match ch {
             BRACE_OPEN => {
                 stack.push_back(Expression::FunctionCall(FunctionCall {
-                    name: buffer.clone(),
+                    name: functions.get(&buffer).unwrap().clone(),
                     args: Vec::new(),
+                    constructor,
                 }));
                 buffer.clear();
             }
