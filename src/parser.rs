@@ -1,10 +1,9 @@
 use crate::{
-    formatter::split,
+    formatter::*,
     structures::*,
 };
 use convert_case::*;
 use lazy_static::lazy_static;
-use regex::Regex;
 use std::{
     collections::{
         HashMap,
@@ -42,8 +41,6 @@ lazy_static! {
 pub enum ParserError {
     FileError(String),
     FileCorrupted,
-    ContractCorrupted,
-    NoContractDefinitionFound,
 }
 
 impl From<std::io::Error> for ParserError {
@@ -58,7 +55,6 @@ enum Action {
     ContractName,
     ContractNamed,
     Contract,
-
     Slash,
 }
 
@@ -498,6 +494,7 @@ fn parse_function(
         if ch == NEW_LINE {
             buffer.push(SPACE);
         } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
+            buffer.push(ch);
             if open_braces == close_braces {
                 break
             }
@@ -527,8 +524,10 @@ fn parse_statements(
         .body
         .iter()
         .map(|statement| {
+            let mut adjusted = statement.content.clone();
+            adjusted.remove_matches(";");
             parse_statement(
-                &statement.content,
+                &adjusted,
                 function.header.name.is_empty(),
                 &storage,
                 imports,
@@ -542,8 +541,6 @@ fn parse_statements(
 /// Parses the statement of a Solidity function
 ///
 /// `line` the statement
-///
-/// TODO: for now we only return the original statement and comment it
 ///
 /// returns the statement as `Statement` struct
 fn parse_statement(
@@ -642,19 +639,6 @@ fn parse_declaration(
         content: format!("let {} : {};", var_name.to_case(Case::Snake), var_type),
         comment: false,
     }
-}
-
-#[derive(Debug)]
-enum Expression {
-    FunctionCall(FunctionCall),
-    Custom(String),
-}
-
-#[derive(Debug)]
-struct FunctionCall {
-    pub name: String,
-    pub args: Vec<String>,
-    pub constructor: bool,
 }
 
 fn parse_expression_raw(
@@ -1108,19 +1092,6 @@ fn convert_int(arg_type: String) -> String {
         }
     }
     arg_type
-}
-
-fn remove_commas() -> fn(&str) -> String {
-    move |s: &str| {
-        let mut out = s.to_owned();
-        out.remove_matches(",");
-        out
-    }
-}
-
-fn trim(line: &String) -> String {
-    let regex = Regex::new(r"\s+").unwrap();
-    regex.replace_all(line.as_str(), " ").trim().to_string()
 }
 
 fn read_until(chars: &mut Chars, until: Vec<char>) -> String {

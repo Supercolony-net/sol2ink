@@ -92,3 +92,16 @@ pub struct Statement {
     pub content: String,
     pub comment: bool,
 }
+
+#[derive(Debug)]
+pub struct FunctionCall {
+    pub name: String,
+    pub args: Vec<String>,
+    pub constructor: bool,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    FunctionCall(FunctionCall),
+    Custom(String),
+}

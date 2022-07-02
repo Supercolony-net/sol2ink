@@ -150,9 +150,9 @@ pub mod erc_20 {
             let owner: AccountId = self.env().caller();
             let current_allowance: u128 = self.allowance(owner, spender);
             // require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero")
-            // unchecked
+            // unchecked {
             // _approve(owner, spender, currentAllowance - subtractedValue)
-            //
+            // }
             return true
         }
 
@@ -162,9 +162,9 @@ pub mod erc_20 {
             // _beforeTokenTransfer(from, to, amount)
             let from_balance: u128 = self.balances.get(&from);
             // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance")
-            // unchecked
+            // unchecked {
             // _balances[from] = fromBalance - amount
-            //
+            // }
             // _balances[to] += amount
             // emit Transfer(from, to, amount)
             // _afterTokenTransfer(from, to, amount)
@@ -184,9 +184,9 @@ pub mod erc_20 {
             // _beforeTokenTransfer(account, address(0), amount)
             let account_balance: u128 = self.balances.get(&account);
             // require(accountBalance >= amount, "ERC20: burn amount exceeds balance")
-            // unchecked
+            // unchecked {
             // _balances[account] = accountBalance - amount
-            //
+            // }
             // _totalSupply -= amount
             // emit Transfer(account, address(0), amount)
             // _afterTokenTransfer(account, address(0), amount)
@@ -201,12 +201,12 @@ pub mod erc_20 {
 
         fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
             let current_allowance: u128 = self.allowance(owner, spender);
-            // if (currentAllowance != type(uint256).max)
+            // if (currentAllowance != type(uint256).max) {
             // require(currentAllowance >= amount, "ERC20: insufficient allowance")
-            // unchecked
+            // unchecked {
             // _approve(owner, spender, currentAllowance - amount)
-            //
-            //
+            // }
+            // }
         }
 
         fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {}
