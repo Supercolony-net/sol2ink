@@ -26,9 +26,18 @@
 /// allowances. See {IERC20-approve}.
 #[brush::contract]
 pub mod erc_20 {
-    use brush::traits::AccountId;
+    use brush::traits::{
+        AccountId,
+        AcountIdExt,
+    };
     use ink::prelude::string::String;
     use ink_storage::Mapping;
+
+    #[derive(Debug, Encode, Decode, PartialEq)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum Error {
+        Custom(String),
+    }
 
     /// @dev Emitted when `value` tokens are moved from one account (`from`) to
     /// another (`to`).
@@ -87,130 +96,210 @@ pub mod erc_20 {
         }
 
         #[ink(message)]
-        pub fn name(&self) -> String {
-            return self.name
+        pub fn name(&self) -> Result<String, Error> {
+            return Ok(self.name)
         }
 
         #[ink(message)]
-        pub fn symbol(&self) -> String {
-            return self.symbol
+        pub fn symbol(&self) -> Result<String, Error> {
+            return Ok(self.symbol)
         }
 
         #[ink(message)]
-        pub fn decimals(&self) -> u8 {
-            return 18
+        pub fn decimals(&self) -> Result<u8, Error> {
+            return Ok(18)
         }
 
         #[ink(message)]
-        pub fn total_supply(&self) -> u128 {
-            return self.total_supply
+        pub fn total_supply(&self) -> Result<u128, Error> {
+            return Ok(self.total_supply)
         }
 
         #[ink(message)]
-        pub fn balance_of(&self, account: AccountId) -> u128 {
-            return self.balances.get(&account)
+        pub fn balance_of(&self, account: AccountId) -> Result<u128, Error> {
+            return Ok(self.balances.get(&account))
         }
 
         #[ink(message)]
-        pub fn transfer(&mut self, to: AccountId, amount: u128) -> bool {
+        pub fn transfer(&mut self, to: AccountId, amount: u128) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
             // _transfer(owner, to, amount)
-            return true
+            return Ok(true)
         }
 
         #[ink(message)]
-        pub fn allowance(&self, owner: AccountId, spender: AccountId) -> u128 {
-            return self.allowances.get(&(owner, spender))
+        pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Result<u128, Error> {
+            return Ok(self.allowances.get(&(owner, spender)))
         }
 
         #[ink(message)]
-        pub fn approve(&mut self, spender: AccountId, amount: u128) -> bool {
+        pub fn approve(&mut self, spender: AccountId, amount: u128) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
             // _approve(owner, spender, amount)
-            return true
+            return Ok(true)
         }
 
         #[ink(message)]
-        pub fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool {
+        pub fn transfer_from(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            amount: u128,
+        ) -> Result<bool, Error> {
             let spender: AccountId = self.env().caller();
             // _spendAllowance(from, spender, amount)
             // _transfer(from, to, amount)
-            return true
+            return Ok(true)
         }
 
         #[ink(message)]
-        pub fn increase_allowance(&mut self, spender: AccountId, added_value: u128) -> bool {
+        pub fn increase_allowance(
+            &mut self,
+            spender: AccountId,
+            added_value: u128,
+        ) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
             // _approve(owner, spender, allowance(owner, spender) + addedValue)
-            return true
+            return Ok(true)
         }
 
         #[ink(message)]
-        pub fn decrease_allowance(&mut self, spender: AccountId, subtracted_value: u128) -> bool {
+        pub fn decrease_allowance(
+            &mut self,
+            spender: AccountId,
+            subtracted_value: u128,
+        ) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
-            let current_allowance: u128 = self.allowance(owner, spender);
-            // require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero")
+            let current_allowance: u128 = self.allowance(owner, spender)?;
+            if current_allowance < subtracted_value {
+                return Err(Error::Custom(String::from(
+                    "ERC20: decreased allowance below zero",
+                )))
+            }
             // unchecked {
             // _approve(owner, spender, currentAllowance - subtractedValue)
             // }
-            return true
+            return Ok(true)
         }
 
-        fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {
-            // require(from != address(0), "ERC20: transfer from the zero address")
-            // require(to != address(0), "ERC20: transfer to the zero address")
+        fn _transfer(&mut self, from: AccountId, to: AccountId, amount: u128) -> Result<(), Error> {
+            if from.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: transfer from the zero address",
+                )))
+            }
+            if to.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: transfer to the zero address",
+                )))
+            }
             // _beforeTokenTransfer(from, to, amount)
             let from_balance: u128 = self.balances.get(&from);
-            // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance")
+            if from_balance < amount {
+                return Err(Error::Custom(String::from(
+                    "ERC20: transfer amount exceeds balance",
+                )))
+            }
             // unchecked {
             // _balances[from] = fromBalance - amount
             // }
             // _balances[to] += amount
             // emit Transfer(from, to, amount)
             // _afterTokenTransfer(from, to, amount)
+            Ok(())
         }
 
-        fn _mint(&mut self, account: AccountId, amount: u128) {
-            // require(account != address(0), "ERC20: mint to the zero address")
+        fn _mint(&mut self, account: AccountId, amount: u128) -> Result<(), Error> {
+            if account.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: mint to the zero address",
+                )))
+            }
             // _beforeTokenTransfer(address(0), account, amount)
             // _totalSupply += amount
             // _balances[account] += amount
             // emit Transfer(address(0), account, amount)
             // _afterTokenTransfer(address(0), account, amount)
+            Ok(())
         }
 
-        fn _burn(&mut self, account: AccountId, amount: u128) {
-            // require(account != address(0), "ERC20: burn from the zero address")
+        fn _burn(&mut self, account: AccountId, amount: u128) -> Result<(), Error> {
+            if account.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: burn from the zero address",
+                )))
+            }
             // _beforeTokenTransfer(account, address(0), amount)
             let account_balance: u128 = self.balances.get(&account);
-            // require(accountBalance >= amount, "ERC20: burn amount exceeds balance")
+            if account_balance < amount {
+                return Err(Error::Custom(String::from(
+                    "ERC20: burn amount exceeds balance",
+                )))
+            }
             // unchecked {
             // _balances[account] = accountBalance - amount
             // }
             // _totalSupply -= amount
             // emit Transfer(account, address(0), amount)
             // _afterTokenTransfer(account, address(0), amount)
+            Ok(())
         }
 
-        fn _approve(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
-            // require(owner != address(0), "ERC20: approve from the zero address")
-            // require(spender != address(0), "ERC20: approve to the zero address")
+        fn _approve(
+            &mut self,
+            owner: AccountId,
+            spender: AccountId,
+            amount: u128,
+        ) -> Result<(), Error> {
+            if owner.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: approve from the zero address",
+                )))
+            }
+            if spender.is_zero() {
+                return Err(Error::Custom(String::from(
+                    "ERC20: approve to the zero address",
+                )))
+            }
             // _allowances[owner][spender] = amount
             // emit Approval(owner, spender, amount)
+            Ok(())
         }
 
-        fn _spend_allowance(&mut self, owner: AccountId, spender: AccountId, amount: u128) {
-            let current_allowance: u128 = self.allowance(owner, spender);
+        fn _spend_allowance(
+            &mut self,
+            owner: AccountId,
+            spender: AccountId,
+            amount: u128,
+        ) -> Result<(), Error> {
+            let current_allowance: u128 = self.allowance(owner, spender)?;
             // if (currentAllowance != type(uint256).max) {
-            // require(currentAllowance >= amount, "ERC20: insufficient allowance")
+            if current_allowance < amount {
+                return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
+            }
             // unchecked {
             // _approve(owner, spender, currentAllowance - amount)
             // }
             // }
+            Ok(())
         }
 
-        fn _before_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {}
+        fn _before_token_transfer(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            amount: u128,
+        ) -> Result<(), Error> {
+            Ok(())
+        }
 
-        fn _after_token_transfer(&mut self, from: AccountId, to: AccountId, amount: u128) {}
+        fn _after_token_transfer(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            amount: u128,
+        ) -> Result<(), Error> {
+            Ok(())
+        }
     }
 }

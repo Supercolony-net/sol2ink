@@ -43,13 +43,13 @@ pub type ERC721Ref = dyn ERC721;
 pub trait ERC721 {
     /// @dev Returns the number of tokens in ``owner``'s account.
     #[ink(message)]
-    fn balance_of(&self, owner: AccountId) -> u128;
+    fn balance_of(&self, owner: AccountId) -> Result<u128, Error>;
 
     /// @dev Returns the owner of the `tokenId` token.
     /// Requirements:
     /// - `tokenId` must exist.
     #[ink(message)]
-    fn owner_of(&self, token_id: u128) -> AccountId;
+    fn owner_of(&self, token_id: u128) -> Result<AccountId, Error>;
 
     /// @dev Safely transfers `tokenId` token from `from` to `to`.
     /// Requirements:
@@ -60,7 +60,13 @@ pub trait ERC721 {
     /// - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
     /// Emits a {Transfer} event.
     #[ink(message)]
-    fn safe_transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128, data: Vec<u8>);
+    fn safe_transfer_from(
+        &mut self,
+        from: AccountId,
+        to: AccountId,
+        token_id: u128,
+        data: Vec<u8>,
+    ) -> Result<(), Error>;
 
     /// @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
     /// are aware of the ERC721 protocol to prevent tokens from being forever locked.
@@ -72,7 +78,12 @@ pub trait ERC721 {
     /// - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
     /// Emits a {Transfer} event.
     #[ink(message)]
-    fn safe_transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128);
+    fn safe_transfer_from(
+        &mut self,
+        from: AccountId,
+        to: AccountId,
+        token_id: u128,
+    ) -> Result<(), Error>;
 
     /// @dev Transfers `tokenId` token from `from` to `to`.
     /// WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
@@ -83,7 +94,12 @@ pub trait ERC721 {
     /// - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
     /// Emits a {Transfer} event.
     #[ink(message)]
-    fn transfer_from(&mut self, from: AccountId, to: AccountId, token_id: u128);
+    fn transfer_from(
+        &mut self,
+        from: AccountId,
+        to: AccountId,
+        token_id: u128,
+    ) -> Result<(), Error>;
 
     /// @dev Gives permission to `to` to transfer `tokenId` token to another account.
     /// The approval is cleared when the token is transferred.
@@ -93,7 +109,7 @@ pub trait ERC721 {
     /// - `tokenId` must exist.
     /// Emits an {Approval} event.
     #[ink(message)]
-    fn approve(&mut self, to: AccountId, token_id: u128);
+    fn approve(&mut self, to: AccountId, token_id: u128) -> Result<(), Error>;
 
     /// @dev Approve or remove `operator` as an operator for the caller.
     /// Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
@@ -101,16 +117,16 @@ pub trait ERC721 {
     /// - The `operator` cannot be the caller.
     /// Emits an {ApprovalForAll} event.
     #[ink(message)]
-    fn set_approval_for_all(&mut self, operator: AccountId, approved: bool);
+    fn set_approval_for_all(&mut self, operator: AccountId, approved: bool) -> Result<(), Error>;
 
     /// @dev Returns the account approved for `tokenId` token.
     /// Requirements:
     /// - `tokenId` must exist.
     #[ink(message)]
-    fn get_approved(&self, token_id: u128) -> AccountId;
+    fn get_approved(&self, token_id: u128) -> Result<AccountId, Error>;
 
     /// @dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
     /// See {setApprovalForAll}
     #[ink(message)]
-    fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool;
+    fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> Result<bool, Error>;
 }

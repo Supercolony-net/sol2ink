@@ -33,6 +33,14 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
         #[brush::contract]
         pub mod #mod_name {
             #imports
+
+            #[derive(Debug, Encode, Decode, PartialEq)]
+            #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+            pub enum Error {
+                Custom(String),
+            }
+            _blank_!();
+
             #events
             #enums
             #structs
@@ -363,7 +371,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         // assemble return params
-        if !function.header.return_params.is_empty() {
+        if function.header.return_params.len() > 0 {
             let mut params = TokenStream::new();
             for i in 0..function.header.return_params.len() {
                 let param_type =
@@ -379,13 +387,17 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 
             if function.header.return_params.len() > 1 {
                 return_params.extend(quote! {
-                    -> (#params)
+                    (#params)
                 });
             } else {
                 return_params.extend(quote! {
-                    -> #params
+                    #params
                 });
             }
+        } else {
+            return_params.extend(quote! {
+                ()
+            });
         }
 
         // body
@@ -400,10 +412,16 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             }
         }
 
+        if function.header.return_params.is_empty() {
+            body.extend(quote! {
+                Ok(())
+            });
+        }
+
         // TODO remove todo
         output.extend(quote! {
             #message
-            #function_name(#view #params) #return_params {
+            #function_name(#view #params) -> Result<#return_params, Error> {
                 #body
             }
         });
@@ -476,7 +494,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         }
 
         // assemble return params
-        if !function.return_params.is_empty() {
+        if function.return_params.len() > 0 {
             let mut params = TokenStream::new();
             for i in 0..function.return_params.len() {
                 let param_type =
@@ -492,19 +510,23 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
             if function.return_params.len() > 1 {
                 return_params.extend(quote! {
-                    -> (#params)
+                    (#params)
                 });
             } else {
                 return_params.extend(quote! {
-                    -> #params
+                    #params
                 });
             }
+        } else {
+            return_params.extend(quote! {
+                ()
+            });
         }
 
         output.extend(quote! {
             #function_comments
             #message
-            #function_name(#view #params) #return_params;
+            #function_name(#view #params) -> Result<#return_params, Error>;
         });
 
         if i < function_headers.len() - 1 {

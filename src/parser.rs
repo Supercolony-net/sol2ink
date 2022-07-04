@@ -4,6 +4,7 @@ use crate::{
 };
 use convert_case::*;
 use lazy_static::lazy_static;
+use regex::Regex;
 use std::{
     collections::{
         HashMap,
@@ -20,6 +21,8 @@ enum ArgsReader {
     ARGNAME,
 }
 
+const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
+
 lazy_static! {
     static ref TYPES: HashMap<String, (String, Option<String>)> = {
         let mut map = HashMap::new();
@@ -33,6 +36,17 @@ lazy_static! {
             "address".to_string(),
             ("AccountId".to_string(), Some("brush::traits".to_string())),
         );
+        map
+    };
+    static ref OPERATIONS: HashMap<String, Operation> = {
+        let mut map = HashMap::new();
+        map.insert(String::from("!"), Operation::Not);
+        map.insert(String::from(">="), Operation::GreaterThanEqual);
+        map.insert(String::from("<="), Operation::LessThanEqual);
+        map.insert(String::from(">"), Operation::GreaterThan);
+        map.insert(String::from("<"), Operation::LessThan);
+        map.insert(String::from("=="), Operation::Equal);
+        map.insert(String::from("!="), Operation::NotEqual);
         map
     };
 }
@@ -556,6 +570,12 @@ fn parse_statement(
         return parse_return(line, storage)
     } else if is_type(tokens[0].to_owned()) {
         return parse_declaration(tokens, constructor, storage, imports, functions)
+    } else if split(&tokens[0], "(", None)[0] == "require" {
+        return parse_require(line, constructor, storage, imports)
+    } else if tokens[0] == "unchecked" {
+        // TODO
+    } else if tokens[0] == "emit" {
+        // TODO
     }
     // Assignment
     // Function call
@@ -587,29 +607,125 @@ fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
     };
 
     Statement {
-        content: format!("return {}", output),
+        content: format!("return Ok({})", output),
         comment: false,
     }
 }
 
-impl ToString for Expression {
-    fn to_string(&self) -> String {
-        return match self {
-            Expression::Custom(exp) => exp.to_owned(),
-            Expression::FunctionCall(function_call) => {
-                format!(
-                    "{}.{}({})",
-                    if function_call.constructor {
-                        "instance"
-                    } else {
-                        "self"
-                    },
-                    function_call.name,
-                    function_call.args.join(", ")
-                )
-            }
-        }
+fn parse_require(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+) -> Statement {
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*require\((?P<condition>.+)
+        \s*,\s*"(?P<error>.+)"\)$
+        "#,
+    )
+    .unwrap();
+
+    imports.insert(String::from("use ink::prelude::string::String;"));
+
+    let condition = capture_regex(&regex, line, "condition");
+    let error = capture_regex(&regex, line, "error");
+
+    let condition = parse_condition(&condition.unwrap(), constructor, storage, imports);
+    let error_output = if constructor {
+        format!("panic!(\"{}\")", error.unwrap_or(DEFAULT_ERROR.to_owned()))
+    } else {
+        format!(
+            "return Err(Error::Custom(String::from(\"{}\")))",
+            error.unwrap_or(DEFAULT_ERROR.to_owned())
+        )
+    };
+
+    let content = if condition.right.is_some() {
+        format!(
+            "if {} {} {} {{\n{}\n}}",
+            condition.left,
+            negate(condition.operation).to_string(),
+            condition.right.unwrap(),
+            error_output
+        )
+    } else {
+        format!(
+            "if {}{} {{\n{}\n}}",
+            negate(condition.operation).to_string(),
+            condition.left,
+            error_output
+        )
+    };
+    Statement {
+        content,
+        comment: false,
     }
+}
+
+fn negate(operation: Operation) -> Operation {
+    match operation {
+        Operation::Not => Operation::True,
+        Operation::True => Operation::Not,
+        Operation::GreaterThanEqual => Operation::LessThan,
+        Operation::GreaterThan => Operation::LessThanEqual,
+        Operation::LessThanEqual => Operation::GreaterThan,
+        Operation::LessThan => Operation::GreaterThanEqual,
+        Operation::Equal => Operation::NotEqual,
+        Operation::NotEqual => Operation::Equal,
+    }
+}
+
+fn parse_condition(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+) -> Condition {
+    let tokens = split(&trim(line), " ", None);
+    let mut left_raw = tokens[0].to_owned();
+    left_raw.remove_matches("!");
+    let mut left = parse_expression(left_raw, constructor, storage);
+
+    let (mut right, mut operation) = if tokens.len() > 1 {
+        let right = parse_expression(tokens[2].to_owned(), constructor, storage);
+        let operation = *OPERATIONS.get(&tokens[1]).unwrap();
+        (Some(right), operation)
+    } else {
+        (
+            None,
+            if tokens[0].contains("!") {
+                Operation::Not
+            } else {
+                Operation::True
+            },
+        )
+    };
+
+    if right.clone().unwrap_or(String::from("")) == "address(0)" {
+        operation = match operation {
+            Operation::Equal => Operation::True,
+            Operation::NotEqual => Operation::Not,
+            _ => operation,
+        };
+        right = None;
+        left = format!("{}.is_zero()", left);
+        imports.insert(String::from("use brush::traits::AcountIdExt;\n"));
+    }
+
+    Condition {
+        left: left.to_owned(),
+        operation,
+        right,
+    }
+}
+
+#[inline(always)]
+fn capture_regex(regex: &Regex, line: &String, capture_name: &str) -> Option<String> {
+    regex.captures(line).and_then(|cap| {
+        cap.name(capture_name)
+            .map(|value| value.as_str().to_string())
+    })
 }
 
 fn parse_declaration(
@@ -766,11 +882,15 @@ fn parse_expression(
             expression
         )
     }
-    expression_raw
+    expression
 }
 
 fn is_literal(line: &String) -> bool {
-    return line.parse::<i32>().is_ok() || line.contains("\"") || line.contains("\'")
+    return line.parse::<i32>().is_ok()
+        || line.contains("\"")
+        || line.contains("\'")
+        || line == "true"
+        || line == "false"
 }
 
 /// Parses parameters of a function

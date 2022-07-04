@@ -101,7 +101,61 @@ pub struct FunctionCall {
 }
 
 #[derive(Debug)]
+pub struct Condition {
+    pub left: String,
+    pub operation: Operation,
+    pub right: Option<String>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Operation {
+    Not,
+    True,
+    GreaterThanEqual,
+    GreaterThan,
+    LessThanEqual,
+    LessThan,
+    Equal,
+    NotEqual,
+}
+
+impl ToString for Operation {
+    fn to_string(&self) -> String {
+        return match self {
+            Operation::Not => String::from("!"),
+            Operation::True => String::from(""),
+            Operation::GreaterThanEqual => String::from(">="),
+            Operation::GreaterThan => String::from(">"),
+            Operation::LessThanEqual => String::from("<="),
+            Operation::LessThan => String::from("<"),
+            Operation::Equal => String::from("=="),
+            Operation::NotEqual => String::from("!="),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Expression {
     FunctionCall(FunctionCall),
     Custom(String),
+}
+
+impl ToString for Expression {
+    fn to_string(&self) -> String {
+        return match self {
+            Expression::Custom(exp) => exp.to_owned(),
+            Expression::FunctionCall(function_call) => {
+                format!(
+                    "{}.{}({})?",
+                    if function_call.constructor {
+                        "instance"
+                    } else {
+                        "self"
+                    },
+                    function_call.name,
+                    function_call.args.join(", ")
+                )
+            }
+        }
+    }
 }

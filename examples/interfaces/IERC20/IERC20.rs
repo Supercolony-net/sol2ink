@@ -33,24 +33,24 @@ pub type ERC20Ref = dyn ERC20;
 pub trait ERC20 {
     /// @dev Returns the amount of tokens in existence.
     #[ink(message)]
-    fn total_supply(&self) -> u128;
+    fn total_supply(&self) -> Result<u128, Error>;
 
     /// @dev Returns the amount of tokens owned by `account`.
     #[ink(message)]
-    fn balance_of(&self, account: AccountId) -> u128;
+    fn balance_of(&self, account: AccountId) -> Result<u128, Error>;
 
     /// @dev Moves `amount` tokens from the caller's account to `to`.
     /// Returns a boolean value indicating whether the operation succeeded.
     /// Emits a {Transfer} event.
     #[ink(message)]
-    fn transfer(&mut self, to: AccountId, amount: u128) -> bool;
+    fn transfer(&mut self, to: AccountId, amount: u128) -> Result<bool, Error>;
 
     /// @dev Returns the remaining number of tokens that `spender` will be
     /// allowed to spend on behalf of `owner` through {transferFrom}. This is
     /// zero by default.
     /// This value changes when {approve} or {transferFrom} are called.
     #[ink(message)]
-    fn allowance(&self, owner: AccountId, spender: AccountId) -> u128;
+    fn allowance(&self, owner: AccountId, spender: AccountId) -> Result<u128, Error>;
 
     /// @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
     /// Returns a boolean value indicating whether the operation succeeded.
@@ -62,7 +62,7 @@ pub trait ERC20 {
     /// https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
     /// Emits an {Approval} event.
     #[ink(message)]
-    fn approve(&mut self, spender: AccountId, amount: u128) -> bool;
+    fn approve(&mut self, spender: AccountId, amount: u128) -> Result<bool, Error>;
 
     /// @dev Moves `amount` tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from the caller's
@@ -70,5 +70,10 @@ pub trait ERC20 {
     /// Returns a boolean value indicating whether the operation succeeded.
     /// Emits a {Transfer} event.
     #[ink(message)]
-    fn transfer_from(&mut self, from: AccountId, to: AccountId, amount: u128) -> bool;
+    fn transfer_from(
+        &mut self,
+        from: AccountId,
+        to: AccountId,
+        amount: u128,
+    ) -> Result<bool, Error>;
 }
