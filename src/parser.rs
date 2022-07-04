@@ -534,22 +534,24 @@ fn parse_statements(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, String>,
 ) {
-    let statements = function
-        .body
-        .iter()
-        .map(|statement| {
-            let mut adjusted = statement.content.clone();
-            adjusted.remove_matches(";");
-            parse_statement(
-                &adjusted,
-                function.header.name.is_empty(),
-                &storage,
-                imports,
-                &functions,
-            )
-        })
-        .collect::<Vec<Statement>>();
-    function.body = statements;
+    let mut iterator = function.body.iter();
+    let mut stack = VecDeque::<Block>::new();
+    let mut out = Vec::default();
+
+    while let Some(statement) = iterator.next() {
+        let mut adjusted = statement.content.clone();
+        adjusted.remove_matches(";");
+        out.push(parse_statement(
+            &adjusted,
+            function.header.name.is_empty(),
+            &storage,
+            imports,
+            &functions,
+            &mut stack,
+        ));
+    }
+
+    function.body = out;
 }
 
 /// Parses the statement of a Solidity function
@@ -563,6 +565,7 @@ fn parse_statement(
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, String>,
+    stack: &mut VecDeque<Block>,
 ) -> Statement {
     let tokens = split(&trim(line), " ", None);
 
@@ -572,8 +575,29 @@ fn parse_statement(
         return parse_declaration(tokens, constructor, storage, imports, functions)
     } else if split(&tokens[0], "(", None)[0] == "require" {
         return parse_require(line, constructor, storage, imports)
+    } else if tokens[0] == "if" {
+        stack.push_back(Block::If);
+        return parse_if(line, constructor, storage, imports)
     } else if tokens[0] == "unchecked" {
-        // TODO
+        stack.push_back(Block::Unchecked);
+        return Statement {
+            content: format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)),
+            comment: true,
+        }
+    } else if tokens[0] == "}" {
+        match stack.pop_back().unwrap() {
+            Block::Unchecked => {}
+            Block::If => {
+                return Statement {
+                    content: String::from("}"),
+                    comment: false,
+                }
+            }
+        }
+        return Statement {
+            content: format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)),
+            comment: true,
+        }
     } else if tokens[0] == "emit" {
         // TODO
     }
@@ -608,6 +632,42 @@ fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
 
     Statement {
         content: format!("return Ok({})", output),
+        comment: false,
+    }
+}
+
+fn parse_if(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+) -> Statement {
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*if\s*\((?P<condition>.+)\s*\)\s*\{
+        "#,
+    )
+    .unwrap();
+
+    let condition = capture_regex(&regex, line, "condition");
+    let condition = parse_condition(&condition.unwrap(), constructor, storage, imports);
+
+    let content = if condition.right.is_some() {
+        format!(
+            "if {} {} {} {{\n",
+            condition.left,
+            condition.operation.to_string(),
+            condition.right.unwrap(),
+        )
+    } else {
+        format!(
+            "if {}{} {{\n",
+            condition.operation.to_string(),
+            condition.left,
+        )
+    };
+    Statement {
+        content,
         comment: false,
     }
 }
@@ -828,6 +888,8 @@ fn parse_expression(
 ) -> String {
     if expression_raw == "msg.sender" {
         return String::from("self.env().caller()")
+    } else if expression_raw == "type(uint256).max" {
+        return String::from("u128::MAX")
     } else if is_literal(&expression_raw) {
         return expression_raw
     }

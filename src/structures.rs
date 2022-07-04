@@ -140,6 +140,11 @@ pub enum Expression {
     Custom(String),
 }
 
+pub enum Block {
+    Unchecked,
+    If
+}
+
 impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
