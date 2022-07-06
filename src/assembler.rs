@@ -273,6 +273,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
+    let constructor_functions = constructor.body;
 
     // assemble params
     for param in constructor.header.params.iter() {
@@ -287,16 +288,9 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut body = TokenStream::new();
 
     // assemble body
-    for statement in constructor.body.iter() {
-        let content = &statement.content;
-        if statement.comment {
-            body.extend(quote! {
-                _comment_!(#content);
-            });
-        } else {
-            body.extend(TokenStream::from_str(content).unwrap());
-        }
-    }
+    body.extend(quote! {
+        #(#constructor_functions)*
+    });
 
     output.extend(quote! {
         #[ink(constructor)]
@@ -315,14 +309,14 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for i in 0..functions.len() {
-        let function = &functions[i];
+    for function in functions.iter() {
         let mut message = TokenStream::new();
         let mut function_name = TokenStream::new();
         let mut view = TokenStream::new();
         let mut params = TokenStream::new();
         let mut return_params = TokenStream::new();
         let mut body = TokenStream::new();
+        let functions = function.body.clone();
 
         // assemble message
         if function.header.external {
@@ -401,16 +395,9 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         // body
-        for statement in function.body.iter() {
-            let content = &statement.content;
-            if statement.comment {
-                body.extend(quote! {
-                    _comment_!(#content);
-                });
-            } else {
-                body.extend(TokenStream::from_str(content).unwrap());
-            }
-        }
+        body.extend(quote! {
+            #(#functions)*
+        });
 
         if function.header.return_params.is_empty() {
             body.extend(quote! {
@@ -418,7 +405,6 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             });
         }
 
-        // TODO remove todo
         output.extend(quote! {
             #message
             #function_name(#view #params) -> Result<#return_params, Error> {
@@ -426,14 +412,26 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             }
         });
 
-        if i < functions.len() - 1 {
-            output.extend(quote! {
-                _blank_!();
-            });
-        }
+        output.extend(quote! {
+            _blank_!();
+        });
     }
 
     output
+}
+
+impl ToTokens for Statement {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Statement::Inline(content) => stream.extend(TokenStream::from_str(content).unwrap()),
+            Statement::Comment(content) => {
+                stream.extend(quote! {
+                    _comment_!(#content);
+                })
+            }
+            _ => {}
+        }
+    }
 }
 
 /// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings

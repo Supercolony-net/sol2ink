@@ -512,10 +512,7 @@ fn parse_function(
             if open_braces == close_braces {
                 break
             }
-            statements.push(Statement {
-                content: buffer.clone(),
-                comment: true,
-            });
+            statements.push(Statement::Raw(buffer.clone()));
             buffer.clear();
         } else {
             buffer.push(ch);
@@ -539,16 +536,21 @@ fn parse_statements(
     let mut out = Vec::default();
 
     while let Some(statement) = iterator.next() {
-        let mut adjusted = statement.content.clone();
-        adjusted.remove_matches(";");
-        out.push(parse_statement(
-            &adjusted,
-            function.header.name.is_empty(),
-            &storage,
-            imports,
-            &functions,
-            &mut stack,
-        ));
+        match statement {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                out.push(parse_statement(
+                    &adjusted,
+                    function.header.name.is_empty(),
+                    &storage,
+                    imports,
+                    &functions,
+                    &mut stack,
+                ));
+            }
+            _ => {}
+        }
     }
 
     function.body = out;
@@ -580,35 +582,20 @@ fn parse_statement(
         return parse_if(line, constructor, storage, imports)
     } else if tokens[0] == "unchecked" {
         stack.push_back(Block::Unchecked);
-        return Statement {
-            content: format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)),
-            comment: true,
-        }
+        return Statement::Comment(format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)))
     } else if tokens[0] == "}" {
         match stack.pop_back().unwrap() {
             Block::Unchecked => {}
-            Block::If => {
-                return Statement {
-                    content: String::from("}"),
-                    comment: false,
-                }
-            }
+            Block::If => {}//return Statement::Inline(String::from("}")),
         }
-        return Statement {
-            content: format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)),
-            comment: true,
-        }
+        return Statement::Comment(format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)))
     } else if tokens[0] == "emit" {
         // TODO
     }
     // Assignment
     // Function call
 
-    // TODO actual parsing
-    Statement {
-        content: trim(line),
-        comment: true,
-    }
+    Statement::Comment(trim(line))
 }
 
 #[inline(always)]
@@ -630,10 +617,7 @@ fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
         raw_content
     };
 
-    Statement {
-        content: format!("return Ok({})", output),
-        comment: false,
-    }
+    Statement::Inline(format!("return Ok({})", output))
 }
 
 fn parse_if(
@@ -654,22 +638,19 @@ fn parse_if(
 
     let content = if condition.right.is_some() {
         format!(
-            "if {} {} {} {{\n",
+            "if {} {} {} {{\n}}",
             condition.left,
             condition.operation.to_string(),
             condition.right.unwrap(),
         )
     } else {
         format!(
-            "if {}{} {{\n",
+            "if {}{} {{\n}}",
             condition.operation.to_string(),
             condition.left,
         )
     };
-    Statement {
-        content,
-        comment: false,
-    }
+    Statement::Inline(content)
 }
 
 fn parse_require(
@@ -717,10 +698,7 @@ fn parse_require(
             error_output
         )
     };
-    Statement {
-        content,
-        comment: false,
-    }
+    Statement::Inline(content)
 }
 
 fn negate(operation: Operation) -> Operation {
@@ -800,21 +778,19 @@ fn parse_declaration(
     if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
         let expression = parse_expression_raw(expression_raw, constructor, storage, functions);
-        return Statement {
-            content: format!(
-                "let {} : {} = {};",
-                var_name.to_case(Case::Snake),
-                var_type,
-                expression.to_string()
-            ),
-            comment: false,
-        }
+        return Statement::Inline(format!(
+            "let {} : {} = {};",
+            var_name.to_case(Case::Snake),
+            var_type,
+            expression.to_string()
+        ))
     }
 
-    Statement {
-        content: format!("let {} : {};", var_name.to_case(Case::Snake), var_type),
-        comment: false,
-    }
+    Statement::Inline(format!(
+        "let {} : {};",
+        var_name.to_case(Case::Snake),
+        var_type
+    ))
 }
 
 fn parse_expression_raw(

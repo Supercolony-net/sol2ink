@@ -88,9 +88,11 @@ pub struct FunctionParam {
 }
 
 #[derive(Clone, Debug)]
-pub struct Statement {
-    pub content: String,
-    pub comment: bool,
+pub enum Statement {
+    Raw(String),
+    Comment(String),
+    Inline(String),
+    Block(Vec<Statement>)
 }
 
 #[derive(Debug)]
