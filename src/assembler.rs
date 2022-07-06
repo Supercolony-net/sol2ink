@@ -420,6 +420,21 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     output
 }
 
+impl ToTokens for Operation {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        stream.extend(match self {
+            Operation::Not => quote!(!),
+            Operation::True => quote!(),
+            Operation::GreaterThanEqual => quote!(>=),
+            Operation::GreaterThan => quote!(>),
+            Operation::LessThanEqual => quote!(<=),
+            Operation::LessThan => quote!(<),
+            Operation::Equal => quote!(==),
+            Operation::NotEqual => quote!(!=),
+        })
+    }
+}
+
 impl ToTokens for Statement {
     fn to_tokens(&self, stream: &mut TokenStream) {
         match self {
@@ -427,6 +442,21 @@ impl ToTokens for Statement {
             Statement::Comment(content) => {
                 stream.extend(quote! {
                     _comment_!(#content);
+                })
+            }
+            Statement::If(condition, statements) => {
+                let left = TokenStream::from_str(&condition.left).unwrap();
+                let operation = condition.operation;
+                let condition_formatted = if let Some(condition) = condition.right.clone() {
+                    let right = TokenStream::from_str(&condition).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    if #condition_formatted {
+                        #(#statements)*
+                    }
                 })
             }
             _ => {}

@@ -11,6 +11,7 @@ use std::{
         HashSet,
         VecDeque,
     },
+    slice::Iter,
     str::Chars,
 };
 use substring::Substring;
@@ -547,6 +548,7 @@ fn parse_statements(
                     imports,
                     &functions,
                     &mut stack,
+                    &mut iterator,
                 ));
             }
             _ => {}
@@ -568,6 +570,7 @@ fn parse_statement(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, String>,
     stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
 ) -> Statement {
     let tokens = split(&trim(line), " ", None);
 
@@ -579,16 +582,24 @@ fn parse_statement(
         return parse_require(line, constructor, storage, imports)
     } else if tokens[0] == "if" {
         stack.push_back(Block::If);
-        return parse_if(line, constructor, storage, imports)
+        return parse_if(
+            line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+        )
     } else if tokens[0] == "unchecked" {
         stack.push_back(Block::Unchecked);
-        return Statement::Comment(format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)))
+        return Statement::Comment(String::from("Please handle unchecked blocks manually >>>"))
     } else if tokens[0] == "}" {
         match stack.pop_back().unwrap() {
             Block::Unchecked => {}
-            Block::If => {}//return Statement::Inline(String::from("}")),
+            Block::If => return Statement::EndIf,
         }
-        return Statement::Comment(format!("{} I AM NOT GONNA HANDLE UNCHECKED ", trim(line)))
+        return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
         // TODO
     }
@@ -625,6 +636,9 @@ fn parse_if(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, String>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
 ) -> Statement {
     let regex = Regex::new(
         r#"(?x)
@@ -633,24 +647,35 @@ fn parse_if(
     )
     .unwrap();
 
-    let condition = capture_regex(&regex, line, "condition");
-    let condition = parse_condition(&condition.unwrap(), constructor, storage, imports);
+    let condition_raw = capture_regex(&regex, line, "condition");
+    let condition = parse_condition(&condition_raw.unwrap(), constructor, storage, imports);
+    let mut statements = Vec::default();
 
-    let content = if condition.right.is_some() {
-        format!(
-            "if {} {} {} {{\n}}",
-            condition.left,
-            condition.operation.to_string(),
-            condition.right.unwrap(),
-        )
-    } else {
-        format!(
-            "if {}{} {{\n}}",
-            condition.operation.to_string(),
-            condition.left,
-        )
-    };
-    Statement::Inline(content)
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                let statement = parse_statement(
+                    &adjusted,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    stack,
+                    iterator,
+                );
+                if statement == Statement::EndIf {
+                    break
+                } else {
+                    statements.push(statement)
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Statement::If(condition, statements)
 }
 
 fn parse_require(

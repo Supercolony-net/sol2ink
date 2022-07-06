@@ -87,12 +87,14 @@ pub struct FunctionParam {
     pub param_type: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Raw(String),
     Comment(String),
     Inline(String),
-    Block(Vec<Statement>)
+    If(Condition, Vec<Statement>),
+    EndIf,
+    Block(Vec<Statement>),
 }
 
 #[derive(Debug)]
@@ -102,14 +104,14 @@ pub struct FunctionCall {
     pub constructor: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Condition {
     pub left: String,
     pub operation: Operation,
     pub right: Option<String>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Operation {
     Not,
     True,
@@ -120,6 +122,8 @@ pub enum Operation {
     Equal,
     NotEqual,
 }
+
+
 
 impl ToString for Operation {
     fn to_string(&self) -> String {
@@ -144,7 +148,7 @@ pub enum Expression {
 
 pub enum Block {
     Unchecked,
-    If
+    If,
 }
 
 impl ToString for Expression {

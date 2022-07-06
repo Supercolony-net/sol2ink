@@ -176,9 +176,9 @@ pub mod erc_20 {
                     "ERC20: decreased allowance below zero",
                 )))
             }
-            // unchecked { I AM NOT GONNA HANDLE UNCHECKED 
+            // Please handle unchecked blocks manually >>>
             // _approve(owner, spender, currentAllowance - subtractedValue)
-            // } I AM NOT GONNA HANDLE UNCHECKED 
+            // <<< Please handle unchecked blocks manually
             return Ok(true)
         }
 
@@ -200,9 +200,9 @@ pub mod erc_20 {
                     "ERC20: transfer amount exceeds balance",
                 )))
             }
-            // unchecked { I AM NOT GONNA HANDLE UNCHECKED 
+            // Please handle unchecked blocks manually >>>
             // _balances[from] = fromBalance - amount
-            // } I AM NOT GONNA HANDLE UNCHECKED 
+            // <<< Please handle unchecked blocks manually
             // _balances[to] += amount
             // emit Transfer(from, to, amount)
             // _afterTokenTransfer(from, to, amount)
@@ -236,9 +236,9 @@ pub mod erc_20 {
                     "ERC20: burn amount exceeds balance",
                 )))
             }
-            // unchecked { I AM NOT GONNA HANDLE UNCHECKED 
+            // Please handle unchecked blocks manually >>>
             // _balances[account] = accountBalance - amount
-            // } I AM NOT GONNA HANDLE UNCHECKED 
+            // <<< Please handle unchecked blocks manually
             // _totalSupply -= amount
             // emit Transfer(account, address(0), amount)
             // _afterTokenTransfer(account, address(0), amount)
@@ -273,14 +273,14 @@ pub mod erc_20 {
             amount: u128,
         ) -> Result<(), Error> {
             let current_allowance: u128 = self.allowance(owner, spender)?;
-            if current_allowance != u128::MAX {}
-            if current_allowance < amount {
-                return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
+            if current_allowance != u128::MAX {
+                if current_allowance < amount {
+                    return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
+                }
+                // Please handle unchecked blocks manually >>>
+                // _approve(owner, spender, currentAllowance - amount)
+                // <<< Please handle unchecked blocks manually
             }
-            // unchecked { I AM NOT GONNA HANDLE UNCHECKED 
-            // _approve(owner, spender, currentAllowance - amount)
-            // } I AM NOT GONNA HANDLE UNCHECKED 
-            // } I AM NOT GONNA HANDLE UNCHECKED 
             Ok(())
         }
 
