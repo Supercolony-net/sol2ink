@@ -14,6 +14,7 @@ use quote::*;
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
 pub fn assemble_contract(contract: Contract) -> TokenStream {
     let mod_name = format_ident!("{}", contract.name.to_case(Case::Snake));
+    let contract_name = format_ident!("{}", contract.name);
     let signature = signature();
     let imports = assemble_imports(contract.imports);
     let events = assemble_events(contract.events);
@@ -45,7 +46,7 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
             #enums
             #structs
             #storage
-            impl #mod_name {
+            impl #contract_name {
                 #constructor
                 #functions
             }

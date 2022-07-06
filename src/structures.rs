@@ -95,7 +95,7 @@ pub enum Statement {
     IfEnd,
     Raw(String),
     Require(Condition, String),
-    Return(String)
+    Return(String),
 }
 
 #[derive(Debug)]
@@ -139,10 +139,25 @@ impl ToString for Operation {
     }
 }
 
+impl Operation {
+    pub fn negate(&self) -> Operation {
+        match self {
+            Operation::Not => Operation::True,
+            Operation::True => Operation::Not,
+            Operation::GreaterThanEqual => Operation::LessThan,
+            Operation::GreaterThan => Operation::LessThanEqual,
+            Operation::LessThanEqual => Operation::GreaterThan,
+            Operation::LessThan => Operation::GreaterThanEqual,
+            Operation::Equal => Operation::NotEqual,
+            Operation::NotEqual => Operation::Equal,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Expression {
     FunctionCall(FunctionCall),
-    Custom(String),
+    Var(String),
 }
 
 pub enum Block {
@@ -153,7 +168,6 @@ pub enum Block {
 impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
-            Expression::Custom(exp) => exp.to_owned(),
             Expression::FunctionCall(function_call) => {
                 format!(
                     "{}.{}({})?",
@@ -166,6 +180,7 @@ impl ToString for Expression {
                     function_call.args.join(", ")
                 )
             }
+            Expression::Var(exp) => exp.to_owned(),
         }
     }
 }

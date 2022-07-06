@@ -602,9 +602,9 @@ fn parse_statement(
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
         // TODO
+    } else if tokens[0].contains("(") {
+        // function call
     }
-    // Assignment
-    // Function call
 
     Statement::Comment(trim(line))
 }
@@ -615,9 +615,8 @@ fn is_type(line: String) -> bool {
 }
 
 fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
-    let mut raw_content = line.to_owned();
-    raw_content.remove_matches("return");
-    raw_content = trim(&raw_content);
+    let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
+    let mut raw_content = capture_regex(&regex, line, "output").unwrap();
     raw_content = raw_content.replace(", ", ",");
 
     let tokens = split(&raw_content, " ", None);
@@ -716,19 +715,6 @@ fn parse_require(
     Statement::Require(condition, error_output)
 }
 
-fn negate(operation: Operation) -> Operation {
-    match operation {
-        Operation::Not => Operation::True,
-        Operation::True => Operation::Not,
-        Operation::GreaterThanEqual => Operation::LessThan,
-        Operation::GreaterThan => Operation::LessThanEqual,
-        Operation::LessThanEqual => Operation::GreaterThan,
-        Operation::LessThan => Operation::GreaterThanEqual,
-        Operation::Equal => Operation::NotEqual,
-        Operation::NotEqual => Operation::Equal,
-    }
-}
-
 fn parse_condition(
     line: &String,
     constructor: bool,
@@ -770,7 +756,7 @@ fn parse_condition(
     Condition {
         left: left.to_owned(),
         operation: if inverted {
-            negate(operation)
+            operation.negate()
         } else {
             operation
         },
@@ -797,7 +783,7 @@ fn parse_declaration(
     let var_name = tokens[1].to_owned();
     return if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
-        let expression = parse_expression_raw(expression_raw, constructor, storage, functions);
+        let expression = parse_expression_raw(&expression_raw, constructor, storage, functions);
         Statement::Declaration(var_name, var_type, Some(expression.to_string()))
     } else {
         Statement::Declaration(var_name, var_type, None)
@@ -805,7 +791,7 @@ fn parse_declaration(
 }
 
 fn parse_expression_raw(
-    line: String,
+    line: &String,
     constructor: bool,
     storage: &HashMap<String, String>,
     functions: &HashMap<String, String>,
@@ -862,10 +848,10 @@ fn parse_expression_raw(
     }
 
     if buffer.len() > 0 {
-        return Expression::Custom(parse_expression(buffer, constructor, storage))
+        return Expression::Var(parse_expression(buffer, constructor, storage))
     }
 
-    return Expression::Custom(String::from(""))
+    return Expression::Var(String::from(""))
 }
 
 fn parse_expression(
