@@ -19,7 +19,7 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let events = assemble_events(contract.events);
     let enums = assemble_enums(contract.enums);
     let structs = assemble_structs(contract.structs);
-    let storage = assemble_storage(contract.name.clone(), contract.fields);
+    let storage = assemble_storage(&contract.name, contract.fields);
     let constructor = assemble_constructor(contract.constructor);
     let functions = assemble_functions(contract.functions);
     let comments = assemble_contract_comments(contract.comments);
@@ -199,7 +199,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 }
 
 /// Assembles ink! storage struct from the vec of parsed ContractField structs and return it as a vec of Strings
-fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenStream {
+fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
     let contract_name = format_ident!("{}", contract_name);
     let mut storage_fields = TokenStream::new();
@@ -316,7 +316,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         let mut params = TokenStream::new();
         let mut return_params = TokenStream::new();
         let mut body = TokenStream::new();
-        let functions = function.body.clone();
+        let statements = &function.body;
 
         // assemble message
         if function.header.external {
@@ -396,7 +396,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 
         // body
         body.extend(quote! {
-            #(#functions)*
+            #(#statements)*
         });
 
         if function.header.return_params.is_empty() {
@@ -447,8 +447,8 @@ impl ToTokens for Statement {
             Statement::If(condition, statements) => {
                 let left = TokenStream::from_str(&condition.left).unwrap();
                 let operation = condition.operation;
-                let condition_formatted = if let Some(condition) = condition.right.clone() {
-                    let right = TokenStream::from_str(&condition).unwrap();
+                let condition_formatted = if let Some(condition) = &condition.right {
+                    let right = TokenStream::from_str(condition).unwrap();
                     quote!(#left #operation #right)
                 } else {
                     quote!(#operation #left)
