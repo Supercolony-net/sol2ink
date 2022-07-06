@@ -435,35 +435,6 @@ impl ToTokens for Operation {
     }
 }
 
-impl ToTokens for Statement {
-    fn to_tokens(&self, stream: &mut TokenStream) {
-        match self {
-            Statement::Inline(content) => stream.extend(TokenStream::from_str(content).unwrap()),
-            Statement::Comment(content) => {
-                stream.extend(quote! {
-                    _comment_!(#content);
-                })
-            }
-            Statement::If(condition, statements) => {
-                let left = TokenStream::from_str(&condition.left).unwrap();
-                let operation = condition.operation;
-                let condition_formatted = if let Some(condition) = &condition.right {
-                    let right = TokenStream::from_str(condition).unwrap();
-                    quote!(#left #operation #right)
-                } else {
-                    quote!(#operation #left)
-                };
-                stream.extend(quote! {
-                    if #condition_formatted {
-                        #(#statements)*
-                    }
-                })
-            }
-            _ => {}
-        }
-    }
-}
-
 /// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
 fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
     let mut output = TokenStream::new();
@@ -576,5 +547,66 @@ fn signature() -> TokenStream {
         _comment_!(#version);
         _comment_!(#link);
         _blank_!();
+    }
+}
+
+impl ToTokens for Statement {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Statement::Comment(content) => {
+                stream.extend(quote! {
+                    _comment_!(#content);
+                })
+            }
+            Statement::Declaration(var_name_raw, var_type_raw, initial_value_maybe) => {
+                let var_name = format_ident!("{}", var_name_raw.to_case(Case::Snake));
+                let var_type = TokenStream::from_str(var_type_raw).unwrap();
+                if let Some(initial_value_raw) = &initial_value_maybe {
+                    let initial_value = TokenStream::from_str(initial_value_raw).unwrap();
+                    stream.extend(quote!(let #var_name : #var_type = #initial_value;));
+                } else {
+                    stream.extend(quote!(let #var_name : #var_type;));
+                }
+            }
+            Statement::If(condition_raw, statements) => {
+                let left = TokenStream::from_str(&condition_raw.left).unwrap();
+                let operation = condition_raw.operation;
+                let condition = if let Some(condition) = &condition_raw.right {
+                    let right = TokenStream::from_str(condition).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    if #condition {
+                        #(#statements)*
+                    }
+                })
+            }
+            Statement::IfEnd => {}
+            Statement::Raw(_) => {}
+            Statement::Require(condition_raw, error_raw) => {
+                let left = TokenStream::from_str(&condition_raw.left).unwrap();
+                let operation = condition_raw.operation;
+                let error = TokenStream::from_str(&error_raw).unwrap();
+                let condition = if let Some(condition) = &condition_raw.right {
+                    let right = TokenStream::from_str(condition).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    if #condition {
+                        #error
+                    }
+                })
+            }
+            Statement::Return(output_raw) => {
+                let output = TokenStream::from_str(&output_raw).unwrap();
+                stream.extend(quote! {
+                    return #output
+                })
+            }
+        }
     }
 }

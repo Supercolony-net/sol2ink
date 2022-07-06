@@ -89,12 +89,13 @@ pub struct FunctionParam {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    Raw(String),
     Comment(String),
-    Inline(String),
+    Declaration(String, String, Option<String>),
     If(Condition, Vec<Statement>),
-    EndIf,
-    Block(Vec<Statement>),
+    IfEnd,
+    Raw(String),
+    Require(Condition, String),
+    Return(String)
 }
 
 #[derive(Debug)]
@@ -122,8 +123,6 @@ pub enum Operation {
     Equal,
     NotEqual,
 }
-
-
 
 impl ToString for Operation {
     fn to_string(&self) -> String {

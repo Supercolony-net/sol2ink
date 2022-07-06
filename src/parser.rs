@@ -597,7 +597,7 @@ fn parse_statement(
     } else if tokens[0] == "}" {
         match stack.pop_back().unwrap() {
             Block::Unchecked => {}
-            Block::If => return Statement::EndIf,
+            Block::If => return Statement::IfEnd,
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
@@ -628,7 +628,7 @@ fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
         raw_content
     };
 
-    Statement::Inline(format!("return Ok({})", output))
+    Statement::Return(format!("Ok({})", output))
 }
 
 fn parse_if(
@@ -648,7 +648,13 @@ fn parse_if(
     .unwrap();
 
     let condition_raw = capture_regex(&regex, line, "condition");
-    let condition = parse_condition(&condition_raw.unwrap(), constructor, storage, imports);
+    let condition = parse_condition(
+        &condition_raw.unwrap(),
+        constructor,
+        false,
+        storage,
+        imports,
+    );
     let mut statements = Vec::default();
 
     while let Some(statement_raw) = iterator.next() {
@@ -665,7 +671,7 @@ fn parse_if(
                     stack,
                     iterator,
                 );
-                if statement == Statement::EndIf {
+                if statement == Statement::IfEnd {
                     break
                 } else {
                     statements.push(statement)
@@ -697,7 +703,7 @@ fn parse_require(
     let condition = capture_regex(&regex, line, "condition");
     let error = capture_regex(&regex, line, "error");
 
-    let condition = parse_condition(&condition.unwrap(), constructor, storage, imports);
+    let condition = parse_condition(&condition.unwrap(), constructor, true, storage, imports);
     let error_output = if constructor {
         format!("panic!(\"{}\")", error.unwrap_or(DEFAULT_ERROR.to_owned()))
     } else {
@@ -707,23 +713,7 @@ fn parse_require(
         )
     };
 
-    let content = if condition.right.is_some() {
-        format!(
-            "if {} {} {} {{\n{}\n}}",
-            condition.left,
-            negate(condition.operation).to_string(),
-            condition.right.unwrap(),
-            error_output
-        )
-    } else {
-        format!(
-            "if {}{} {{\n{}\n}}",
-            negate(condition.operation).to_string(),
-            condition.left,
-            error_output
-        )
-    };
-    Statement::Inline(content)
+    Statement::Require(condition, error_output)
 }
 
 fn negate(operation: Operation) -> Operation {
@@ -742,6 +732,7 @@ fn negate(operation: Operation) -> Operation {
 fn parse_condition(
     line: &String,
     constructor: bool,
+    inverted: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
 ) -> Condition {
@@ -778,7 +769,11 @@ fn parse_condition(
 
     Condition {
         left: left.to_owned(),
-        operation,
+        operation: if inverted {
+            negate(operation)
+        } else {
+            operation
+        },
         right,
     }
 }
@@ -800,22 +795,13 @@ fn parse_declaration(
 ) -> Statement {
     let var_type = convert_variable_type(tokens[0].to_owned(), imports);
     let var_name = tokens[1].to_owned();
-    if tokens.len() > 2 {
+    return if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
         let expression = parse_expression_raw(expression_raw, constructor, storage, functions);
-        return Statement::Inline(format!(
-            "let {} : {} = {};",
-            var_name.to_case(Case::Snake),
-            var_type,
-            expression.to_string()
-        ))
+        Statement::Declaration(var_name, var_type, Some(expression.to_string()))
+    } else {
+        Statement::Declaration(var_name, var_type, None)
     }
-
-    Statement::Inline(format!(
-        "let {} : {};",
-        var_name.to_case(Case::Snake),
-        var_type
-    ))
 }
 
 fn parse_expression_raw(
