@@ -610,8 +610,8 @@ fn parse_statement(
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
         // TODO
-    } else if tokens[0].contains("(") {
-        // function call
+    } else if tokens.get(1).unwrap_or(&String::new()) == "=" {
+        return parse_assign(line, constructor, storage, imports, functions)
     }
 
     Statement::Comment(trim(line))
@@ -620,6 +620,38 @@ fn parse_statement(
 #[inline(always)]
 fn is_type(line: String) -> bool {
     TYPES.contains_key(&line)
+}
+
+fn parse_assign(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+) -> Statement {
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)\s*=
+        (?P<right>.+)+?
+        \s*$"#,
+    )
+    .unwrap();
+    let left_raw = capture_regex(&regex, line, "left").unwrap();
+    let right_raw = capture_regex(&regex, line, "right").unwrap();
+
+    let left = parse_member(&left_raw, constructor, storage, imports, functions);
+    let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+    return if let Expression::Mapping(name, indices, selector, None) = left {
+        Statement::FunctionCall(Expression::Mapping(
+            name,
+            indices,
+            selector,
+            Some(Box::new(right)),
+        ))
+    } else {
+        Statement::Assign(left, right)
+    }
 }
 
 fn parse_return(
@@ -793,7 +825,7 @@ fn parse_member(
 
         let selector = get_selector(storage, constructor, &mapping_name_raw);
 
-        return Expression::Mapping(mapping_name_raw, indices, selector)
+        return Expression::Mapping(mapping_name_raw, indices, selector, None)
     }
 
     let regex_function_call = Regex::new(
@@ -854,6 +886,23 @@ fn parse_member(
             selector!(constructor),
             *functions.get(&function_name_raw).unwrap(),
         )
+    }
+
+    let regex_subtraction = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*\-[^=\-]\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_subtraction.is_match(raw) {
+        let left_raw = capture_regex(&regex_subtraction, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_subtraction, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::Subtraction(Box::new(left), Box::new(right))
     }
 
     let selector = get_selector(storage, constructor, &raw);

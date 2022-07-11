@@ -89,8 +89,10 @@ pub struct FunctionParam {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    Assign(Expression, Expression),
     Comment(String),
     Declaration(String, String, Option<Expression>),
+    FunctionCall(Expression),
     If(Condition, Vec<Statement>),
     IfEnd,
     Raw(String),
@@ -154,7 +156,13 @@ pub enum Expression {
     IsZero(Box<Expression>),
     Literal(String),
     Member(String, Option<String>),
-    Mapping(String, Vec<Expression>, Option<String>),
+    Mapping(
+        String,
+        Vec<Expression>,
+        Option<String>,
+        Option<Box<Expression>>,
+    ),
+    Subtraction(Box<Expression>, Box<Expression>),
     ZeroAddressInto,
 }
 

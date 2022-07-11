@@ -554,6 +554,13 @@ fn signature() -> TokenStream {
 impl ToTokens for Statement {
     fn to_tokens(&self, stream: &mut TokenStream) {
         match self {
+            Statement::Assign(left_raw, right_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left = #right;
+                })
+            }
             Statement::Comment(content) => {
                 stream.extend(quote! {
                     _comment_!(#content);
@@ -569,6 +576,12 @@ impl ToTokens for Statement {
                 } else {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
+            }
+            Statement::FunctionCall(expression_raw) => {
+                let expression = TokenStream::from_str(&expression_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #expression;
+                })
             }
             Statement::If(condition_raw, statements) => {
                 let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
@@ -647,7 +660,7 @@ impl ToString for Expression {
                     expression
                 }
             }
-            Expression::Mapping(name_raw, indices_raw, selector_raw) => {
+            Expression::Mapping(name_raw, indices_raw, selector_raw, insert_maybe) => {
                 let indices = if indices_raw.len() > 1 {
                     format!(
                         "({})",
@@ -661,11 +674,20 @@ impl ToString for Expression {
                     indices_raw.get(0).unwrap().to_string()
                 };
                 let name = name_raw.to_case(Snake);
-                if let Some(selector) = selector_raw {
-                    format!("{selector}.{name}.get(&{indices}).unwrap()")
+                let name_and_selector = if let Some(selector) = selector_raw {
+                    format!("{selector}.{name}")
                 } else {
-                    format!("{name}.get(&{indices}).unwrap()")
+                    format!("{name}")
+                };
+                if let Some(insert_raw) = insert_maybe {
+                    let insert = insert_raw.to_string();
+                    format!("{name_and_selector}.insert(&{indices}, {insert})")
+                } else {
+                    format!("{name_and_selector}.get(&{indices}).unwrap()")
                 }
+            }
+            Expression::Subtraction(left, right) => {
+                format!("{} - {}", left.to_string(), right.to_string())
             }
             Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
         }

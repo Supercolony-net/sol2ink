@@ -90,8 +90,8 @@ pub mod erc_20 {
         #[ink(constructor)]
         pub fn new(name: String, symbol: String) -> Self {
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
-                // _name = name_
-                // _symbol = symbol_
+                instance.name = name;
+                instance.symbol = symbol;
             })
         }
 
@@ -201,7 +201,7 @@ pub mod erc_20 {
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            // _balances[from] = fromBalance - amount
+            self.balances.insert(&from, from_balance - amount);
             // <<< Please handle unchecked blocks manually
             // _balances[to] += amount
             // emit Transfer(from, to, amount)
@@ -237,7 +237,7 @@ pub mod erc_20 {
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            // _balances[account] = accountBalance - amount
+            self.balances.insert(&account, account_balance - amount);
             // <<< Please handle unchecked blocks manually
             // _totalSupply -= amount
             // emit Transfer(account, address(0), amount)
@@ -261,7 +261,7 @@ pub mod erc_20 {
                     "ERC20: approve to the zero address",
                 )))
             }
-            // _allowances[owner][spender] = amount
+            self.allowances.insert(&(owner, spender), amount);
             // emit Approval(owner, spender, amount)
             Ok(())
         }
