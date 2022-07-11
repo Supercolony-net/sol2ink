@@ -2,7 +2,6 @@ use crate::{
     formatter::*,
     structures::*,
 };
-use convert_case::*;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -316,20 +315,9 @@ fn parse_contract(
             contract_field.field_type.clone(),
         );
     }
-    let mut functions_map = HashMap::<String, String>::new();
+    let mut functions_map = HashMap::<String, bool>::new();
     for function in functions.iter() {
-        functions_map.insert(
-            function.header.name.clone(),
-            format!(
-                "{}{}",
-                if function.header.external {
-                    String::from("")
-                } else {
-                    String::from("_")
-                },
-                function.header.name.to_case(Case::Snake)
-            ),
-        );
+        functions_map.insert(function.header.name.clone(), function.header.external);
     }
 
     // now we know the contracts members and we can parse statements
@@ -550,7 +538,7 @@ fn parse_statements(
     function: &mut Function,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: &HashMap<String, String>,
+    functions: &HashMap<String, bool>,
 ) {
     let mut iterator = function.body.iter();
     let mut stack = VecDeque::<Block>::new();
@@ -588,18 +576,18 @@ fn parse_statement(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: &HashMap<String, String>,
+    functions: &HashMap<String, bool>,
     stack: &mut VecDeque<Block>,
     iterator: &mut Iter<Statement>,
 ) -> Statement {
     let tokens = split(&trim(line), " ", None);
 
     if tokens[0] == "return" {
-        return parse_return(line, storage, imports)
+        return parse_return(line, storage, imports, functions)
     } else if is_type(tokens[0].to_owned()) {
-        return parse_declaration(tokens, constructor, storage, imports)
+        return parse_declaration(tokens, constructor, storage, imports, functions)
     } else if split(&tokens[0], "(", None)[0] == "require" {
-        return parse_require(line, constructor, storage, imports)
+        return parse_require(line, constructor, storage, imports, functions)
     } else if tokens[0] == "if" {
         stack.push_back(Block::If);
         return parse_if(
@@ -638,10 +626,11 @@ fn parse_return(
     line: &String,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Statement {
     let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
     let raw_content = capture_regex(&regex, line, "output").unwrap();
-    let output = parse_member(&raw_content, false, storage, imports);
+    let output = parse_member(&raw_content, false, storage, imports, functions);
 
     Statement::Return(output)
 }
@@ -651,7 +640,7 @@ fn parse_if(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: &HashMap<String, String>,
+    functions: &HashMap<String, bool>,
     stack: &mut VecDeque<Block>,
     iterator: &mut Iter<Statement>,
 ) -> Statement {
@@ -669,6 +658,7 @@ fn parse_if(
         false,
         storage,
         imports,
+        functions,
     );
     let mut statements = Vec::default();
 
@@ -704,6 +694,7 @@ fn parse_require(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Statement {
     let regex = Regex::new(
         r#"(?x)
@@ -718,7 +709,14 @@ fn parse_require(
     let condition = capture_regex(&regex, line, "condition");
     let error = capture_regex(&regex, line, "error");
 
-    let condition = parse_condition(&condition.unwrap(), constructor, true, storage, imports);
+    let condition = parse_condition(
+        &condition.unwrap(),
+        constructor,
+        true,
+        storage,
+        imports,
+        functions,
+    );
     let error_output = if constructor {
         format!("panic!(\"{}\")", error.unwrap_or(DEFAULT_ERROR.to_owned()))
     } else {
@@ -736,6 +734,7 @@ fn parse_member(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Expression {
     if is_literal(raw) {
         return Expression::Literal(raw.clone())
@@ -776,7 +775,13 @@ fn parse_member(
                 BRACKET_CLOSE => {
                     close_braces += 1;
                     if open_braces == close_braces {
-                        indices.push(parse_member(&buffer, constructor, storage, imports));
+                        indices.push(parse_member(
+                            &buffer,
+                            constructor,
+                            storage,
+                            imports,
+                            functions,
+                        ));
                         buffer.clear();
                     } else {
                         buffer.push(ch)
@@ -819,7 +824,13 @@ fn parse_member(
                 }
                 COMMA => {
                     if open_parentheses == close_parenthesis {
-                        args.push(parse_member(&buffer, constructor, storage, imports));
+                        args.push(parse_member(
+                            &buffer,
+                            constructor,
+                            storage,
+                            imports,
+                            functions,
+                        ));
                         buffer.clear();
                     } else {
                         buffer.push(ch)
@@ -829,9 +840,20 @@ fn parse_member(
             }
         }
 
-        args.push(parse_member(&buffer, constructor, storage, imports));
+        args.push(parse_member(
+            &buffer,
+            constructor,
+            storage,
+            imports,
+            functions,
+        ));
 
-        return Expression::FunctionCall(function_name_raw, args, selector!(constructor))
+        return Expression::FunctionCall(
+            function_name_raw.clone(),
+            args,
+            selector!(constructor),
+            *functions.get(&function_name_raw).unwrap(),
+        )
     }
 
     let selector = get_selector(storage, constructor, &raw);
@@ -857,14 +879,21 @@ fn parse_condition(
     inverted: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Condition {
     let tokens = split(&trim(line), " ", None);
     let mut left_raw = tokens[0].to_owned();
     left_raw.remove_matches("!");
-    let mut left = parse_member(&left_raw, constructor, storage, imports);
+    let mut left = parse_member(&left_raw, constructor, storage, imports, functions);
 
     let (mut right, mut operation) = if tokens.len() > 1 {
-        let right = parse_member(&tokens[2].to_owned(), constructor, storage, imports);
+        let right = parse_member(
+            &tokens[2].to_owned(),
+            constructor,
+            storage,
+            imports,
+            functions,
+        );
         let operation = *OPERATIONS.get(&tokens[1]).unwrap();
         (Some(right), operation)
     } else {
@@ -914,12 +943,13 @@ fn parse_declaration(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Statement {
     let var_type = convert_variable_type(tokens[0].to_owned(), imports);
     let var_name = tokens[1].to_owned();
     return if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
-        let expression = parse_member(&expression_raw, constructor, storage, imports);
+        let expression = parse_member(&expression_raw, constructor, storage, imports, functions);
         Statement::Declaration(var_name, var_type, Some(expression))
     } else {
         Statement::Declaration(var_name, var_type, None)

@@ -5,7 +5,7 @@ use std::{
 
 use crate::structures::*;
 use convert_case::{
-    Case,
+    Case::Snake,
     Casing,
 };
 use proc_macro2::TokenStream;
@@ -13,7 +13,7 @@ use quote::*;
 
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
 pub fn assemble_contract(contract: Contract) -> TokenStream {
-    let mod_name = format_ident!("{}", contract.name.to_case(Case::Snake));
+    let mod_name = format_ident!("{}", contract.name.to_case(Snake));
     let contract_name = format_ident!("{}", contract.name);
     let signature = signature();
     let imports = assemble_imports(contract.imports);
@@ -177,7 +177,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
                 });
             }
 
-            let event_field_name = format_ident!("{}", event_field.name.to_case(Case::Snake));
+            let event_field_name = format_ident!("{}", event_field.name.to_case(Snake));
             let event_field_type = TokenStream::from_str(&event_field.field_type).unwrap();
 
             event_fields.extend(quote! {
@@ -207,7 +207,7 @@ fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> Token
 
     // assemble storage fields
     for field in fields.iter() {
-        let field_name = format_ident!("{}", field.name.to_case(Case::Snake));
+        let field_name = format_ident!("{}", field.name.to_case(Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
         storage_fields.extend(quote! {
             #field_name: #field_type,
@@ -245,7 +245,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 
         // assemble struct fields
         for struct_field in structure.fields.iter() {
-            let struct_field_name = format_ident!("{}", struct_field.name.to_case(Case::Snake));
+            let struct_field_name = format_ident!("{}", struct_field.name.to_case(Snake));
             let struct_field_type = TokenStream::from_str(&struct_field.field_type).unwrap();
 
             struct_fields.extend(quote! {
@@ -278,7 +278,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 
     // assemble params
     for param in constructor.header.params.iter() {
-        let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+        let param_name = format_ident!("{}", param.name.to_case(Snake));
         let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
         params.extend(quote! {
@@ -341,7 +341,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 } else {
                     String::from("fn _")
                 },
-                function.header.name.to_case(Case::Snake)
+                function.header.name.to_case(Snake)
             ))
             .unwrap(),
         );
@@ -357,7 +357,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 
         // assemble params
         for param in function.header.params.iter() {
-            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -471,7 +471,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
         // assemble function name
         function_name.extend(
-            TokenStream::from_str(&format!("fn {}", function.name.to_case(Case::Snake))).unwrap(),
+            TokenStream::from_str(&format!("fn {}", function.name.to_case(Snake))).unwrap(),
         );
 
         // assemble view
@@ -485,7 +485,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
         // assemble params
         for param in function.params.iter() {
-            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -560,7 +560,7 @@ impl ToTokens for Statement {
                 })
             }
             Statement::Declaration(var_name_raw, var_type_raw, initial_value_maybe) => {
-                let var_name = format_ident!("{}", var_name_raw.to_case(Case::Snake));
+                let var_name = format_ident!("{}", var_name_raw.to_case(Snake));
                 let var_type = TokenStream::from_str(var_type_raw).unwrap();
                 if let Some(initial_value_raw) = &initial_value_maybe {
                     let initial_value =
@@ -609,6 +609,65 @@ impl ToTokens for Statement {
                     return Ok(#output)
                 })
             }
+        }
+    }
+}
+
+impl ToString for Expression {
+    fn to_string(&self) -> String {
+        return match self {
+            Expression::EnvCaller(selector) => {
+                format!("{}.env().caller()", selector.clone().unwrap())
+            }
+            Expression::FunctionCall(function_name_raw, args, selector, external) => {
+                format!(
+                    "{}.{}{}({})?",
+                    selector,
+                    if *external {
+                        String::from("")
+                    } else {
+                        String::from("_")
+                    },
+                    function_name_raw.to_case(Snake),
+                    args.iter()
+                        .map(|expression| expression.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
+            Expression::IsZero(expression) => {
+                format!("{}.is_zero()", expression.to_string())
+            }
+            Expression::Literal(content) => content.to_owned(),
+            Expression::Member(expression_raw, selector_raw) => {
+                let expression = expression_raw.to_case(Snake);
+                if let Some(selector) = selector_raw {
+                    format!("{selector}.{expression}")
+                } else {
+                    expression
+                }
+            }
+            Expression::Mapping(name_raw, indices_raw, selector_raw) => {
+                let indices = if indices_raw.len() > 1 {
+                    format!(
+                        "({})",
+                        indices_raw
+                            .iter()
+                            .map(|expr| expr.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                } else {
+                    indices_raw.get(0).unwrap().to_string()
+                };
+                let name = name_raw.to_case(Snake);
+                if let Some(selector) = selector_raw {
+                    format!("{selector}.{name}.get(&{indices}).unwrap()")
+                } else {
+                    format!("{name}.get(&{indices}).unwrap()")
+                }
+            }
+            Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
         }
     }
 }

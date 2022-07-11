@@ -1,10 +1,5 @@
 use std::collections::HashSet;
 
-use convert_case::{
-    Case::Snake,
-    Casing,
-};
-
 #[derive(Debug, PartialEq, Default)]
 pub enum ContractType {
     #[default]
@@ -155,7 +150,7 @@ impl Operation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     EnvCaller(Option<String>),
-    FunctionCall(String, Vec<Expression>, String),
+    FunctionCall(String, Vec<Expression>, String, bool),
     IsZero(Box<Expression>),
     Literal(String),
     Member(String, Option<String>),
@@ -166,58 +161,4 @@ pub enum Expression {
 pub enum Block {
     Unchecked,
     If,
-}
-
-impl ToString for Expression {
-    fn to_string(&self) -> String {
-        return match self {
-            Expression::EnvCaller(selector) => {
-                format!("{}.env().caller()", selector.clone().unwrap())
-            }
-            Expression::FunctionCall(function_name_raw, args, selector) => {
-                format!(
-                    "{}.{}({})?",
-                    selector,
-                    function_name_raw.to_case(Snake),
-                    args.iter()
-                        .map(|expression| expression.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-            }
-            Expression::IsZero(expression) => {
-                format!("{}.is_zero()", expression.to_string())
-            }
-            Expression::Literal(content) => content.to_owned(),
-            Expression::Member(expression_raw, selector_raw) => {
-                let expression = expression_raw.to_case(Snake);
-                if let Some(selector) = selector_raw {
-                    format!("{selector}.{expression}")
-                } else {
-                    expression
-                }
-            }
-            Expression::Mapping(name_raw, indices_raw, selector_raw) => {
-                let indices = if indices_raw.len() > 1 {
-                    format!(
-                        "({})",
-                        indices_raw
-                            .iter()
-                            .map(|expr| expr.to_string())
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    )
-                } else {
-                    indices_raw.get(0).unwrap().to_string()
-                };
-                let name = name_raw.to_case(Snake);
-                if let Some(selector) = selector_raw {
-                    format!("{selector}.{name}.get(&{indices}).unwrap()")
-                } else {
-                    format!("{name}.get(&{indices}).unwrap()")
-                }
-            }
-            Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
-        }
-    }
 }
