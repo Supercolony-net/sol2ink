@@ -34,12 +34,14 @@ pub struct ContractField {
     pub name: String,
 }
 
+#[derive(Clone)]
 pub struct Event {
     pub name: String,
     pub fields: Vec<EventField>,
     pub comments: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct EventField {
     pub indexed: bool,
     pub field_type: String,
@@ -89,15 +91,18 @@ pub struct FunctionParam {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    AddAssign(Expression, Expression),
     Assign(Expression, Expression),
     Comment(String),
     Declaration(String, String, Option<Expression>),
+    Emit(String, Vec<Expression>),
     FunctionCall(Expression),
     If(Condition, Vec<Statement>),
     IfEnd,
     Raw(String),
     Require(Condition, String),
     Return(Expression),
+    SubAssign(Expression, Expression),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -151,6 +156,7 @@ impl Operation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
+    Addition(Box<Expression>, Box<Expression>),
     EnvCaller(Option<String>),
     FunctionCall(String, Vec<Expression>, String, bool),
     IsZero(Box<Expression>),
@@ -163,6 +169,7 @@ pub enum Expression {
         Option<Box<Expression>>,
     ),
     Subtraction(Box<Expression>, Box<Expression>),
+    StructArg(String, Box<Expression>),
     ZeroAddressInto,
 }
 

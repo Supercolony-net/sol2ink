@@ -561,6 +561,13 @@ impl ToTokens for Statement {
                     #left = #right;
                 })
             }
+            Statement::AddAssign(left_raw, right_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left += #right;
+                })
+            }
             Statement::Comment(content) => {
                 stream.extend(quote! {
                     _comment_!(#content);
@@ -576,6 +583,20 @@ impl ToTokens for Statement {
                 } else {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
+            }
+            Statement::Emit(event_name_raw, args_raw) => {
+                let args_str = args_raw
+                    .iter()
+                    .map(|arg| arg.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                let args = TokenStream::from_str(args_str.as_str()).unwrap();
+                let event_name = TokenStream::from_str(event_name_raw).unwrap();
+                stream.extend(quote! {
+                    self.env().emit_event(#event_name {
+                        #args
+                    });
+                })
             }
             Statement::FunctionCall(expression_raw) => {
                 let expression = TokenStream::from_str(&expression_raw.to_string()).unwrap();
@@ -622,6 +643,13 @@ impl ToTokens for Statement {
                     return Ok(#output)
                 })
             }
+            Statement::SubAssign(left_raw, right_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left -= #right;
+                })
+            }
         }
     }
 }
@@ -629,6 +657,9 @@ impl ToTokens for Statement {
 impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
+            Expression::Addition(left, right) => {
+                format!("{} + {}", left.to_string(), right.to_string())
+            }
             Expression::EnvCaller(selector) => {
                 format!("{}.env().caller()", selector.clone().unwrap())
             }
@@ -688,6 +719,9 @@ impl ToString for Expression {
             }
             Expression::Subtraction(left, right) => {
                 format!("{} - {}", left.to_string(), right.to_string())
+            }
+            Expression::StructArg(field_name, value) => {
+                format!("{} : {}", field_name, value.to_string())
             }
             Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
         }

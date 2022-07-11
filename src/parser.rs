@@ -319,12 +319,28 @@ fn parse_contract(
     for function in functions.iter() {
         functions_map.insert(function.header.name.clone(), function.header.external);
     }
+    let mut events_map = HashMap::<String, Event>::new();
+    for event in events.iter() {
+        events_map.insert(event.name.clone(), event.clone());
+    }
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(function, &storage, &mut imports, &functions_map);
+        parse_statements(
+            function,
+            &storage,
+            &mut imports,
+            &functions_map,
+            &events_map,
+        );
     }
-    parse_statements(&mut constructor, &storage, &mut imports, &functions_map);
+    parse_statements(
+        &mut constructor,
+        &storage,
+        &mut imports,
+        &functions_map,
+        &events_map,
+    );
 
     Ok(Contract {
         name,
@@ -539,6 +555,7 @@ fn parse_statements(
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
+    events: &HashMap<String, Event>,
 ) {
     let mut iterator = function.body.iter();
     let mut stack = VecDeque::<Block>::new();
@@ -557,6 +574,7 @@ fn parse_statements(
                     &functions,
                     &mut stack,
                     &mut iterator,
+                    events,
                 ));
             }
             _ => {}
@@ -579,6 +597,7 @@ fn parse_statement(
     functions: &HashMap<String, bool>,
     stack: &mut VecDeque<Block>,
     iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
 ) -> Statement {
     let tokens = split(&trim(line), " ", None);
 
@@ -598,6 +617,7 @@ fn parse_statement(
             functions,
             stack,
             iterator,
+            events,
         )
     } else if tokens[0] == "unchecked" {
         stack.push_back(Block::Unchecked);
@@ -609,12 +629,21 @@ fn parse_statement(
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
-        // TODO
+        return parse_emit(line, constructor, storage, imports, functions, events)
+        // println!("{emit:?}");
+        // return Statement::Comment(trim(line))
     } else if tokens.get(1).unwrap_or(&String::new()) == "=" {
         return parse_assign(line, constructor, storage, imports, functions)
+    } else if tokens.get(1).unwrap_or(&String::new()) == "+=" {
+        return parse_add_assign(line, constructor, storage, imports, functions)
+    } else if tokens.get(1).unwrap_or(&String::new()) == "-=" {
+        return parse_sub_assign(line, constructor, storage, imports, functions)
     }
 
-    Statement::Comment(trim(line))
+    let aaa = parse_member(&trim(line), constructor, storage, imports, functions);
+    Statement::FunctionCall(aaa)
+
+    // Statement::Comment(trim(line))
 }
 
 #[inline(always)]
@@ -631,7 +660,7 @@ fn parse_assign(
 ) -> Statement {
     let regex = Regex::new(
         r#"(?x)
-        ^\s*(?P<left>.+?)\s*=
+        ^\s*(?P<left>.+?)\s*=\s*
         (?P<right>.+)+?
         \s*$"#,
     )
@@ -652,6 +681,163 @@ fn parse_assign(
     } else {
         Statement::Assign(left, right)
     }
+}
+
+fn parse_add_assign(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+) -> Statement {
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)\s*\+=\s*
+        (?P<right>.+)+?
+        \s*$"#,
+    )
+    .unwrap();
+    let left_raw = capture_regex(&regex, line, "left").unwrap();
+    let right_raw = capture_regex(&regex, line, "right").unwrap();
+
+    let left = parse_member(&left_raw, constructor, storage, imports, functions);
+    let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+    return if let Expression::Mapping(name, indices, selector, None) = left {
+        Statement::FunctionCall(Expression::Mapping(
+            name.clone(),
+            indices.clone(),
+            selector.clone(),
+            Some(Box::new(Expression::Addition(
+                Box::new(Expression::Mapping(name, indices, selector, None)),
+                Box::new(right),
+            ))),
+        ))
+    } else {
+        Statement::AddAssign(left, right)
+    }
+}
+
+fn parse_sub_assign(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+) -> Statement {
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)\s*\-=\s*
+        (?P<right>.+)+?
+        \s*$"#,
+    )
+    .unwrap();
+    let left_raw = capture_regex(&regex, line, "left").unwrap();
+    let right_raw = capture_regex(&regex, line, "right").unwrap();
+
+    let left = parse_member(&left_raw, constructor, storage, imports, functions);
+    let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+    return if let Expression::Mapping(name, indices, selector, None) = left {
+        Statement::FunctionCall(Expression::Mapping(
+            name.clone(),
+            indices.clone(),
+            selector.clone(),
+            Some(Box::new(Expression::Subtraction(
+                Box::new(Expression::Mapping(name, indices, selector, None)),
+                Box::new(right),
+            ))),
+        ))
+    } else {
+        Statement::SubAssign(left, right)
+    }
+}
+
+fn parse_emit(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    imports.insert(String::from("use ink_lang::codegen::EmitEvent;"));
+
+    let regex = Regex::new(
+        r#"(?x)
+        ^\s*emit\s+(?P<event_name>.+?)\s*\(\s*
+        (?P<args>.+)+?\)
+        \s*$"#,
+    )
+    .unwrap();
+    let event_name_raw = capture_regex(&regex, line, "event_name").unwrap();
+    let args_raw = capture_regex(&regex, line, "args").unwrap();
+
+    let mut args = Vec::<Expression>::new();
+    let mut chars = args_raw.chars();
+    let mut buffer = String::new();
+    let mut open_parentheses = 0;
+    let mut close_parenthesis = 0;
+    let mut event_count = 0;
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            PARENTHESIS_OPEN => {
+                open_parentheses += 1;
+                buffer.push(ch)
+            }
+            PARENTHESIS_CLOSE => {
+                close_parenthesis += 1;
+                buffer.push(ch)
+            }
+            COMMA => {
+                if open_parentheses == close_parenthesis {
+                    args.push(Expression::StructArg(
+                        events
+                            .get(&event_name_raw)
+                            .unwrap()
+                            .fields
+                            .get(event_count)
+                            .unwrap()
+                            .name
+                            .clone(),
+                        Box::new(parse_member(
+                            &trim(&buffer),
+                            constructor,
+                            storage,
+                            imports,
+                            functions,
+                        )),
+                    ));
+                    event_count += 1;
+                    buffer.clear();
+                } else {
+                    buffer.push(ch)
+                }
+            }
+            _ => buffer.push(ch),
+        }
+    }
+
+    args.push(Expression::StructArg(
+        events
+            .get(&event_name_raw)
+            .unwrap()
+            .fields
+            .get(event_count)
+            .unwrap()
+            .name
+            .clone(),
+        Box::new(parse_member(
+            &trim(&buffer),
+            constructor,
+            storage,
+            imports,
+            functions,
+        )),
+    ));
+
+    Statement::Emit(event_name_raw, args)
 }
 
 fn parse_return(
@@ -675,6 +861,7 @@ fn parse_if(
     functions: &HashMap<String, bool>,
     stack: &mut VecDeque<Block>,
     iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
 ) -> Statement {
     let regex = Regex::new(
         r#"(?x)
@@ -707,6 +894,7 @@ fn parse_if(
                     functions,
                     stack,
                     iterator,
+                    events,
                 );
                 if statement == Statement::IfEnd {
                     break
@@ -774,6 +962,7 @@ fn parse_member(
         if expression == &Expression::ZeroAddressInto {
             imports.insert(String::from("use brush::traits::ZERO_ADDRESS;"));
         } else if expression == &Expression::EnvCaller(None) {
+            imports.insert(String::from("use ink_lang::codegen::Env;"));
             return Expression::EnvCaller(Some(selector!(constructor)))
         }
 
@@ -857,7 +1046,7 @@ fn parse_member(
                 COMMA => {
                     if open_parentheses == close_parenthesis {
                         args.push(parse_member(
-                            &buffer,
+                            &trim(&buffer),
                             constructor,
                             storage,
                             imports,
@@ -903,6 +1092,23 @@ fn parse_member(
         let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
         return Expression::Subtraction(Box::new(left), Box::new(right))
+    }
+
+    let regex_addition = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*\+[^=\-]\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_addition.is_match(raw) {
+        let left_raw = capture_regex(&regex_addition, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_addition, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::Addition(Box::new(left), Box::new(right))
     }
 
     let selector = get_selector(storage, constructor, &raw);
@@ -965,7 +1171,6 @@ fn parse_condition(
         right = None;
         left = Expression::IsZero(Box::new(left));
         imports.insert(String::from("use brush::traits::AcountIdExt;\n"));
-        imports.remove(&String::from("use brush::traits::ZERO_ADDRESS;"));
     }
 
     Condition {

@@ -29,8 +29,13 @@ pub mod erc_20 {
     use brush::traits::{
         AccountId,
         AcountIdExt,
+        ZERO_ADDRESS,
     };
     use ink::prelude::string::String;
+    use ink_lang::codegen::{
+        EmitEvent,
+        Env,
+    };
     use ink_storage::Mapping;
 
     #[derive(Debug, Encode, Decode, PartialEq)]
@@ -123,7 +128,7 @@ pub mod erc_20 {
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, amount: u128) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
-            // _transfer(owner, to, amount)
+            self._transfer(owner, to, amount)?;
             return Ok(true)
         }
 
@@ -135,7 +140,7 @@ pub mod erc_20 {
         #[ink(message)]
         pub fn approve(&mut self, spender: AccountId, amount: u128) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
-            // _approve(owner, spender, amount)
+            self._approve(owner, spender, amount)?;
             return Ok(true)
         }
 
@@ -147,8 +152,8 @@ pub mod erc_20 {
             amount: u128,
         ) -> Result<bool, Error> {
             let spender: AccountId = self.env().caller();
-            // _spendAllowance(from, spender, amount)
-            // _transfer(from, to, amount)
+            self._spend_allowance(from, spender, amount)?;
+            self._transfer(from, to, amount)?;
             return Ok(true)
         }
 
@@ -159,7 +164,11 @@ pub mod erc_20 {
             added_value: u128,
         ) -> Result<bool, Error> {
             let owner: AccountId = self.env().caller();
-            // _approve(owner, spender, allowance(owner, spender) + addedValue)
+            self._approve(
+                owner,
+                spender,
+                self.allowance(owner, spender)? + added_value,
+            )?;
             return Ok(true)
         }
 
@@ -177,7 +186,7 @@ pub mod erc_20 {
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            // _approve(owner, spender, currentAllowance - subtractedValue)
+            self._approve(owner, spender, current_allowance - subtracted_value)?;
             // <<< Please handle unchecked blocks manually
             return Ok(true)
         }
@@ -193,7 +202,7 @@ pub mod erc_20 {
                     "ERC20: transfer to the zero address",
                 )))
             }
-            // _beforeTokenTransfer(from, to, amount)
+            self._before_token_transfer(from, to, amount)?;
             let from_balance: u128 = self.balances.get(&from).unwrap();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
@@ -203,9 +212,14 @@ pub mod erc_20 {
             // Please handle unchecked blocks manually >>>
             self.balances.insert(&from, from_balance - amount);
             // <<< Please handle unchecked blocks manually
-            // _balances[to] += amount
-            // emit Transfer(from, to, amount)
-            // _afterTokenTransfer(from, to, amount)
+            self.balances
+                .insert(&to, self.balances.get(&to).unwrap() + amount);
+            self.env().emit_event(Transfer {
+                from,
+                to,
+                value: amount,
+            });
+            self._after_token_transfer(from, to, amount)?;
             Ok(())
         }
 
@@ -215,11 +229,16 @@ pub mod erc_20 {
                     "ERC20: mint to the zero address",
                 )))
             }
-            // _beforeTokenTransfer(address(0), account, amount)
-            // _totalSupply += amount
-            // _balances[account] += amount
-            // emit Transfer(address(0), account, amount)
-            // _afterTokenTransfer(address(0), account, amount)
+            self._before_token_transfer(ZERO_ADDRESS.into(), account, amount)?;
+            self.total_supply += amount;
+            self.balances
+                .insert(&account, self.balances.get(&account).unwrap() + amount);
+            self.env().emit_event(Transfer {
+                from: ZERO_ADDRESS.into(),
+                to: account,
+                value: amount,
+            });
+            self._after_token_transfer(ZERO_ADDRESS.into(), account, amount)?;
             Ok(())
         }
 
@@ -229,7 +248,7 @@ pub mod erc_20 {
                     "ERC20: burn from the zero address",
                 )))
             }
-            // _beforeTokenTransfer(account, address(0), amount)
+            self._before_token_transfer(account, ZERO_ADDRESS.into(), amount)?;
             let account_balance: u128 = self.balances.get(&account).unwrap();
             if account_balance < amount {
                 return Err(Error::Custom(String::from(
@@ -239,9 +258,13 @@ pub mod erc_20 {
             // Please handle unchecked blocks manually >>>
             self.balances.insert(&account, account_balance - amount);
             // <<< Please handle unchecked blocks manually
-            // _totalSupply -= amount
-            // emit Transfer(account, address(0), amount)
-            // _afterTokenTransfer(account, address(0), amount)
+            self.total_supply -= amount;
+            self.env().emit_event(Transfer {
+                from: account,
+                to: ZERO_ADDRESS.into(),
+                value: amount,
+            });
+            self._after_token_transfer(account, ZERO_ADDRESS.into(), amount)?;
             Ok(())
         }
 
@@ -262,7 +285,11 @@ pub mod erc_20 {
                 )))
             }
             self.allowances.insert(&(owner, spender), amount);
-            // emit Approval(owner, spender, amount)
+            self.env().emit_event(Approval {
+                owner,
+                spender,
+                value: amount,
+            });
             Ok(())
         }
 
@@ -278,7 +305,7 @@ pub mod erc_20 {
                     return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
                 }
                 // Please handle unchecked blocks manually >>>
-                // _approve(owner, spender, currentAllowance - amount)
+                self._approve(owner, spender, current_allowance - amount)?;
                 // <<< Please handle unchecked blocks manually
             }
             Ok(())
