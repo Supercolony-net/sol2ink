@@ -22,6 +22,16 @@ enum ArgsReader {
     ARGNAME,
 }
 
+macro_rules! selector {
+    ($constructor:ident) => {
+        if $constructor {
+            String::from("instance")
+        } else {
+            String::from("self")
+        }
+    };
+}
+
 const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
@@ -50,6 +60,16 @@ lazy_static! {
         map.insert(String::from("!="), Operation::NotEqual);
         map
     };
+    static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
+        let mut map = HashMap::new();
+        map.insert(String::from("address(0)"), Expression::ZeroAddressInto);
+        map.insert(
+            String::from("type(uint256).max"),
+            Expression::Literal(String::from("u128::MAX")),
+        );
+        map.insert(String::from("msg.sender"), Expression::EnvCaller(None));
+        map
+    };
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -74,17 +94,17 @@ enum Action {
 }
 
 const ASTERISK: char = '*';
-const BRACE_CLOSE: char = ')';
-const BRACE_OPEN: char = '(';
+const BRACKET_CLOSE: char = ']';
+const BRACKET_OPEN: char = '[';
 const COMMA: char = ',';
 const CURLY_CLOSE: char = '}';
 const CURLY_OPEN: char = '{';
 const NEW_LINE: char = '\n';
+const PARENTHESIS_CLOSE: char = ')';
+const PARENTHESIS_OPEN: char = '(';
 const SEMICOLON: char = ';';
 const SLASH: char = '/';
 const SPACE: char = ' ';
-const SQUARE_CLOSE: char = ']';
-const SQUARE_OPEN: char = '[';
 
 pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>), ParserError> {
     let mut chars = string.chars();
@@ -575,9 +595,9 @@ fn parse_statement(
     let tokens = split(&trim(line), " ", None);
 
     if tokens[0] == "return" {
-        return parse_return(line, storage)
+        return parse_return(line, storage, imports)
     } else if is_type(tokens[0].to_owned()) {
-        return parse_declaration(tokens, constructor, storage, imports, functions)
+        return parse_declaration(tokens, constructor, storage, imports)
     } else if split(&tokens[0], "(", None)[0] == "require" {
         return parse_require(line, constructor, storage, imports)
     } else if tokens[0] == "if" {
@@ -614,20 +634,16 @@ fn is_type(line: String) -> bool {
     TYPES.contains_key(&line)
 }
 
-fn parse_return(line: &String, storage: &HashMap<String, String>) -> Statement {
+fn parse_return(
+    line: &String,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+) -> Statement {
     let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
-    let mut raw_content = capture_regex(&regex, line, "output").unwrap();
-    raw_content = raw_content.replace(", ", ",");
+    let raw_content = capture_regex(&regex, line, "output").unwrap();
+    let output = parse_member(&raw_content, false, storage, imports);
 
-    let tokens = split(&raw_content, " ", None);
-    let output = if tokens.len() == 1 {
-        parse_expression(raw_content, false, storage)
-    } else {
-        // TODO
-        raw_content
-    };
-
-    Statement::Return(format!("Ok({})", output))
+    Statement::Return(output)
 }
 
 fn parse_if(
@@ -715,6 +731,126 @@ fn parse_require(
     Statement::Require(condition, error_output)
 }
 
+fn parse_member(
+    raw: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+) -> Expression {
+    if is_literal(raw) {
+        return Expression::Literal(raw.clone())
+    } else if let Some(expression) = SPECIFIC_EXPRESSION.get(raw) {
+        if expression == &Expression::ZeroAddressInto {
+            imports.insert(String::from("use brush::traits::ZERO_ADDRESS;"));
+        } else if expression == &Expression::EnvCaller(None) {
+            return Expression::EnvCaller(Some(selector!(constructor)))
+        }
+
+        return expression.clone()
+    }
+
+    let regex_mapping = Regex::new(
+        r#"(?x)
+        ^\s*(?P<mapping_name>.+?)\s*
+        (?P<index>(\[\s*.+\s*\]))+?
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_mapping.is_match(raw) {
+        let mapping_name_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
+        let indices_raw = capture_regex(&regex_mapping, raw, "index").unwrap();
+        let mut indices = Vec::<Expression>::new();
+        let mut chars = indices_raw.chars();
+        let mut buffer = String::new();
+        let mut open_braces = 0;
+        let mut close_braces = 0;
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                BRACKET_OPEN => {
+                    if open_braces > close_braces {
+                        buffer.push(ch)
+                    }
+                    open_braces += 1;
+                }
+                BRACKET_CLOSE => {
+                    close_braces += 1;
+                    if open_braces == close_braces {
+                        indices.push(parse_member(&buffer, constructor, storage, imports));
+                        buffer.clear();
+                    } else {
+                        buffer.push(ch)
+                    }
+                }
+                _ => buffer.push(ch),
+            }
+        }
+
+        let selector = get_selector(storage, constructor, &mapping_name_raw);
+
+        return Expression::Mapping(mapping_name_raw, indices, selector)
+    }
+
+    let regex_function_call = Regex::new(
+        r#"(?x)
+        ^\s*(?P<function_name>.+?)\s*\(
+        (?P<args>(\s*.+\s*))
+        \)\s*$"#,
+    )
+    .unwrap();
+    if regex_function_call.is_match(raw) {
+        let function_name_raw = capture_regex(&regex_function_call, raw, "function_name").unwrap();
+        let args_raw = capture_regex(&regex_function_call, raw, "args").unwrap();
+        let mut args = Vec::<Expression>::new();
+        let mut chars = args_raw.chars();
+        let mut buffer = String::new();
+        let mut open_parentheses = 0;
+        let mut close_parenthesis = 0;
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                PARENTHESIS_OPEN => {
+                    open_parentheses += 1;
+                    buffer.push(ch)
+                }
+                PARENTHESIS_CLOSE => {
+                    close_parenthesis += 1;
+                    buffer.push(ch)
+                }
+                COMMA => {
+                    if open_parentheses == close_parenthesis {
+                        args.push(parse_member(&buffer, constructor, storage, imports));
+                        buffer.clear();
+                    } else {
+                        buffer.push(ch)
+                    }
+                }
+                _ => buffer.push(ch),
+            }
+        }
+
+        args.push(parse_member(&buffer, constructor, storage, imports));
+
+        return Expression::FunctionCall(function_name_raw, args, selector!(constructor))
+    }
+
+    let selector = get_selector(storage, constructor, &raw);
+
+    return Expression::Member(raw.clone(), selector)
+}
+
+fn get_selector(
+    storage: &HashMap<String, String>,
+    constructor: bool,
+    field_name: &String,
+) -> Option<String> {
+    if storage.contains_key(field_name) {
+        Some(selector!(constructor))
+    } else {
+        None
+    }
+}
+
 fn parse_condition(
     line: &String,
     constructor: bool,
@@ -725,10 +861,10 @@ fn parse_condition(
     let tokens = split(&trim(line), " ", None);
     let mut left_raw = tokens[0].to_owned();
     left_raw.remove_matches("!");
-    let mut left = parse_expression(left_raw, constructor, storage);
+    let mut left = parse_member(&left_raw, constructor, storage, imports);
 
     let (mut right, mut operation) = if tokens.len() > 1 {
-        let right = parse_expression(tokens[2].to_owned(), constructor, storage);
+        let right = parse_member(&tokens[2].to_owned(), constructor, storage, imports);
         let operation = *OPERATIONS.get(&tokens[1]).unwrap();
         (Some(right), operation)
     } else {
@@ -742,19 +878,20 @@ fn parse_condition(
         )
     };
 
-    if right.clone().unwrap_or(String::from("")) == "address(0)" {
+    if let Some(Expression::ZeroAddressInto) = right {
         operation = match operation {
             Operation::Equal => Operation::True,
             Operation::NotEqual => Operation::Not,
             _ => operation,
         };
         right = None;
-        left = format!("{}.is_zero()", left);
+        left = Expression::IsZero(Box::new(left));
         imports.insert(String::from("use brush::traits::AcountIdExt;\n"));
+        imports.remove(&String::from("use brush::traits::ZERO_ADDRESS;"));
     }
 
     Condition {
-        left: left.to_owned(),
+        left,
         operation: if inverted {
             operation.negate()
         } else {
@@ -777,147 +914,16 @@ fn parse_declaration(
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
-    functions: &HashMap<String, String>,
 ) -> Statement {
     let var_type = convert_variable_type(tokens[0].to_owned(), imports);
     let var_name = tokens[1].to_owned();
     return if tokens.len() > 2 {
         let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
-        let expression = parse_expression_raw(&expression_raw, constructor, storage, functions);
-        Statement::Declaration(var_name, var_type, Some(expression.to_string()))
+        let expression = parse_member(&expression_raw, constructor, storage, imports);
+        Statement::Declaration(var_name, var_type, Some(expression))
     } else {
         Statement::Declaration(var_name, var_type, None)
     }
-}
-
-fn parse_expression_raw(
-    line: &String,
-    constructor: bool,
-    storage: &HashMap<String, String>,
-    functions: &HashMap<String, String>,
-) -> Expression {
-    let mut chars = line.chars();
-    let mut buffer = String::new();
-    let mut stack = VecDeque::<Expression>::new();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            BRACE_OPEN => {
-                stack.push_back(Expression::FunctionCall(FunctionCall {
-                    name: functions.get(&buffer).unwrap().clone(),
-                    args: Vec::new(),
-                    constructor,
-                }));
-                buffer.clear();
-            }
-            BRACE_CLOSE => {
-                let expression = stack.pop_back().unwrap();
-                match expression {
-                    Expression::FunctionCall(mut function_call) => {
-                        function_call.args.push(parse_expression(
-                            trim(&buffer),
-                            constructor,
-                            storage,
-                        ));
-                        buffer.clear();
-                        if stack.is_empty() {
-                            return Expression::FunctionCall(function_call)
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            COMMA => {
-                let expression = stack.pop_back().unwrap();
-                match expression {
-                    Expression::FunctionCall(mut function_call) => {
-                        function_call.args.push(parse_expression(
-                            trim(&buffer),
-                            constructor,
-                            storage,
-                        ));
-                        stack.push_back(Expression::FunctionCall(function_call));
-                        buffer.clear();
-                    }
-                    _ => {}
-                }
-            }
-            NEW_LINE => buffer.push(SPACE),
-            _ => buffer.push(ch),
-        }
-    }
-
-    if buffer.len() > 0 {
-        return Expression::Var(parse_expression(buffer, constructor, storage))
-    }
-
-    return Expression::Var(String::from(""))
-}
-
-fn parse_expression(
-    expression_raw: String,
-    constructor: bool,
-    storage: &HashMap<String, String>,
-) -> String {
-    if expression_raw == "msg.sender" {
-        return String::from("self.env().caller()")
-    } else if expression_raw == "type(uint256).max" {
-        return String::from("u128::MAX")
-    } else if is_literal(&expression_raw) {
-        return expression_raw
-    }
-
-    let (field, expression) = if expression_raw.contains(SQUARE_OPEN) {
-        let mut mapping_name = String::new();
-        let mut chars = expression_raw.chars();
-        while let Some(ch) = chars.next() {
-            match ch {
-                SQUARE_OPEN => break,
-                _ => mapping_name.push(ch),
-            }
-        }
-        let mut buffer = String::new();
-        let mut indices_raw = Vec::<String>::new();
-        let mut square_open = 1;
-        let mut square_close = 0;
-        while let Some(ch) = chars.next() {
-            match ch {
-                SQUARE_OPEN => {
-                    square_open += 1;
-                }
-                SQUARE_CLOSE => {
-                    square_close += 1;
-                    if square_close == square_open {
-                        indices_raw.push(buffer.clone());
-                        buffer.clear();
-                    } else {
-                        buffer.push(ch)
-                    }
-                }
-                _ => buffer.push(ch),
-            }
-        }
-        let indices = if indices_raw.len() > 1 {
-            format!("({})", indices_raw.join(", "))
-        } else {
-            indices_raw[0].to_owned()
-        };
-        (
-            mapping_name.clone(),
-            format!("{}.get(&{})", mapping_name.to_case(Case::Snake), indices),
-        )
-    } else {
-        (expression_raw.clone(), expression_raw.to_case(Case::Snake))
-    };
-
-    if storage.contains_key(&field) {
-        return format!(
-            "{}.{}",
-            if constructor { "instance" } else { "self" },
-            expression
-        )
-    }
-    expression
 }
 
 fn is_literal(line: &String) -> bool {

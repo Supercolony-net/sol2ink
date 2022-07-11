@@ -563,17 +563,18 @@ impl ToTokens for Statement {
                 let var_name = format_ident!("{}", var_name_raw.to_case(Case::Snake));
                 let var_type = TokenStream::from_str(var_type_raw).unwrap();
                 if let Some(initial_value_raw) = &initial_value_maybe {
-                    let initial_value = TokenStream::from_str(initial_value_raw).unwrap();
+                    let initial_value =
+                        TokenStream::from_str(&initial_value_raw.to_string()).unwrap();
                     stream.extend(quote!(let #var_name : #var_type = #initial_value;));
                 } else {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
             }
             Statement::If(condition_raw, statements) => {
-                let left = TokenStream::from_str(&condition_raw.left).unwrap();
+                let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
                 let operation = condition_raw.operation;
                 let condition = if let Some(condition) = &condition_raw.right {
-                    let right = TokenStream::from_str(condition).unwrap();
+                    let right = TokenStream::from_str(&condition.to_string()).unwrap();
                     quote!(#left #operation #right)
                 } else {
                     quote!(#operation #left)
@@ -587,11 +588,11 @@ impl ToTokens for Statement {
             Statement::IfEnd => {}
             Statement::Raw(_) => {}
             Statement::Require(condition_raw, error_raw) => {
-                let left = TokenStream::from_str(&condition_raw.left).unwrap();
+                let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
                 let operation = condition_raw.operation;
                 let error = TokenStream::from_str(&error_raw).unwrap();
                 let condition = if let Some(condition) = &condition_raw.right {
-                    let right = TokenStream::from_str(condition).unwrap();
+                    let right = TokenStream::from_str(&condition.to_string()).unwrap();
                     quote!(#left #operation #right)
                 } else {
                     quote!(#operation #left)
@@ -603,9 +604,9 @@ impl ToTokens for Statement {
                 })
             }
             Statement::Return(output_raw) => {
-                let output = TokenStream::from_str(&output_raw).unwrap();
+                let output = TokenStream::from_str(&output_raw.to_string()).unwrap();
                 stream.extend(quote! {
-                    return #output
+                    return Ok(#output)
                 })
             }
         }

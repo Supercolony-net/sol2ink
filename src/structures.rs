@@ -1,5 +1,10 @@
 use std::collections::HashSet;
 
+use convert_case::{
+    Case::Snake,
+    Casing,
+};
+
 #[derive(Debug, PartialEq, Default)]
 pub enum ContractType {
     #[default]
@@ -90,26 +95,19 @@ pub struct FunctionParam {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     Comment(String),
-    Declaration(String, String, Option<String>),
+    Declaration(String, String, Option<Expression>),
     If(Condition, Vec<Statement>),
     IfEnd,
     Raw(String),
     Require(Condition, String),
-    Return(String),
-}
-
-#[derive(Debug)]
-pub struct FunctionCall {
-    pub name: String,
-    pub args: Vec<String>,
-    pub constructor: bool,
+    Return(Expression),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Condition {
-    pub left: String,
+    pub left: Expression,
     pub operation: Operation,
-    pub right: Option<String>,
+    pub right: Option<Expression>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -154,10 +152,15 @@ impl Operation {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
-    FunctionCall(FunctionCall),
-    Var(String),
+    EnvCaller(Option<String>),
+    FunctionCall(String, Vec<Expression>, String),
+    IsZero(Box<Expression>),
+    Literal(String),
+    Member(String, Option<String>),
+    Mapping(String, Vec<Expression>, Option<String>),
+    ZeroAddressInto,
 }
 
 pub enum Block {
@@ -168,19 +171,53 @@ pub enum Block {
 impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
-            Expression::FunctionCall(function_call) => {
+            Expression::EnvCaller(selector) => {
+                format!("{}.env().caller()", selector.clone().unwrap())
+            }
+            Expression::FunctionCall(function_name_raw, args, selector) => {
                 format!(
                     "{}.{}({})?",
-                    if function_call.constructor {
-                        "instance"
-                    } else {
-                        "self"
-                    },
-                    function_call.name,
-                    function_call.args.join(", ")
+                    selector,
+                    function_name_raw.to_case(Snake),
+                    args.iter()
+                        .map(|expression| expression.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
                 )
             }
-            Expression::Var(exp) => exp.to_owned(),
+            Expression::IsZero(expression) => {
+                format!("{}.is_zero()", expression.to_string())
+            }
+            Expression::Literal(content) => content.to_owned(),
+            Expression::Member(expression_raw, selector_raw) => {
+                let expression = expression_raw.to_case(Snake);
+                if let Some(selector) = selector_raw {
+                    format!("{selector}.{expression}")
+                } else {
+                    expression
+                }
+            }
+            Expression::Mapping(name_raw, indices_raw, selector_raw) => {
+                let indices = if indices_raw.len() > 1 {
+                    format!(
+                        "({})",
+                        indices_raw
+                            .iter()
+                            .map(|expr| expr.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                } else {
+                    indices_raw.get(0).unwrap().to_string()
+                };
+                let name = name_raw.to_case(Snake);
+                if let Some(selector) = selector_raw {
+                    format!("{selector}.{name}.get(&{indices}).unwrap()")
+                } else {
+                    format!("{name}.get(&{indices}).unwrap()")
+                }
+            }
+            Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
         }
     }
 }

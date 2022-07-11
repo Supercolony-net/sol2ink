@@ -117,7 +117,7 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn balance_of(&self, account: AccountId) -> Result<u128, Error> {
-            return Ok(self.balances.get(&account))
+            return Ok(self.balances.get(&account).unwrap())
         }
 
         #[ink(message)]
@@ -129,7 +129,7 @@ pub mod erc_20 {
 
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Result<u128, Error> {
-            return Ok(self.allowances.get(&(owner, spender)))
+            return Ok(self.allowances.get(&(owner, spender)).unwrap())
         }
 
         #[ink(message)]
@@ -194,7 +194,7 @@ pub mod erc_20 {
                 )))
             }
             // _beforeTokenTransfer(from, to, amount)
-            let from_balance: u128 = self.balances.get(&from);
+            let from_balance: u128 = self.balances.get(&from).unwrap();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: transfer amount exceeds balance",
@@ -230,7 +230,7 @@ pub mod erc_20 {
                 )))
             }
             // _beforeTokenTransfer(account, address(0), amount)
-            let account_balance: u128 = self.balances.get(&account);
+            let account_balance: u128 = self.balances.get(&account).unwrap();
             if account_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: burn amount exceeds balance",
