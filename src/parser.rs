@@ -630,8 +630,6 @@ fn parse_statement(
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if tokens[0] == "emit" {
         return parse_emit(line, constructor, storage, imports, functions, events)
-        // println!("{emit:?}");
-        // return Statement::Comment(trim(line))
     } else if tokens.get(1).unwrap_or(&String::new()) == "=" {
         return parse_assign(line, constructor, storage, imports, functions)
     } else if tokens.get(1).unwrap_or(&String::new()) == "+=" {
@@ -640,10 +638,8 @@ fn parse_statement(
         return parse_sub_assign(line, constructor, storage, imports, functions)
     }
 
-    let aaa = parse_member(&trim(line), constructor, storage, imports, functions);
-    Statement::FunctionCall(aaa)
-
-    // Statement::Comment(trim(line))
+    let expression = parse_member(&trim(line), constructor, storage, imports, functions);
+    Statement::FunctionCall(expression)
 }
 
 #[inline(always)]
@@ -847,8 +843,8 @@ fn parse_return(
     functions: &HashMap<String, bool>,
 ) -> Statement {
     let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
-    let raw_content = capture_regex(&regex, line, "output").unwrap();
-    let output = parse_member(&raw_content, false, storage, imports, functions);
+    let raw_output = capture_regex(&regex, line, "output").unwrap();
+    let output = parse_member(&raw_output, false, storage, imports, functions);
 
     Statement::Return(output)
 }
@@ -919,7 +915,7 @@ fn parse_require(
     let regex = Regex::new(
         r#"(?x)
         ^\s*require\((?P<condition>.+)
-        \s*,\s*"(?P<error>.+)"\)$
+        \s*,\s*"(?P<error>.+)"\s*\)$
         "#,
     )
     .unwrap();
@@ -1019,7 +1015,7 @@ fn parse_member(
 
     let regex_function_call = Regex::new(
         r#"(?x)
-        ^\s*(?P<function_name>.+?)\s*\(
+        ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
         (?P<args>(\s*.+\s*))
         \)\s*$"#,
     )
@@ -1111,6 +1107,18 @@ fn parse_member(
         return Expression::Addition(Box::new(left), Box::new(right))
     }
 
+    let regex_equals = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*==\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_equals.is_match(raw) {
+        // TODO
+    }
+
     let selector = get_selector(storage, constructor, &raw);
 
     return Expression::Member(raw.clone(), selector)
@@ -1136,7 +1144,7 @@ fn parse_condition(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Condition {
-    let tokens = split(&trim(line), " ", None);
+    let tokens = split(&trim(line).replace(", ", ","), " ", None);
     let mut left_raw = tokens[0].to_owned();
     left_raw.remove_matches("!");
     let mut left = parse_member(&left_raw, constructor, storage, imports, functions);
