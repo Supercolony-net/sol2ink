@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.4.0
+// Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
 use brush::traits::AccountId;
@@ -71,11 +71,7 @@ pub trait ERC1155 {
     /// Requirements:
     /// - `accounts` and `ids` must have the same length.
     #[ink(message)]
-    fn balance_of_batch(
-        &self,
-        accounts: Vec<AccountId>,
-        ids: Vec<u128>,
-    ) -> Result<Vec<u128>, Error>;
+    fn balance_of_batch(&self, accounts: Vec<AccountId>, ids: Vec<u128>) -> Result<(), Error>;
 
     /// @dev Grants or revokes permission to `operator` to transfer the caller's tokens, according to `approved`,
     /// Emits an {ApprovalForAll} event.

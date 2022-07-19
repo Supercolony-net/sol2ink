@@ -92,9 +92,14 @@ pub struct FunctionParam {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
     AddAssign(Expression, Expression),
+    Assembly(Vec<Statement>),
+    AssemblyEnd,
     Assign(Expression, Expression),
+    Catch(Vec<Statement>),
+    CatchEnd,
     Comment(String),
     Declaration(String, String, Option<Expression>),
+    Else(Vec<Statement>),
     Emit(String, Vec<Expression>),
     FunctionCall(Expression),
     If(Condition, Vec<Statement>),
@@ -103,6 +108,8 @@ pub enum Statement {
     Require(Condition, String),
     Return(Expression),
     SubAssign(Expression, Expression),
+    Try(Vec<Statement>),
+    TryEnd
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -120,6 +127,8 @@ pub enum Operation {
     GreaterThan,
     LessThanEqual,
     LessThan,
+    LogicalAnd,
+    LogicalOr,
     Equal,
     NotEqual,
 }
@@ -133,6 +142,8 @@ impl ToString for Operation {
             Operation::GreaterThan => String::from(">"),
             Operation::LessThanEqual => String::from("<="),
             Operation::LessThan => String::from("<"),
+            Operation::LogicalAnd => String::from("&&"),
+            Operation::LogicalOr => String::from("||"),
             Operation::Equal => String::from("=="),
             Operation::NotEqual => String::from("!="),
         }
@@ -148,6 +159,9 @@ impl Operation {
             Operation::GreaterThan => Operation::LessThanEqual,
             Operation::LessThanEqual => Operation::GreaterThan,
             Operation::LessThan => Operation::GreaterThanEqual,
+            // TODO a and b = neg(a) or neg (b)
+            Operation::LogicalAnd => Operation::LogicalOr,
+            Operation::LogicalOr => Operation::LogicalAnd,
             Operation::Equal => Operation::NotEqual,
             Operation::NotEqual => Operation::Equal,
         }
@@ -157,10 +171,12 @@ impl Operation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Addition(Box<Expression>, Box<Expression>),
+    Condition(Box<Condition>),
     EnvCaller(Option<String>),
     FunctionCall(String, Vec<Expression>, String, bool),
     IsZero(Box<Expression>),
     Literal(String),
+    Logical(Box<Expression>, Operation, Box<Expression>),
     Member(String, Option<String>),
     Mapping(
         String,
@@ -170,10 +186,15 @@ pub enum Expression {
     ),
     Subtraction(Box<Expression>, Box<Expression>),
     StructArg(String, Box<Expression>),
+    Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
     ZeroAddressInto,
 }
 
 pub enum Block {
-    Unchecked,
+    Assembly,
+    Catch,
+    Else,
     If,
+    Try,
+    Unchecked,
 }

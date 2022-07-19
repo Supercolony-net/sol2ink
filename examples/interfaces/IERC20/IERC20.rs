@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.4.0
+// Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
 use brush::traits::AccountId;

@@ -41,6 +41,13 @@ lazy_static! {
             ("Mapping".to_string(), Some("ink_storage".to_string())),
         );
         map.insert("uint".to_string(), ("u128".to_string(), None));
+        map.insert(
+            "string".to_string(),
+            (
+                "String".to_string(),
+                Some("ink_prelude::string".to_string()),
+            ),
+        );
         map.insert("uint256".to_string(), ("u128".to_string(), None));
         map.insert(
             "address".to_string(),
@@ -57,6 +64,8 @@ lazy_static! {
         map.insert(String::from("<"), Operation::LessThan);
         map.insert(String::from("=="), Operation::Equal);
         map.insert(String::from("!="), Operation::NotEqual);
+        map.insert(String::from("&&"), Operation::LogicalAnd);
+        map.insert(String::from("||"), Operation::LogicalOr);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -75,6 +84,7 @@ lazy_static! {
 pub enum ParserError {
     FileError(String),
     FileCorrupted,
+    LibraryParsingNotImplemented,
 }
 
 impl From<std::io::Error> for ParserError {
@@ -86,6 +96,9 @@ impl From<std::io::Error> for ParserError {
 #[derive(Eq, PartialEq)]
 enum Action {
     None,
+    AssemblyStart,
+    Assembly,
+    Comment,
     ContractName,
     ContractNamed,
     Contract,
@@ -138,6 +151,8 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
                 } else if buffer == "interface" {
                     let interface = parse_interface(&mut chars, comments)?;
                     return Ok((None, Some(interface)))
+                } else if buffer == "library" {
+                    return Err(ParserError::LibraryParsingNotImplemented)
                 }
             }
         }
@@ -475,24 +490,50 @@ fn parse_function_header(
     function_header_raw.remove_matches(" storage");
     function_header_raw.remove_matches(" calldata");
 
-    let split_by_left_brace = split(&function_header_raw, "(", None);
-    let name = split_by_left_brace[0].to_owned();
+    let regex_return_function = Regex::new(
+        r#"(?x)
+        ^\s*(?P<function_name>[a-zA-Z0-9_]*?)\s*
+        \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
+        .*returns\s*\(\s*(?P<return_parameters>[a-zA-Z0-9_,\s]*?)\s*\)
+        .*$"#,
+    )
+    .unwrap();
+    let return_parameters_maybe = capture_regex(
+        &regex_return_function,
+        &function_header_raw,
+        "return_parameters",
+    );
 
-    let split_by_right_brace = split(&split_by_left_brace[1].trim().to_owned(), ")", None);
-
-    let params_raw = split_by_right_brace[0].trim().to_owned();
-    let params = parse_function_parameters(params_raw, imports);
-    let attributes_raw = split_by_right_brace[1].to_owned();
-    let (external, view, payable) = parse_function_attributes(attributes_raw);
-
-    let return_params = if split_by_left_brace.len() == 3 {
-        parse_return_parameters(
-            split(&split_by_left_brace[2], ")", None)[0].to_owned(),
-            imports,
+    let (name, params, return_params) = if let Some(return_parameters_raw) = return_parameters_maybe
+    {
+        let function_name = capture_regex(
+            &regex_return_function,
+            &function_header_raw,
+            "function_name",
         )
+        .unwrap();
+        let parameters_raw =
+            capture_regex(&regex_return_function, &function_header_raw, "parameters").unwrap();
+        let parameters = parse_function_parameters(parameters_raw, imports);
+        let return_parameters = parse_return_parameters(return_parameters_raw, imports);
+        (function_name, parameters, return_parameters)
     } else {
-        Vec::<FunctionParam>::new()
+        let regex_no_return = Regex::new(
+            r#"(?x)
+            ^\s*(?P<function_name>[a-zA-Z0-9_]*?)\s*
+            \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
+            .*$"#,
+        )
+        .unwrap();
+        let function_name =
+            capture_regex(&regex_no_return, &function_header_raw, "function_name").unwrap();
+        let parameters_raw =
+            capture_regex(&regex_no_return, &function_header_raw, "parameters").unwrap();
+        let parameters = parse_function_parameters(parameters_raw, imports);
+        (function_name, parameters, Vec::default())
     };
+
+    let (external, view, payable) = parse_function_attributes(&function_header_raw);
 
     FunctionHeader {
         name,
@@ -522,6 +563,7 @@ fn parse_function(
     let function_header = parse_function_header(chars, imports, comments);
     let mut statements = Vec::<Statement>::new();
     let mut buffer = String::new();
+    let mut action = Action::None;
 
     while let Some(ch) = chars.next() {
         if ch == CURLY_OPEN {
@@ -531,16 +573,40 @@ fn parse_function(
         }
 
         if ch == NEW_LINE {
-            buffer.push(SPACE);
+            if action == Action::AssemblyStart {
+                action = Action::Assembly;
+            } else if action == Action::Comment || action == Action::Assembly {
+                statements.push(Statement::Raw(buffer.clone()));
+                if action == Action::Comment {
+                    action = Action::None;
+                }
+                buffer.clear();
+            } else {
+                buffer.push(SPACE);
+            }
         } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
             buffer.push(ch);
             if open_braces == close_braces {
                 break
             }
             statements.push(Statement::Raw(buffer.clone()));
+            if action == Action::Assembly {
+                action = Action::None;
+            }
             buffer.clear();
+        } else if ch == SLASH {
+            let next_maybe = chars.next();
+            if next_maybe == Some(SLASH) {
+                action = Action::Comment;
+                buffer.clear();
+            }
+            buffer.push(ch);
+            buffer.push(next_maybe.unwrap());
         } else {
             buffer.push(ch);
+            if trim(&buffer) == "assembly" {
+                action = Action::AssemblyStart;
+            }
         }
     }
 
@@ -590,7 +656,7 @@ fn parse_statements(
 ///
 /// returns the statement as `Statement` struct
 fn parse_statement(
-    line: &String,
+    line_raw: &String,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -599,18 +665,38 @@ fn parse_statement(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    let tokens = split(&trim(line), " ", None);
+    let mut line = trim(line_raw);
+    line = line.replace(" memory ", " ");
+    line = line.replace(" calldata ", " ");
+    line = line.replace(" storage ", " ");
+
+    let tokens = split(&line, " ", None);
 
     if tokens[0] == "return" {
-        return parse_return(line, storage, imports, functions)
+        return parse_return(&line, storage, imports, functions)
     } else if is_type(tokens[0].to_owned()) {
         return parse_declaration(tokens, constructor, storage, imports, functions)
     } else if split(&tokens[0], "(", None)[0] == "require" {
-        return parse_require(line, constructor, storage, imports, functions)
+        return parse_require(&line, constructor, storage, imports, functions)
+    } else if tokens[0] == "//" || tokens[0] == "///" {
+        let comment_regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)$"#).unwrap();
+        let comment = capture_regex(&comment_regex, &line, "comment").unwrap();
+        return Statement::Comment(comment)
     } else if tokens[0] == "if" {
         stack.push_back(Block::If);
         return parse_if(
-            line,
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
+    } else if tokens[0] == "else" {
+        stack.push_back(Block::Else);
+        return parse_else(
             constructor,
             storage,
             imports,
@@ -624,21 +710,54 @@ fn parse_statement(
         return Statement::Comment(String::from("Please handle unchecked blocks manually >>>"))
     } else if tokens[0] == "}" {
         match stack.pop_back().unwrap() {
+            Block::Assembly => return Statement::AssemblyEnd,
+            Block::Catch => return Statement::CatchEnd,
             Block::Unchecked => {}
             Block::If => return Statement::IfEnd,
+            Block::Else => return Statement::IfEnd,
+            Block::Try => return Statement::TryEnd,
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
+    } else if tokens[0] == "try" {
+        stack.push_back(Block::Try);
+        return parse_try(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
+    } else if tokens[0] == "assembly" {
+        stack.push_back(Block::Assembly);
+        return parse_assembly(stack, iterator)
+    } else if tokens[0] == "catch" {
+        stack.push_back(Block::Catch);
+        return parse_catch(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
     } else if tokens[0] == "emit" {
-        return parse_emit(line, constructor, storage, imports, functions, events)
+        return parse_emit(&line, constructor, storage, imports, functions, events)
     } else if tokens.get(1).unwrap_or(&String::new()) == "=" {
-        return parse_assign(line, constructor, storage, imports, functions)
+        return parse_assign(&line, constructor, storage, imports, functions)
     } else if tokens.get(1).unwrap_or(&String::new()) == "+=" {
-        return parse_add_assign(line, constructor, storage, imports, functions)
+        return parse_add_assign(&line, constructor, storage, imports, functions)
     } else if tokens.get(1).unwrap_or(&String::new()) == "-=" {
-        return parse_sub_assign(line, constructor, storage, imports, functions)
+        return parse_sub_assign(&line, constructor, storage, imports, functions)
     }
 
-    let expression = parse_member(&trim(line), constructor, storage, imports, functions);
+    // println!("tokens: {tokens:?}");
+
+    let expression = parse_member(&line, constructor, storage, imports, functions);
     Statement::FunctionCall(expression)
 }
 
@@ -844,6 +963,7 @@ fn parse_return(
 ) -> Statement {
     let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
     let raw_output = capture_regex(&regex, line, "output").unwrap();
+    // println!("raw_output: {raw_output}");
     let output = parse_member(&raw_output, false, storage, imports, functions);
 
     Statement::Return(output)
@@ -905,6 +1025,157 @@ fn parse_if(
     Statement::If(condition, statements)
 }
 
+fn parse_else(
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    // TODO handle else if
+    let mut statements = Vec::default();
+
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                let statement = parse_statement(
+                    &adjusted,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    stack,
+                    iterator,
+                    events,
+                );
+                if statement == Statement::IfEnd {
+                    break
+                } else {
+                    statements.push(statement)
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Statement::Else(statements)
+}
+
+fn parse_try(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    let mut statements = Vec::default();
+    statements.push(Statement::Comment(line.clone()));
+
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                let statement = parse_statement(
+                    &adjusted,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    stack,
+                    iterator,
+                    events,
+                );
+                if statement == Statement::TryEnd {
+                    break
+                } else {
+                    statements.push(statement)
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Statement::Try(statements)
+}
+
+fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -> Statement {
+    let mut statements = Vec::default();
+    statements.push(Statement::Comment(String::from(
+        "Please handle assembly blocks manually >>>",
+    )));
+
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content_raw) => {
+                let content = trim(&content_raw);
+                if content == "}" {
+                    stack.pop_back();
+                    statements.push(Statement::AssemblyEnd);
+                    break
+                } else {
+                    statements.push(Statement::Comment(content.clone()));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    statements.push(Statement::Comment(String::from(
+        "<<< Please handle assembly blocks manually",
+    )));
+
+    Statement::Assembly(statements)
+}
+
+fn parse_catch(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    let mut statements = Vec::default();
+    statements.push(Statement::Comment(line.clone()));
+
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                let statement = parse_statement(
+                    &adjusted,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    stack,
+                    iterator,
+                    events,
+                );
+                if statement == Statement::CatchEnd {
+                    break
+                } else {
+                    statements.push(statement)
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Statement::Catch(statements)
+}
+
 fn parse_require(
     line: &String,
     constructor: bool,
@@ -963,6 +1234,18 @@ fn parse_member(
         }
 
         return expression.clone()
+    }
+
+    let regex_type = Regex::new(
+        r#"(?x)
+        ^\s*type\((?P<rest>.+?)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_type.is_match(raw) {
+        // TODO: type(IERC721).interfaceId
+        let rest = capture_regex(&regex_type, raw, "rest").unwrap();
+        return Expression::Member(format!("type_of({rest}"), None)
     }
 
     let regex_mapping = Regex::new(
@@ -1069,7 +1352,7 @@ fn parse_member(
             function_name_raw.clone(),
             args,
             selector!(constructor),
-            *functions.get(&function_name_raw).unwrap(),
+            *functions.get(&function_name_raw).unwrap_or(&false),
         )
     }
 
@@ -1107,16 +1390,61 @@ fn parse_member(
         return Expression::Addition(Box::new(left), Box::new(right))
     }
 
-    let regex_equals = Regex::new(
+    let regex_logical = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*==\s*
+        \s*(?P<operation>[\|\&][\|\&])\s*
         (?P<right>.+)
         \s*$"#,
     )
     .unwrap();
-    if regex_equals.is_match(raw) {
-        // TODO
+    if regex_logical.is_match(raw) {
+        let left_raw = capture_regex(&regex_logical, raw, "left").unwrap();
+        let operation_raw = capture_regex(&regex_logical, raw, "operation").unwrap();
+        let right_raw = capture_regex(&regex_logical, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let operation = *OPERATIONS.get(&operation_raw).unwrap();
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::Logical(Box::new(left), operation, Box::new(right))
+    }
+
+    let regex_boolean = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*[!=><]+=*\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_boolean.is_match(raw) {
+        let condition = parse_condition(raw, constructor, false, storage, imports, functions);
+        return Expression::Condition(Box::new(condition))
+    }
+
+    let regex_ternary = Regex::new(
+        r#"(?x)
+        ^\s*(?P<condition>.+?)\s*\?
+        \s*(?P<if_true>.+?)\s*:
+        \s*(?P<if_false>.+?)\s*$"#,
+    )
+    .unwrap();
+    if regex_ternary.is_match(raw) {
+        let condition_raw = capture_regex(&regex_ternary, raw, "condition").unwrap();
+        let if_true_raw = capture_regex(&regex_ternary, raw, "if_true").unwrap();
+        let if_false_raw = capture_regex(&regex_ternary, raw, "if_false").unwrap();
+
+        let condition = parse_condition(
+            &condition_raw,
+            constructor,
+            false,
+            storage,
+            imports,
+            functions,
+        );
+        let if_true = parse_member(&if_true_raw, constructor, storage, imports, functions);
+        let if_false = parse_member(&if_false_raw, constructor, storage, imports, functions);
+        return Expression::Ternary(Box::new(condition), Box::new(if_true), Box::new(if_false))
     }
 
     let selector = get_selector(storage, constructor, &raw);
@@ -1219,9 +1547,11 @@ fn parse_declaration(
 }
 
 fn is_literal(line: &String) -> bool {
+    let string_regex = Regex::new(r#"^\s*".*"\s*$"#).unwrap();
+    let char_regex = Regex::new(r#"^\s*'.*'\s*$"#).unwrap();
     return line.parse::<i32>().is_ok()
-        || line.contains("\"")
-        || line.contains("\'")
+        || string_regex.is_match(line)
+        || char_regex.is_match(line)
         || line == "true"
         || line == "false"
 }
@@ -1267,23 +1597,10 @@ fn parse_function_parameters(
 /// `attributes` the raw representation of the attributes of the function
 ///
 /// returns 0. external 1. view 2. payable
-fn parse_function_attributes(attributes: String) -> (bool, bool, bool) {
-    let mut external = false;
-    let mut view = false;
-    let mut payable = false;
-
-    let tokens = split(&attributes, " ", Some(remove_commas()));
-
-    for i in 0..tokens.len() {
-        let attribute = tokens[i].to_owned();
-        if attribute == "external" || attribute == "public" {
-            external = true;
-        } else if attribute == "view" {
-            view = true;
-        } else if attribute == "payable" {
-            payable = true;
-        }
-    }
+fn parse_function_attributes(attributes: &String) -> (bool, bool, bool) {
+    let external = attributes.contains("external") || attributes.contains("public");
+    let view = attributes.contains("view");
+    let payable = attributes.contains("payable");
 
     (external, view, payable)
 }

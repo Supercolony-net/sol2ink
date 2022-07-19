@@ -75,9 +75,9 @@ mod test {
             run(&"examples/interfaces/IERC1155/IERC1155.sol".to_string()),
             Ok(())
         );
-        assert_eq!(
-            run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
-            Ok(())
-        );
+        // assert_eq!(
+        //     run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
+        //     Ok(())
+        // );
     }
 }
