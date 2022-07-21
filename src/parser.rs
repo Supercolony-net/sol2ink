@@ -143,7 +143,7 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
             _ => {
                 buffer.push(ch);
                 if buffer == "pragma" || buffer == "import" {
-                    skip(&mut chars);
+                    read_until(&mut chars, vec![SEMICOLON]);
                     buffer = String::new();
                 } else if buffer == "contract" {
                     let contract = parse_contract(&mut chars, comments)?;
@@ -230,15 +230,6 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
     }
 
     comments
-}
-
-fn skip(chars: &mut Chars) {
-    while let Some(ch) = chars.next() {
-        match ch {
-            SEMICOLON => return,
-            _ => {}
-        }
-    }
 }
 
 /// Parses the code of a Solidity contract
