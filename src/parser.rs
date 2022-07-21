@@ -314,6 +314,9 @@ fn parse_contract(
                     functions.push(parse_function(&mut imports, chars, &comments)?);
                     comments.clear();
                     buffer.clear();
+                } else if buffer.trim() == "using" {
+                    read_until(chars, vec![SEMICOLON]);
+                    buffer.clear();
                 } else if ch == SEMICOLON {
                     fields.push(parse_contract_field(buffer.trim().to_owned(), &mut imports));
                     buffer.clear();
@@ -462,8 +465,6 @@ pub fn parse_interface(
 ///
 /// returns the representation of contract field as `ContractField` struct
 fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
-    // most mappings are written as `type => type`
-    // we will make it `type=>type`
     let tokens = split(&line.replace(" => ", "=>"), " ", None);
     let name_index = if tokens.len() > 2 { 2 } else { 1 };
 

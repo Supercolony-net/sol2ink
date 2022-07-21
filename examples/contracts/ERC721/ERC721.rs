@@ -29,8 +29,6 @@ pub mod erc_721 {
         Custom(String),
     }
 
-    ///using Address for address;
-    ///using Strings for uint256;
     ///Token name
     ///Token symbol
     ///Mapping from token ID to owner address

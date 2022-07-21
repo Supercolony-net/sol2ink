@@ -9,8 +9,8 @@ pragma solidity ^0.8.0;
  * {ERC721Enumerable}.
  */
 contract ERC721 {
-    // using Address for address;
-    // using Strings for uint256;
+    using Address for address;
+    using Strings for uint256;
 
     // Token name
     string private _name;
