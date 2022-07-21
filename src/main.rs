@@ -58,26 +58,50 @@ mod test {
     use crate::run;
 
     #[test]
-    fn transpile_examples() {
+    fn erc20() {
         assert_eq!(
             run(&"examples/contracts/ERC20/ERC20.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn erc721() {
+        assert_eq!(
+            run(&"examples/contracts/ERC721/ERC721.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn ierc20() {
         assert_eq!(
             run(&"examples/interfaces/IERC20/IERC20.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn ierc721() {
         assert_eq!(
             run(&"examples/interfaces/IERC721/IERC721.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn ierc1155() {
         assert_eq!(
             run(&"examples/interfaces/IERC1155/IERC1155.sol".to_string()),
             Ok(())
         );
-        // assert_eq!(
-        //     run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
-        //     Ok(())
-        // );
+    }
+
+    #[test]
+    fn iaccess_control() {
+        assert_eq!(
+            run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
+            Ok(())
+        );
     }
 }

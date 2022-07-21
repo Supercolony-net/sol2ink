@@ -755,8 +755,6 @@ fn parse_statement(
         return parse_sub_assign(&line, constructor, storage, imports, functions)
     }
 
-    // println!("tokens: {tokens:?}");
-
     let expression = parse_member(&line, constructor, storage, imports, functions);
     Statement::FunctionCall(expression)
 }
@@ -963,7 +961,6 @@ fn parse_return(
 ) -> Statement {
     let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
     let raw_output = capture_regex(&regex, line, "output").unwrap();
-    // println!("raw_output: {raw_output}");
     let output = parse_member(&raw_output, false, storage, imports, functions);
 
     Statement::Return(output)

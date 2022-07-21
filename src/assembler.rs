@@ -400,10 +400,6 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             #(#statements)*
         });
 
-        // for statement in statements {
-        //     println!("{statement:?}");
-        // }
-
         if function.header.return_params.is_empty() {
             body.extend(quote! {
                 Ok(())
@@ -780,7 +776,7 @@ impl ToString for Expression {
                 format!("{} - {}", left.to_string(), right.to_string())
             }
             Expression::StructArg(field_name, value) => {
-                format!("{} : {}", field_name, value.to_string())
+                format!("{} : {}", field_name.to_case(Snake), value.to_string())
             }
             Expression::Ternary(condition_raw, if_true, if_false) => {
                 let left = condition_raw.left.to_string();

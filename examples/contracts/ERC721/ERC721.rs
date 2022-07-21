@@ -286,7 +286,7 @@ pub mod erc_721 {
             self.env().emit_event(Transfer {
                 from: ZERO_ADDRESS.into(),
                 to,
-                tokenId: token_id,
+                token_id,
             });
             self._after_token_transfer(ZERO_ADDRESS.into(), to, token_id)?;
             Ok(())
@@ -303,7 +303,7 @@ pub mod erc_721 {
             self.env().emit_event(Transfer {
                 from: owner,
                 to: ZERO_ADDRESS.into(),
-                tokenId: token_id,
+                token_id,
             });
             self._after_token_transfer(owner, ZERO_ADDRESS.into(), token_id)?;
             Ok(())
@@ -333,11 +333,7 @@ pub mod erc_721 {
             self.balances
                 .insert(&to, self.balances.get(&to).unwrap() + 1);
             self.owners.insert(&token_id, to);
-            self.env().emit_event(Transfer {
-                from,
-                to,
-                tokenId: token_id,
-            });
+            self.env().emit_event(Transfer { from, to, token_id });
             self._after_token_transfer(from, to, token_id)?;
             Ok(())
         }
@@ -347,7 +343,7 @@ pub mod erc_721 {
             self.env().emit_event(Approval {
                 owner: erc_721.owner_of(token_id),
                 approved: to,
-                tokenId: token_id,
+                token_id,
             });
             Ok(())
         }
