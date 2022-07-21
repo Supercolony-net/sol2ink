@@ -209,6 +209,12 @@ fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> Token
     for field in fields.iter() {
         let field_name = format_ident!("{}", field.name.to_case(Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
+
+        for comment in field.comments.iter() {
+            storage_fields.extend(quote! {
+                #[doc = #comment]
+            });
+        }
         storage_fields.extend(quote! {
             #field_name: #field_type,
         });
@@ -274,7 +280,15 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
+    let mut comments = TokenStream::new();
     let constructor_functions = constructor.body;
+
+    // assemble comments
+    for comment in constructor.header.comments.iter() {
+        comments.extend(quote! {
+            #[doc = #comment]
+        });
+    }
 
     // assemble params
     for param in constructor.header.params.iter() {
@@ -294,6 +308,7 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     });
 
     output.extend(quote! {
+        #comments
         #[ink(constructor)]
         pub fn new(#params) -> Self{
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
@@ -317,6 +332,14 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         let mut params = TokenStream::new();
         let mut return_params = TokenStream::new();
         let mut body = TokenStream::new();
+        let mut comments = TokenStream::new();
+
+        // assemble comments
+        for comment in function.header.comments.iter() {
+            comments.extend(quote! {
+                #[doc = #comment]
+            });
+        }
         let statements = &function.body;
 
         // assemble message
@@ -407,6 +430,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         output.extend(quote! {
+            #comments
             #message
             #function_name(#view #params) -> Result<#return_params, Error> {
                 #body

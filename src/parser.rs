@@ -309,8 +309,13 @@ fn parse_contract(
                     read_until(chars, vec![SEMICOLON]);
                     buffer.clear();
                 } else if ch == SEMICOLON {
-                    fields.push(parse_contract_field(buffer.trim().to_owned(), &mut imports));
+                    fields.push(parse_contract_field(
+                        buffer.trim().to_owned(),
+                        &mut imports,
+                        &comments,
+                    ));
                     buffer.clear();
+                    comments.clear();
                 }
             }
             _ => {}
@@ -455,7 +460,11 @@ pub fn parse_interface(
 /// `imports` the HashSet of imports of the contract
 ///
 /// returns the representation of contract field as `ContractField` struct
-fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> ContractField {
+fn parse_contract_field(
+    line: String,
+    imports: &mut HashSet<String>,
+    comments: &Vec<String>,
+) -> ContractField {
     let tokens = split(&line.replace(" => ", "=>"), " ", None);
     let name_index = if tokens.len() > 2 { 2 } else { 1 };
 
@@ -463,7 +472,11 @@ fn parse_contract_field(line: String, imports: &mut HashSet<String>) -> Contract
     let name = tokens[name_index]
         .substring(0, tokens[name_index].len() - 1)
         .to_owned();
-    ContractField { field_type, name }
+    ContractField {
+        field_type,
+        name,
+        comments: comments.clone(),
+    }
 }
 
 /// Parses the function header of a Solidity function

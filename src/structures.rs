@@ -32,6 +32,7 @@ pub struct Interface {
 pub struct ContractField {
     pub field_type: String,
     pub name: String,
+    pub comments: Vec<String>
 }
 
 #[derive(Clone)]
