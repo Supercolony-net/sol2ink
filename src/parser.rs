@@ -107,6 +107,13 @@ lazy_static! {
         (?P<right>.+)+?\s*$"#
     )
     .unwrap();
+    static ref REGEX_FUNCTION_CALL: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
+        \s*(?P<args>.+)\s*
+        \)\s*$"#,
+    )
+    .unwrap();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -780,10 +787,12 @@ fn parse_statement(
         return parse_emit(&line, constructor, storage, imports, functions, events)
     } else if REGEX_ASSIGN.is_match(&line) {
         return parse_assign(&line, constructor, storage, imports, functions)
+    } else if REGEX_FUNCTION_CALL.is_match(&line) {
+        let expression = parse_function_call(&line, constructor, storage, imports, functions);
+        return Statement::FunctionCall(expression)
     }
 
-    let expression = parse_member(&line, constructor, storage, imports, functions);
-    Statement::FunctionCall(expression)
+    Statement::Comment(format!("Sol2Ink Not Implemented yet: {}", line.clone()))
 }
 
 fn parse_assign(
@@ -1222,64 +1231,8 @@ fn parse_member(
         return Expression::Mapping(mapping_name_raw, indices, selector, None)
     }
 
-    let regex_function_call = Regex::new(
-        r#"(?x)
-        ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
-        (?P<args>(\s*.+\s*))
-        \)\s*$"#,
-    )
-    .unwrap();
-    if regex_function_call.is_match(raw) {
-        let function_name_raw = capture_regex(&regex_function_call, raw, "function_name").unwrap();
-        let args_raw = capture_regex(&regex_function_call, raw, "args").unwrap();
-        let mut args = Vec::<Expression>::new();
-        let mut chars = args_raw.chars();
-        let mut buffer = String::new();
-        let mut open_parentheses = 0;
-        let mut close_parenthesis = 0;
-
-        while let Some(ch) = chars.next() {
-            match ch {
-                PARENTHESIS_OPEN => {
-                    open_parentheses += 1;
-                    buffer.push(ch)
-                }
-                PARENTHESIS_CLOSE => {
-                    close_parenthesis += 1;
-                    buffer.push(ch)
-                }
-                COMMA => {
-                    if open_parentheses == close_parenthesis {
-                        args.push(parse_member(
-                            &trim(&buffer),
-                            constructor,
-                            storage,
-                            imports,
-                            functions,
-                        ));
-                        buffer.clear();
-                    } else {
-                        buffer.push(ch)
-                    }
-                }
-                _ => buffer.push(ch),
-            }
-        }
-
-        args.push(parse_member(
-            &buffer,
-            constructor,
-            storage,
-            imports,
-            functions,
-        ));
-
-        return Expression::FunctionCall(
-            function_name_raw.clone(),
-            args,
-            selector!(constructor),
-            *functions.get(&function_name_raw).unwrap_or(&false),
-        )
+    if REGEX_FUNCTION_CALL.is_match(raw) {
+        return parse_function_call(raw, constructor, storage, imports, functions)
     }
 
     let regex_subtraction = Regex::new(
@@ -1376,6 +1329,65 @@ fn parse_member(
     let selector = get_selector(storage, constructor, &raw);
 
     return Expression::Member(raw.clone(), selector)
+}
+
+fn parse_function_call(
+    raw: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+) -> Expression {
+    let function_name_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "function_name").unwrap();
+    let args_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "args").unwrap();
+    let mut args = Vec::<Expression>::new();
+    let mut chars = args_raw.chars();
+    let mut buffer = String::new();
+    let mut open_parentheses = 0;
+    let mut close_parenthesis = 0;
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            PARENTHESIS_OPEN => {
+                open_parentheses += 1;
+                buffer.push(ch)
+            }
+            PARENTHESIS_CLOSE => {
+                close_parenthesis += 1;
+                buffer.push(ch)
+            }
+            COMMA => {
+                if open_parentheses == close_parenthesis {
+                    args.push(parse_member(
+                        &trim(&buffer),
+                        constructor,
+                        storage,
+                        imports,
+                        functions,
+                    ));
+                    buffer.clear();
+                } else {
+                    buffer.push(ch)
+                }
+            }
+            _ => buffer.push(ch),
+        }
+    }
+
+    args.push(parse_member(
+        &buffer,
+        constructor,
+        storage,
+        imports,
+        functions,
+    ));
+
+    return Expression::FunctionCall(
+        function_name_raw.clone(),
+        args,
+        selector!(constructor),
+        *functions.get(&function_name_raw).unwrap_or(&false),
+    )
 }
 
 fn get_selector(
