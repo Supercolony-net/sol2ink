@@ -606,10 +606,10 @@ impl ToTokens for Statement {
             }
             Statement::Catch(statements) => {
                 stream.extend(quote! {
-                    else {
+                    else if false {
                         #(#statements)*
+                        _comment_!("<<< Please handle try/catch blocks manually");
                     }
-                    _comment_!("<<< Please handle try/catch blocks manually");
                 })
             }
             Statement::CatchEnd => {}

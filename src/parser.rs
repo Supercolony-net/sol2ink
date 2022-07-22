@@ -535,7 +535,7 @@ fn parse_function_header(
         r#"(?x)
         ^\s*(?P<function_name>[a-zA-Z0-9_]*?)\s*
         \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
-        .*returns\s*\(\s*(?P<return_parameters>[a-zA-Z0-9_,\s]*?)\s*\)
+        .*returns\s*\(\s*(?P<return_parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
         .*$"#,
     )
     .unwrap();
@@ -747,6 +747,9 @@ fn parse_statement(
         stack.push_back(Block::Unchecked);
         return Statement::Comment(String::from("Please handle unchecked blocks manually >>>"))
     } else if REGEX_END_BLOCK.is_match(&line) {
+        if stack.is_empty() {
+            return Statement::Comment(String::from("Sol2Ink Not Implemented yet End Block here"))
+        }
         match stack.pop_back().unwrap() {
             Block::Assembly => return Statement::AssemblyEnd,
             Block::Catch => return Statement::CatchEnd,
