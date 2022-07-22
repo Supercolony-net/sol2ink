@@ -32,7 +32,7 @@ pub struct Interface {
 pub struct ContractField {
     pub field_type: String,
     pub name: String,
-    pub comments: Vec<String>
+    pub comments: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -95,7 +95,7 @@ pub enum Statement {
     AddAssign(Expression, Expression),
     Assembly(Vec<Statement>),
     AssemblyEnd,
-    Assign(Expression, Expression),
+    Assign(Expression, Expression, Operation),
     Catch(Vec<Statement>),
     CatchEnd,
     Comment(String),
@@ -110,7 +110,7 @@ pub enum Statement {
     Return(Expression),
     SubAssign(Expression, Expression),
     Try(Vec<Statement>),
-    TryEnd
+    TryEnd,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -122,31 +122,37 @@ pub struct Condition {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Operation {
-    Not,
-    True,
+    Add,
+    Assign,
+    Equal,
     GreaterThanEqual,
     GreaterThan,
     LessThanEqual,
     LessThan,
     LogicalAnd,
     LogicalOr,
-    Equal,
+    Not,
     NotEqual,
+    Subtract,
+    True,
 }
 
 impl ToString for Operation {
     fn to_string(&self) -> String {
         return match self {
-            Operation::Not => String::from("!"),
-            Operation::True => String::from(""),
+            Operation::Assign => String::from("="),
+            Operation::Equal => String::from("=="),
             Operation::GreaterThanEqual => String::from(">="),
             Operation::GreaterThan => String::from(">"),
             Operation::LessThanEqual => String::from("<="),
             Operation::LessThan => String::from("<"),
             Operation::LogicalAnd => String::from("&&"),
             Operation::LogicalOr => String::from("||"),
-            Operation::Equal => String::from("=="),
+            Operation::Subtract => String::from("-="),
+            Operation::Not => String::from("!"),
             Operation::NotEqual => String::from("!="),
+            Operation::Add => String::from("+="),
+            Operation::True => String::from(""),
         }
     }
 }
@@ -154,8 +160,8 @@ impl ToString for Operation {
 impl Operation {
     pub fn negate(&self) -> Operation {
         match self {
-            Operation::Not => Operation::True,
-            Operation::True => Operation::Not,
+            Operation::Assign => Operation::Assign,
+            Operation::Equal => Operation::NotEqual,
             Operation::GreaterThanEqual => Operation::LessThan,
             Operation::GreaterThan => Operation::LessThanEqual,
             Operation::LessThanEqual => Operation::GreaterThan,
@@ -163,8 +169,11 @@ impl Operation {
             // TODO a and b = neg(a) or neg (b)
             Operation::LogicalAnd => Operation::LogicalOr,
             Operation::LogicalOr => Operation::LogicalAnd,
-            Operation::Equal => Operation::NotEqual,
+            Operation::Subtract => Operation::Add,
+            Operation::Not => Operation::True,
             Operation::NotEqual => Operation::Equal,
+            Operation::Add => Operation::Subtract,
+            Operation::True => Operation::Not,
         }
     }
 }

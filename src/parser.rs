@@ -34,25 +34,13 @@ macro_rules! selector {
 const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
-    static ref TYPES: HashMap<String, (String, Option<String>)> = {
+    static ref TYPES: HashMap<String, String> = {
         let mut map = HashMap::new();
-        map.insert(
-            "mapping".to_string(),
-            ("Mapping".to_string(), Some("ink_storage".to_string())),
-        );
-        map.insert("uint".to_string(), ("u128".to_string(), None));
-        map.insert(
-            "string".to_string(),
-            (
-                "String".to_string(),
-                Some("ink_prelude::string".to_string()),
-            ),
-        );
-        map.insert("uint256".to_string(), ("u128".to_string(), None));
-        map.insert(
-            "address".to_string(),
-            ("AccountId".to_string(), Some("brush::traits".to_string())),
-        );
+        map.insert("mapping".to_string(), "Mapping".to_string());
+        map.insert("uint".to_string(), "u128".to_string());
+        map.insert("string".to_string(), "String".to_string());
+        map.insert("uint256".to_string(), "u128".to_string());
+        map.insert("address".to_string(), "AccountId".to_string());
         map
     };
     static ref OPERATIONS: HashMap<String, Operation> = {
@@ -66,6 +54,9 @@ lazy_static! {
         map.insert(String::from("!="), Operation::NotEqual);
         map.insert(String::from("&&"), Operation::LogicalAnd);
         map.insert(String::from("||"), Operation::LogicalOr);
+        map.insert(String::from("+"), Operation::Add);
+        map.insert(String::from("-"), Operation::Subtract);
+        map.insert(String::from("="), Operation::Assign);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -78,6 +69,44 @@ lazy_static! {
         map.insert(String::from("msg.sender"), Expression::EnvCaller(None));
         map
     };
+    static ref REGEX_RETURN: Regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
+    static ref REGEX_DECLARE: Regex = Regex::new(
+        r#"(?x)^\s*
+        (?P<field_type>[a-zA-Z0-9\[\]]+)\s+
+        (?P<field_name>[_a-zA-Z0-9]+)\s*
+        (=\s*(?P<value>.+))*\s*$"#
+    )
+    .unwrap();
+    static ref REGEX_REQUIRE: Regex = Regex::new(
+        r#"(?x)
+        ^\s*require\s*\((?P<condition>.+?)\s*
+        (,\s*"(?P<error>.*)"\s*)*\)\s*$"#
+    )
+    .unwrap();
+    static ref REGEX_COMMENT: Regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)\s*$"#).unwrap();
+    static ref REGEX_IF: Regex =
+        Regex::new(r#"(?x)^\s*if\s*\((?P<condition>.+)\s*\)\s*\{\s*"#).unwrap();
+    static ref REGEX_ELSE: Regex = Regex::new(r#"^\s*else\s*\{\s*"#).unwrap();
+    static ref REGEX_ELSE_IF: Regex =
+        Regex::new(r#"(?x)^\s*else\s+if\s*\((?P<condition>.+)\s*\)\s*\{\s*"#).unwrap();
+    static ref REGEX_UNCHECKED: Regex = Regex::new(r#"(?x)^\s*unchecked\s*\{\s*"#).unwrap();
+    static ref REGEX_END_BLOCK: Regex = Regex::new(r#"^\s*\}\s*"#).unwrap();
+    static ref REGEX_TRY: Regex = Regex::new(r#"(?x)^\s*try\s*.*$"#).unwrap();
+    static ref REGEX_ASSEMBLY: Regex = Regex::new(r#"(?x)^\s*assembly\s*\{\s*"#).unwrap();
+    static ref REGEX_CATCH: Regex = Regex::new(r#"(?x)^\s*catch\s*.*$"#).unwrap();
+    static ref REGEX_EMIT: Regex = Regex::new(
+        r#"(?x)
+        ^\s*emit\s+(?P<event_name>.+?)\s*\(\s*
+        (?P<args>.+)+?\)\s*$"#
+    )
+    .unwrap();
+    static ref REGEX_ASSIGN: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>[^+-=><!]+?)\s*
+        (?P<operation>[+-])*=\s*
+        (?P<right>.+)+?\s*$"#
+    )
+    .unwrap();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -675,19 +704,16 @@ fn parse_statement(
     line = line.replace(" calldata ", " ");
     line = line.replace(" storage ", " ");
 
-    let tokens = split(&line, " ", None);
-
-    if tokens[0] == "return" {
+    if REGEX_RETURN.is_match(&line) {
         return parse_return(&line, storage, imports, functions)
-    } else if is_type(tokens[0].to_owned()) {
-        return parse_declaration(tokens, constructor, storage, imports, functions)
-    } else if split(&tokens[0], "(", None)[0] == "require" {
+    } else if REGEX_DECLARE.is_match(&line) {
+        return parse_declaration(&line, constructor, storage, imports, functions)
+    } else if REGEX_REQUIRE.is_match(&line) {
         return parse_require(&line, constructor, storage, imports, functions)
-    } else if tokens[0] == "//" || tokens[0] == "///" {
-        let comment_regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)$"#).unwrap();
-        let comment = capture_regex(&comment_regex, &line, "comment").unwrap();
+    } else if REGEX_COMMENT.is_match(&line) {
+        let comment = capture_regex(&REGEX_COMMENT, &line, "comment").unwrap();
         return Statement::Comment(comment)
-    } else if tokens[0] == "if" {
+    } else if REGEX_IF.is_match(&line) {
         stack.push_back(Block::If);
         return parse_if(
             &line,
@@ -699,7 +725,7 @@ fn parse_statement(
             iterator,
             events,
         )
-    } else if tokens[0] == "else" {
+    } else if REGEX_ELSE.is_match(&line) {
         stack.push_back(Block::Else);
         return parse_else(
             constructor,
@@ -710,10 +736,10 @@ fn parse_statement(
             iterator,
             events,
         )
-    } else if tokens[0] == "unchecked" {
+    } else if REGEX_UNCHECKED.is_match(&line) {
         stack.push_back(Block::Unchecked);
         return Statement::Comment(String::from("Please handle unchecked blocks manually >>>"))
-    } else if tokens[0] == "}" {
+    } else if REGEX_END_BLOCK.is_match(&line) {
         match stack.pop_back().unwrap() {
             Block::Assembly => return Statement::AssemblyEnd,
             Block::Catch => return Statement::CatchEnd,
@@ -723,7 +749,7 @@ fn parse_statement(
             Block::Try => return Statement::TryEnd,
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
-    } else if tokens[0] == "try" {
+    } else if REGEX_TRY.is_match(&line) {
         stack.push_back(Block::Try);
         return parse_try(
             &line,
@@ -735,10 +761,10 @@ fn parse_statement(
             iterator,
             events,
         )
-    } else if tokens[0] == "assembly" {
+    } else if REGEX_ASSEMBLY.is_match(&line) {
         stack.push_back(Block::Assembly);
         return parse_assembly(stack, iterator)
-    } else if tokens[0] == "catch" {
+    } else if REGEX_CATCH.is_match(&line) {
         stack.push_back(Block::Catch);
         return parse_catch(
             &line,
@@ -750,23 +776,14 @@ fn parse_statement(
             iterator,
             events,
         )
-    } else if tokens[0] == "emit" {
+    } else if REGEX_EMIT.is_match(&line) {
         return parse_emit(&line, constructor, storage, imports, functions, events)
-    } else if tokens.get(1).unwrap_or(&String::new()) == "=" {
+    } else if REGEX_ASSIGN.is_match(&line) {
         return parse_assign(&line, constructor, storage, imports, functions)
-    } else if tokens.get(1).unwrap_or(&String::new()) == "+=" {
-        return parse_add_assign(&line, constructor, storage, imports, functions)
-    } else if tokens.get(1).unwrap_or(&String::new()) == "-=" {
-        return parse_sub_assign(&line, constructor, storage, imports, functions)
     }
 
     let expression = parse_member(&line, constructor, storage, imports, functions);
     Statement::FunctionCall(expression)
-}
-
-#[inline(always)]
-fn is_type(line: String) -> bool {
-    TYPES.contains_key(&line)
 }
 
 fn parse_assign(
@@ -776,98 +793,44 @@ fn parse_assign(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Statement {
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)\s*=\s*
-        (?P<right>.+)+?
-        \s*$"#,
-    )
-    .unwrap();
-    let left_raw = capture_regex(&regex, line, "left").unwrap();
-    let right_raw = capture_regex(&regex, line, "right").unwrap();
+    let left_raw = capture_regex(&REGEX_ASSIGN, line, "left").unwrap();
+    let operation_raw =
+        capture_regex(&REGEX_ASSIGN, line, "operation").unwrap_or(String::from("="));
+    let right_raw = capture_regex(&REGEX_ASSIGN, line, "right").unwrap();
 
     let left = parse_member(&left_raw, constructor, storage, imports, functions);
+    let operation = *OPERATIONS.get(&operation_raw).unwrap();
     let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
     return if let Expression::Mapping(name, indices, selector, None) = left {
-        Statement::FunctionCall(Expression::Mapping(
-            name,
-            indices,
-            selector,
-            Some(Box::new(right)),
-        ))
+        let right_mapping = match operation {
+            Operation::Add => {
+                Some(Box::new(Expression::Addition(
+                    Box::new(Expression::Mapping(
+                        name.clone(),
+                        indices.clone(),
+                        selector.clone(),
+                        None,
+                    )),
+                    Box::new(right),
+                )))
+            }
+            Operation::Subtract => {
+                Some(Box::new(Expression::Subtraction(
+                    Box::new(Expression::Mapping(
+                        name.clone(),
+                        indices.clone(),
+                        selector.clone(),
+                        None,
+                    )),
+                    Box::new(right),
+                )))
+            }
+            _ => Some(Box::new(right)),
+        };
+        Statement::FunctionCall(Expression::Mapping(name, indices, selector, right_mapping))
     } else {
-        Statement::Assign(left, right)
-    }
-}
-
-fn parse_add_assign(
-    line: &String,
-    constructor: bool,
-    storage: &HashMap<String, String>,
-    imports: &mut HashSet<String>,
-    functions: &HashMap<String, bool>,
-) -> Statement {
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)\s*\+=\s*
-        (?P<right>.+)+?
-        \s*$"#,
-    )
-    .unwrap();
-    let left_raw = capture_regex(&regex, line, "left").unwrap();
-    let right_raw = capture_regex(&regex, line, "right").unwrap();
-
-    let left = parse_member(&left_raw, constructor, storage, imports, functions);
-    let right = parse_member(&right_raw, constructor, storage, imports, functions);
-
-    return if let Expression::Mapping(name, indices, selector, None) = left {
-        Statement::FunctionCall(Expression::Mapping(
-            name.clone(),
-            indices.clone(),
-            selector.clone(),
-            Some(Box::new(Expression::Addition(
-                Box::new(Expression::Mapping(name, indices, selector, None)),
-                Box::new(right),
-            ))),
-        ))
-    } else {
-        Statement::AddAssign(left, right)
-    }
-}
-
-fn parse_sub_assign(
-    line: &String,
-    constructor: bool,
-    storage: &HashMap<String, String>,
-    imports: &mut HashSet<String>,
-    functions: &HashMap<String, bool>,
-) -> Statement {
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)\s*\-=\s*
-        (?P<right>.+)+?
-        \s*$"#,
-    )
-    .unwrap();
-    let left_raw = capture_regex(&regex, line, "left").unwrap();
-    let right_raw = capture_regex(&regex, line, "right").unwrap();
-
-    let left = parse_member(&left_raw, constructor, storage, imports, functions);
-    let right = parse_member(&right_raw, constructor, storage, imports, functions);
-
-    return if let Expression::Mapping(name, indices, selector, None) = left {
-        Statement::FunctionCall(Expression::Mapping(
-            name.clone(),
-            indices.clone(),
-            selector.clone(),
-            Some(Box::new(Expression::Subtraction(
-                Box::new(Expression::Mapping(name, indices, selector, None)),
-                Box::new(right),
-            ))),
-        ))
-    } else {
-        Statement::SubAssign(left, right)
+        Statement::Assign(left, right, operation)
     }
 }
 
@@ -881,15 +844,8 @@ fn parse_emit(
 ) -> Statement {
     imports.insert(String::from("use ink_lang::codegen::EmitEvent;"));
 
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*emit\s+(?P<event_name>.+?)\s*\(\s*
-        (?P<args>.+)+?\)
-        \s*$"#,
-    )
-    .unwrap();
-    let event_name_raw = capture_regex(&regex, line, "event_name").unwrap();
-    let args_raw = capture_regex(&regex, line, "args").unwrap();
+    let event_name_raw = capture_regex(&REGEX_EMIT, line, "event_name").unwrap();
+    let args_raw = capture_regex(&REGEX_EMIT, line, "args").unwrap();
 
     let mut args = Vec::<Expression>::new();
     let mut chars = args_raw.chars();
@@ -964,8 +920,7 @@ fn parse_return(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Statement {
-    let regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
-    let raw_output = capture_regex(&regex, line, "output").unwrap();
+    let raw_output = capture_regex(&REGEX_RETURN, line, "output").unwrap();
     let output = parse_member(&raw_output, false, storage, imports, functions);
 
     Statement::Return(output)
@@ -981,14 +936,7 @@ fn parse_if(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*if\s*\((?P<condition>.+)\s*\)\s*\{
-        "#,
-    )
-    .unwrap();
-
-    let condition_raw = capture_regex(&regex, line, "condition");
+    let condition_raw = capture_regex(&REGEX_IF, line, "condition");
     let condition = parse_condition(
         &condition_raw.unwrap(),
         constructor,
@@ -1036,7 +984,6 @@ fn parse_else(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    // TODO handle else if
     let mut statements = Vec::default();
 
     while let Some(statement_raw) = iterator.next() {
@@ -1185,18 +1132,10 @@ fn parse_require(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Statement {
-    let regex = Regex::new(
-        r#"(?x)
-        ^\s*require\((?P<condition>.+)
-        \s*,\s*"(?P<error>.+)"\s*\)$
-        "#,
-    )
-    .unwrap();
-
     imports.insert(String::from("use ink::prelude::string::String;"));
 
-    let condition = capture_regex(&regex, line, "condition");
-    let error = capture_regex(&regex, line, "error");
+    let condition = capture_regex(&REGEX_REQUIRE, line, "condition");
+    let error = capture_regex(&REGEX_REQUIRE, line, "error");
 
     let condition = parse_condition(
         &condition.unwrap(),
@@ -1531,20 +1470,22 @@ fn capture_regex(regex: &Regex, line: &String, capture_name: &str) -> Option<Str
 }
 
 fn parse_declaration(
-    tokens: Vec<String>,
+    line: &String,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Statement {
-    let var_type = convert_variable_type(tokens[0].to_owned(), imports);
-    let var_name = tokens[1].to_owned();
-    return if tokens.len() > 2 {
-        let expression_raw = tokens.clone().drain(3..).collect::<Vec<String>>().join(" ");
-        let expression = parse_member(&expression_raw, constructor, storage, imports, functions);
-        Statement::Declaration(var_name, var_type, Some(expression))
+    let field_type_raw = capture_regex(&REGEX_DECLARE, line, "field_type").unwrap();
+    let field_name = capture_regex(&REGEX_DECLARE, line, "field_name").unwrap();
+    let value_raw = capture_regex(&REGEX_DECLARE, line, "value");
+    let field_type = convert_variable_type(field_type_raw, imports);
+
+    return if let Some(value) = value_raw {
+        let expression = parse_member(&value, constructor, storage, imports, functions);
+        Statement::Declaration(field_name, field_type, Some(expression))
     } else {
-        Statement::Declaration(var_name, var_type, None)
+        Statement::Declaration(field_name, field_type, None)
     }
 }
 

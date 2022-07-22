@@ -20,7 +20,10 @@ pub mod erc_721 {
         string::String,
         vec::Vec,
     };
-    use ink_lang::codegen::EmitEvent;
+    use ink_lang::codegen::{
+        EmitEvent,
+        Env,
+    };
     use ink_storage::Mapping;
 
     #[derive(Debug, Encode, Decode, PartialEq)]
@@ -153,7 +156,7 @@ pub mod erc_721 {
                     "ERC721: approval to current owner",
                 )))
             }
-            if msg_sender() != owner {
+            if self.env().caller() != owner {
                 return Err(Error::Custom(String::from(
                     "ERC721: approve caller is not token owner nor approved for all",
                 )))
@@ -176,7 +179,7 @@ pub mod erc_721 {
             operator: AccountId,
             approved: bool,
         ) -> Result<(), Error> {
-            self._set_approval_for_all(msg_sender(), operator, approved)?;
+            self._set_approval_for_all(self.env().caller(), operator, approved)?;
             Ok(())
         }
 
@@ -199,7 +202,7 @@ pub mod erc_721 {
             token_id: u128,
         ) -> Result<(), Error> {
             // solhint-disable-next-line max-line-length
-            if !self._is_approved_or_owner(msg_sender(), token_id)? {
+            if !self._is_approved_or_owner(self.env().caller(), token_id)? {
                 return Err(Error::Custom(String::from(
                     "ERC721: caller is not token owner nor approved",
                 )))
@@ -229,7 +232,7 @@ pub mod erc_721 {
             token_id: u128,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            if !self._is_approved_or_owner(msg_sender(), token_id)? {
+            if !self._is_approved_or_owner(self.env().caller(), token_id)? {
                 return Err(Error::Custom(String::from(
                     "ERC721: caller is not token owner nor approved",
                 )))
@@ -452,7 +455,7 @@ pub mod erc_721 {
             if to.is_contract() {
                 // Please handle try/catch blocks manually >>>
                 if true {
-                    // try IERC721Receiver(to).onERC721Received(_msgSender(), from, tokenId, data) returns (bytes4 retval) {
+                    // try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 retval) {
                     return Ok(retval == ierc_721_receiver.on_erc_721_received.selector)
                 } else {
                     // catch (bytes reason) {

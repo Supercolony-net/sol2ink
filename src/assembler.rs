@@ -448,16 +448,19 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 impl ToTokens for Operation {
     fn to_tokens(&self, stream: &mut TokenStream) {
         stream.extend(match self {
-            Operation::Not => quote!(!),
-            Operation::True => quote!(),
+            Operation::Assign => quote!(=),
+            Operation::Equal => quote!(==),
             Operation::GreaterThanEqual => quote!(>=),
             Operation::GreaterThan => quote!(>),
             Operation::LessThanEqual => quote!(<=),
             Operation::LessThan => quote!(<),
             Operation::LogicalAnd => quote!(&&),
             Operation::LogicalOr => quote!(||),
-            Operation::Equal => quote!(==),
+            Operation::Subtract => quote!(-),
+            Operation::Not => quote!(!),
             Operation::NotEqual => quote!(!=),
+            Operation::Add => quote!(+),
+            Operation::True => quote!(),
         })
     }
 }
@@ -581,11 +584,12 @@ impl ToTokens for Statement {
     fn to_tokens(&self, stream: &mut TokenStream) {
         match self {
             Statement::AssemblyEnd => {}
-            Statement::Assign(left_raw, right_raw) => {
+            Statement::Assign(left_raw, right_raw, operation_raw) => {
                 let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
                 let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                let operation = TokenStream::from_str(&operation_raw.to_string()).unwrap();
                 stream.extend(quote! {
-                    #left = #right;
+                    #left #operation #right;
                 })
             }
             Statement::AddAssign(left_raw, right_raw) => {
