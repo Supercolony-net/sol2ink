@@ -926,6 +926,43 @@ fn parse_return(
     Statement::Return(output)
 }
 
+fn parse_block(
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+    statements: &mut Vec<Statement>,
+    until: Statement,
+) {
+    while let Some(statement_raw) = iterator.next() {
+        match statement_raw {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                let statement = parse_statement(
+                    &adjusted,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    stack,
+                    iterator,
+                    events,
+                );
+                if statement == until {
+                    break
+                } else {
+                    statements.push(statement)
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn parse_if(
     line: &String,
     constructor: bool,
@@ -947,30 +984,17 @@ fn parse_if(
     );
     let mut statements = Vec::default();
 
-    while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
-                let statement = parse_statement(
-                    &adjusted,
-                    constructor,
-                    storage,
-                    imports,
-                    functions,
-                    stack,
-                    iterator,
-                    events,
-                );
-                if statement == Statement::IfEnd {
-                    break
-                } else {
-                    statements.push(statement)
-                }
-            }
-            _ => {}
-        }
-    }
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::IfEnd,
+    );
 
     Statement::If(condition, statements)
 }
@@ -986,30 +1010,17 @@ fn parse_else(
 ) -> Statement {
     let mut statements = Vec::default();
 
-    while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
-                let statement = parse_statement(
-                    &adjusted,
-                    constructor,
-                    storage,
-                    imports,
-                    functions,
-                    stack,
-                    iterator,
-                    events,
-                );
-                if statement == Statement::IfEnd {
-                    break
-                } else {
-                    statements.push(statement)
-                }
-            }
-            _ => {}
-        }
-    }
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::IfEnd,
+    );
 
     Statement::Else(statements)
 }
@@ -1027,30 +1038,17 @@ fn parse_try(
     let mut statements = Vec::default();
     statements.push(Statement::Comment(line.clone()));
 
-    while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
-                let statement = parse_statement(
-                    &adjusted,
-                    constructor,
-                    storage,
-                    imports,
-                    functions,
-                    stack,
-                    iterator,
-                    events,
-                );
-                if statement == Statement::TryEnd {
-                    break
-                } else {
-                    statements.push(statement)
-                }
-            }
-            _ => {}
-        }
-    }
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::TryEnd,
+    );
 
     Statement::Try(statements)
 }
@@ -1097,30 +1095,17 @@ fn parse_catch(
     let mut statements = Vec::default();
     statements.push(Statement::Comment(line.clone()));
 
-    while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
-                let statement = parse_statement(
-                    &adjusted,
-                    constructor,
-                    storage,
-                    imports,
-                    functions,
-                    stack,
-                    iterator,
-                    events,
-                );
-                if statement == Statement::CatchEnd {
-                    break
-                } else {
-                    statements.push(statement)
-                }
-            }
-            _ => {}
-        }
-    }
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::CatchEnd,
+    );
 
     Statement::Catch(statements)
 }
