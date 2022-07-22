@@ -647,6 +647,11 @@ fn parse_function(
             buffer.push(ch);
             if trim(&buffer) == "assembly" {
                 action = Action::AssemblyStart;
+            } else if trim(&buffer) == "for" {
+                open_braces += 1;
+                let for_block = read_until(chars, vec!['{']);
+                statements.push(Statement::Raw(format!("for{for_block}{{")));
+                buffer.clear();
             }
         }
     }
@@ -1172,6 +1177,19 @@ fn parse_member(
         }
 
         return expression.clone()
+    }
+
+    let regex_new_array = Regex::new(
+        r#"(?x)^\s*new\s+(?P<array_type>.+?)\s*
+        \[\s*\]\s*\((?P<array_size>.+?)\s*\)\s*$"#,
+    )
+    .unwrap();
+    if regex_new_array.is_match(raw) {
+        let array_type_raw = capture_regex(&regex_new_array, raw, "array_type").unwrap();
+        let array_size = capture_regex(&regex_new_array, raw, "array_size").unwrap();
+
+        let array_type = convert_variable_type(array_type_raw, imports);
+        return Expression::Member(format!("vec![{array_type}::default(); {array_size}]"), None)
     }
 
     let regex_type = Regex::new(
