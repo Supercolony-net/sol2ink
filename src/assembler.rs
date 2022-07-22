@@ -5,7 +5,7 @@ use std::{
 
 use crate::structures::*;
 use convert_case::{
-    Case,
+    Case::Snake,
     Casing,
 };
 use proc_macro2::TokenStream;
@@ -13,13 +13,14 @@ use quote::*;
 
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
 pub fn assemble_contract(contract: Contract) -> TokenStream {
-    let mod_name = format_ident!("{}", contract.name.to_case(Case::Snake));
+    let mod_name = format_ident!("{}", contract.name.to_case(Snake));
+    let contract_name = format_ident!("{}", contract.name);
     let signature = signature();
     let imports = assemble_imports(contract.imports);
     let events = assemble_events(contract.events);
     let enums = assemble_enums(contract.enums);
     let structs = assemble_structs(contract.structs);
-    let storage = assemble_storage(contract.name.clone(), contract.fields);
+    let storage = assemble_storage(&contract.name, contract.fields);
     let constructor = assemble_constructor(contract.constructor);
     let functions = assemble_functions(contract.functions);
     let comments = assemble_contract_comments(contract.comments);
@@ -33,11 +34,19 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
         #[brush::contract]
         pub mod #mod_name {
             #imports
+
+            #[derive(Debug, Encode, Decode, PartialEq)]
+            #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+            pub enum Error {
+                Custom(String),
+            }
+            _blank_!();
+
             #events
             #enums
             #structs
             #storage
-            impl #mod_name {
+            impl #contract_name {
                 #constructor
                 #functions
             }
@@ -168,7 +177,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
                 });
             }
 
-            let event_field_name = format_ident!("{}", event_field.name.to_case(Case::Snake));
+            let event_field_name = format_ident!("{}", event_field.name.to_case(Snake));
             let event_field_type = TokenStream::from_str(&event_field.field_type).unwrap();
 
             event_fields.extend(quote! {
@@ -191,15 +200,21 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 }
 
 /// Assembles ink! storage struct from the vec of parsed ContractField structs and return it as a vec of Strings
-fn assemble_storage(contract_name: String, fields: Vec<ContractField>) -> TokenStream {
+fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
     let contract_name = format_ident!("{}", contract_name);
     let mut storage_fields = TokenStream::new();
 
     // assemble storage fields
     for field in fields.iter() {
-        let field_name = format_ident!("{}", field.name.to_case(Case::Snake));
+        let field_name = format_ident!("{}", field.name.to_case(Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
+
+        for comment in field.comments.iter() {
+            storage_fields.extend(quote! {
+                #[doc = #comment]
+            });
+        }
         storage_fields.extend(quote! {
             #field_name: #field_type,
         });
@@ -236,7 +251,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 
         // assemble struct fields
         for struct_field in structure.fields.iter() {
-            let struct_field_name = format_ident!("{}", struct_field.name.to_case(Case::Snake));
+            let struct_field_name = format_ident!("{}", struct_field.name.to_case(Snake));
             let struct_field_type = TokenStream::from_str(&struct_field.field_type).unwrap();
 
             struct_fields.extend(quote! {
@@ -265,10 +280,19 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
+    let mut comments = TokenStream::new();
+    let constructor_functions = constructor.body;
+
+    // assemble comments
+    for comment in constructor.header.comments.iter() {
+        comments.extend(quote! {
+            #[doc = #comment]
+        });
+    }
 
     // assemble params
     for param in constructor.header.params.iter() {
-        let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+        let param_name = format_ident!("{}", param.name.to_case(Snake));
         let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
         params.extend(quote! {
@@ -279,18 +303,12 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     let mut body = TokenStream::new();
 
     // assemble body
-    for statement in constructor.body.iter() {
-        let content = &statement.content;
-        if statement.comment {
-            body.extend(quote! {
-                _comment_!(#content);
-            });
-        } else {
-            body.extend(TokenStream::from_str(content).unwrap());
-        }
-    }
+    body.extend(quote! {
+        #(#constructor_functions)*
+    });
 
     output.extend(quote! {
+        #comments
         #[ink(constructor)]
         pub fn new(#params) -> Self{
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
@@ -307,14 +325,22 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
 fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for i in 0..functions.len() {
-        let function = &functions[i];
+    for function in functions.iter() {
         let mut message = TokenStream::new();
         let mut function_name = TokenStream::new();
         let mut view = TokenStream::new();
         let mut params = TokenStream::new();
         let mut return_params = TokenStream::new();
         let mut body = TokenStream::new();
+        let mut comments = TokenStream::new();
+
+        // assemble comments
+        for comment in function.header.comments.iter() {
+            comments.extend(quote! {
+                #[doc = #comment]
+            });
+        }
+        let statements = &function.body;
 
         // assemble message
         if function.header.external {
@@ -338,7 +364,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 } else {
                     String::from("fn _")
                 },
-                function.header.name.to_case(Case::Snake)
+                function.header.name.to_case(Snake)
             ))
             .unwrap(),
         );
@@ -354,7 +380,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 
         // assemble params
         for param in function.header.params.iter() {
-            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -363,7 +389,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         // assemble return params
-        if !function.header.return_params.is_empty() {
+        if function.header.return_params.len() > 0 {
             let mut params = TokenStream::new();
             for i in 0..function.header.return_params.len() {
                 let param_type =
@@ -379,44 +405,64 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 
             if function.header.return_params.len() > 1 {
                 return_params.extend(quote! {
-                    -> (#params)
+                    (#params)
                 });
             } else {
                 return_params.extend(quote! {
-                    -> #params
+                    #params
                 });
             }
+        } else {
+            return_params.extend(quote! {
+                ()
+            });
         }
 
         // body
-        for statement in function.body.iter() {
-            let content = &statement.content;
-            if statement.comment {
-                body.extend(quote! {
-                    _comment_!(#content);
-                });
-            } else {
-                body.extend(TokenStream::from_str(content).unwrap());
-            }
+        body.extend(quote! {
+            #(#statements)*
+        });
+
+        if function.header.return_params.is_empty() {
+            body.extend(quote! {
+                Ok(())
+            });
         }
 
-        // TODO remove todo
         output.extend(quote! {
+            #comments
             #message
-            #function_name(#view #params) #return_params {
+            #function_name(#view #params) -> Result<#return_params, Error> {
                 #body
-                todo!()
             }
         });
 
-        if i < functions.len() - 1 {
-            output.extend(quote! {
-                _blank_!();
-            });
-        }
+        output.extend(quote! {
+            _blank_!();
+        });
     }
 
     output
+}
+
+impl ToTokens for Operation {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        stream.extend(match self {
+            Operation::Assign => quote!(=),
+            Operation::Equal => quote!(==),
+            Operation::GreaterThanEqual => quote!(>=),
+            Operation::GreaterThan => quote!(>),
+            Operation::LessThanEqual => quote!(<=),
+            Operation::LessThan => quote!(<),
+            Operation::LogicalAnd => quote!(&&),
+            Operation::LogicalOr => quote!(||),
+            Operation::Subtract => quote!(-),
+            Operation::Not => quote!(!),
+            Operation::NotEqual => quote!(!=),
+            Operation::Add => quote!(+),
+            Operation::True => quote!(),
+        })
+    }
 }
 
 /// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
@@ -454,7 +500,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
         // assemble function name
         function_name.extend(
-            TokenStream::from_str(&format!("fn {}", function.name.to_case(Case::Snake))).unwrap(),
+            TokenStream::from_str(&format!("fn {}", function.name.to_case(Snake))).unwrap(),
         );
 
         // assemble view
@@ -468,7 +514,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
         // assemble params
         for param in function.params.iter() {
-            let param_name = format_ident!("{}", param.name.to_case(Case::Snake));
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
             let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
             params.extend(quote! {
@@ -477,7 +523,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         }
 
         // assemble return params
-        if !function.return_params.is_empty() {
+        if function.return_params.len() > 0 {
             let mut params = TokenStream::new();
             for i in 0..function.return_params.len() {
                 let param_type =
@@ -493,19 +539,23 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
 
             if function.return_params.len() > 1 {
                 return_params.extend(quote! {
-                    -> (#params)
+                    (#params)
                 });
             } else {
                 return_params.extend(quote! {
-                    -> #params
+                    #params
                 });
             }
+        } else {
+            return_params.extend(quote! {
+                ()
+            });
         }
 
         output.extend(quote! {
             #function_comments
             #message
-            #function_name(#view #params) #return_params;
+            #function_name(#view #params) -> Result<#return_params, Error>;
         });
 
         if i < function_headers.len() - 1 {
@@ -527,5 +577,252 @@ fn signature() -> TokenStream {
         _comment_!(#version);
         _comment_!(#link);
         _blank_!();
+    }
+}
+
+impl ToTokens for Statement {
+    fn to_tokens(&self, stream: &mut TokenStream) {
+        match self {
+            Statement::AssemblyEnd => {}
+            Statement::Assign(left_raw, right_raw, operation_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                let operation = TokenStream::from_str(&operation_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left #operation #right;
+                })
+            }
+            Statement::AddAssign(left_raw, right_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left += #right;
+                })
+            }
+            Statement::Assembly(statements) => {
+                stream.extend(quote! {
+                        #(#statements)*
+                })
+            }
+            Statement::Catch(statements) => {
+                stream.extend(quote! {
+                    else if false {
+                        #(#statements)*
+                        _comment_!("<<< Please handle try/catch blocks manually");
+                    }
+                })
+            }
+            Statement::CatchEnd => {}
+            Statement::Comment(content) => {
+                stream.extend(quote! {
+                    _comment_!(#content);
+                })
+            }
+            Statement::Declaration(var_name_raw, var_type_raw, initial_value_maybe) => {
+                let var_name = format_ident!("{}", var_name_raw.to_case(Snake));
+                let var_type = TokenStream::from_str(var_type_raw).unwrap();
+                if let Some(initial_value_raw) = &initial_value_maybe {
+                    let initial_value =
+                        TokenStream::from_str(&initial_value_raw.to_string()).unwrap();
+                    stream.extend(quote!(let #var_name : #var_type = #initial_value;));
+                } else {
+                    stream.extend(quote!(let #var_name : #var_type;));
+                }
+            }
+            Statement::Else(statements) => {
+                stream.extend(quote! {
+                    else {
+                        #(#statements)*
+                    }
+                })
+            }
+            Statement::Emit(event_name_raw, args_raw) => {
+                let args_str = args_raw
+                    .iter()
+                    .map(|arg| arg.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                let args = TokenStream::from_str(args_str.as_str()).unwrap();
+                let event_name = TokenStream::from_str(event_name_raw).unwrap();
+                stream.extend(quote! {
+                    self.env().emit_event(#event_name {
+                        #args
+                    });
+                })
+            }
+            Statement::FunctionCall(expression_raw) => {
+                let expression =
+                    TokenStream::from_str(&expression_raw.to_string()).unwrap_or_else(|_| {
+                        panic!(
+                            "expression_raw: {expression_raw:?} to_string: {}",
+                            expression_raw.to_string()
+                        )
+                    });
+                stream.extend(quote! {
+                    #expression;
+                })
+            }
+            Statement::If(condition_raw, statements) => {
+                let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
+                let operation = condition_raw.operation;
+                let condition = if let Some(condition) = &condition_raw.right {
+                    let right = TokenStream::from_str(&condition.to_string()).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    if #condition {
+                        #(#statements)*
+                    }
+                })
+            }
+            Statement::IfEnd => {}
+            Statement::Raw(_) => {}
+            Statement::Require(condition_raw, error_raw) => {
+                let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
+                let operation = condition_raw.operation;
+                let error = TokenStream::from_str(&error_raw).unwrap();
+                let condition = if let Some(condition) = &condition_raw.right {
+                    let right = TokenStream::from_str(&condition.to_string()).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    if #condition {
+                        #error
+                    }
+                })
+            }
+            Statement::Return(output_raw) => {
+                let output = TokenStream::from_str(&output_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    return Ok(#output)
+                })
+            }
+            Statement::SubAssign(left_raw, right_raw) => {
+                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
+                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #left -= #right;
+                })
+            }
+            Statement::Try(statements) => {
+                stream.extend(quote! {
+                    _comment_!("Please handle try/catch blocks manually >>>");
+                    if true {
+                        #(#statements)*
+                    }
+                })
+            }
+            Statement::TryEnd => {}
+        }
+    }
+}
+
+impl ToString for Expression {
+    fn to_string(&self) -> String {
+        return match self {
+            Expression::Addition(left, right) => {
+                format!("{} + {}", left.to_string(), right.to_string())
+            }
+            Expression::Condition(condition_raw) => {
+                let left = condition_raw.left.to_string();
+                let operation = condition_raw.operation.to_string();
+                if let Some(right_raw) = &condition_raw.right {
+                    let right = right_raw.to_string();
+                    format!("{left} {operation} {right}")
+                } else {
+                    format!("{operation} {left}")
+                }
+            }
+            Expression::EnvCaller(selector) => {
+                format!("{}.env().caller()", selector.clone().unwrap())
+            }
+            Expression::FunctionCall(function_name_raw, args, selector, external) => {
+                format!(
+                    "{}.{}{}({})?",
+                    selector,
+                    if *external {
+                        String::from("")
+                    } else {
+                        String::from("_")
+                    },
+                    function_name_raw.to_case(Snake),
+                    args.iter()
+                        .map(|expression| expression.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            }
+            Expression::IsZero(expression) => {
+                format!("{}.is_zero()", expression.to_string())
+            }
+            Expression::Literal(content) => content.to_owned(),
+            Expression::Logical(left_raw, operation_raw, right_raw) => {
+                let left = left_raw.to_string();
+                let operation = operation_raw.to_string();
+                let right = right_raw.to_string();
+                format!("{left} {operation} {right}")
+            }
+            Expression::Member(expression_raw, selector_raw) => {
+                let expression = expression_raw.to_case(Snake);
+                if let Some(selector) = selector_raw {
+                    format!("{selector}.{expression}")
+                } else {
+                    expression
+                }
+            }
+            Expression::Mapping(name_raw, indices_raw, selector_raw, insert_maybe) => {
+                let indices = if indices_raw.len() > 1 {
+                    format!(
+                        "({})",
+                        indices_raw
+                            .iter()
+                            .map(|expr| expr.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )
+                } else {
+                    indices_raw.get(0).unwrap().to_string()
+                };
+                let name = name_raw.to_case(Snake);
+                let name_and_selector = if let Some(selector) = selector_raw {
+                    format!("{selector}.{name}")
+                } else {
+                    format!("{name}")
+                };
+                if let Some(insert_raw) = insert_maybe {
+                    let insert = insert_raw.to_string();
+                    format!("{name_and_selector}.insert(&{indices}, {insert})")
+                } else {
+                    format!("{name_and_selector}.get(&{indices}).unwrap()")
+                }
+            }
+            Expression::Subtraction(left, right) => {
+                format!("{} - {}", left.to_string(), right.to_string())
+            }
+            Expression::StructArg(field_name, value) => {
+                format!("{} : {}", field_name.to_case(Snake), value.to_string())
+            }
+            Expression::Ternary(condition_raw, if_true, if_false) => {
+                let left = condition_raw.left.to_string();
+                let operation = condition_raw.operation.to_string();
+                let condition = if let Some(right_raw) = &condition_raw.right {
+                    let right = right_raw.to_string();
+                    format!("{left} {operation} {right}")
+                } else {
+                    format!("{operation} {left}")
+                };
+                format!(
+                    "if {} {{{}}} else {{{}}}",
+                    condition,
+                    if_true.to_string(),
+                    if_false.to_string()
+                )
+            }
+            Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
+        }
     }
 }
