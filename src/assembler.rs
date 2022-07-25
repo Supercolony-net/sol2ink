@@ -636,6 +636,21 @@ impl ToTokens for Statement {
                     }
                 })
             }
+            Statement::ElseIf(condition_raw, statements) => {
+                let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
+                let operation = condition_raw.operation;
+                let condition = if let Some(condition) = &condition_raw.right {
+                    let right = TokenStream::from_str(&condition.to_string()).unwrap();
+                    quote!(#left #operation #right)
+                } else {
+                    quote!(#operation #left)
+                };
+                stream.extend(quote! {
+                    else if #condition {
+                        #(#statements)*
+                    }
+                })
+            }
             Statement::Emit(event_name_raw, args_raw) => {
                 let args_str = args_raw
                     .iter()

@@ -822,6 +822,18 @@ fn parse_statement(
             iterator,
             events,
         )
+    } else if REGEX_ELSE_IF.is_match(&line) {
+        stack.push_back(Block::ElseIf);
+        return parse_else_if(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
     } else if REGEX_UNCHECKED.is_match(&line) {
         stack.push_back(Block::Unchecked);
         return Statement::Comment(String::from("Please handle unchecked blocks manually >>>"))
@@ -835,6 +847,7 @@ fn parse_statement(
             Block::Unchecked => {}
             Block::If => return Statement::IfEnd,
             Block::Else => return Statement::IfEnd,
+            Block::ElseIf => return Statement::IfEnd,
             Block::Try => return Statement::TryEnd,
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
@@ -1114,6 +1127,42 @@ fn parse_else(
     );
 
     Statement::Else(statements)
+}
+
+fn parse_else_if(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    let condition_raw = capture_regex(&REGEX_IF, line, "condition");
+    let condition = parse_condition(
+        &condition_raw.unwrap(),
+        constructor,
+        false,
+        storage,
+        imports,
+        functions,
+    );
+    let mut statements = Vec::default();
+
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::IfEnd,
+    );
+
+    Statement::ElseIf(condition, statements)
 }
 
 fn parse_try(
