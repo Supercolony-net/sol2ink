@@ -188,7 +188,7 @@ pub enum Expression {
     Addition(Box<Expression>, Box<Expression>),
     Condition(Box<Condition>),
     EnvCaller(Option<String>),
-    FunctionCall(String, Vec<Expression>, String, bool),
+    FunctionCall(String, Vec<Expression>, Option<String>, bool),
     IsZero(Box<Expression>),
     Literal(String),
     Logical(Box<Expression>, Operation, Box<Expression>),

@@ -107,7 +107,7 @@ pub mod ierc_1155_metadata_uri {
         pub fn supports_interface(&self, interface_id: bytes4) -> Result<bool, Error> {
             return Ok(interface_id == type_of(ierc_1155).interface_id
                 || interface_id == type_of(ierc_1155_metadata_uri).interface_id
-                || super.supports_interface(interface_id))
+                || super.supports_interface(interface_id)?)
         }
 
         /// @dev See {IERC1155MetadataURI-uri}.
@@ -642,7 +642,7 @@ pub mod ierc_1155_metadata_uri {
 
         fn _as_singleton_array(&mut self, element: u128) -> Result<Vec<u128>, Error> {
             let array: Vec<u128> = vec![u_128::default(); _1];
-            // Sol2Ink Not Implemented yet: array[0] = element
+            array.insert(&0, element);
             return Ok(array)
         }
 

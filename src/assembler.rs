@@ -740,9 +740,14 @@ impl ToString for Expression {
             Expression::EnvCaller(selector) => {
                 format!("{}.env().caller()", selector.clone().unwrap())
             }
-            Expression::FunctionCall(function_name_raw, args, selector, external) => {
+            Expression::FunctionCall(function_name_raw, args, selector_maybe, external) => {
+                let selector = if let Some(selector) = selector_maybe {
+                    format!("{selector}.")
+                } else {
+                    String::from("")
+                };
                 format!(
-                    "{}.{}{}({})?",
+                    "{}{}{}({})?",
                     selector,
                     if *external {
                         String::from("")

@@ -102,7 +102,7 @@ lazy_static! {
     .unwrap();
     static ref REGEX_ASSIGN: Regex = Regex::new(
         r#"(?x)
-        ^\s*(?P<left>[^+-=><!]+?)\s*
+        ^\s*(?P<left>[0-9a-zA-Z_\[\].]+?)\s*
         (?P<operation>[+-])*=\s*
         (?P<right>.+)+?\s*$"#
     )
@@ -1379,6 +1379,27 @@ fn parse_member(
         let left = parse_member(&left_raw, constructor, storage, imports, functions);
         let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
+        match &right {
+            Expression::FunctionCall(function_name, expressions, _, external) => {
+                return Expression::WithSelector(
+                    Box::new(left),
+                    Box::new(Expression::FunctionCall(
+                        function_name.clone(),
+                        expressions.clone(),
+                        None,
+                        *external,
+                    )),
+                )
+            }
+            Expression::Member(member_name, _) => {
+                return Expression::WithSelector(
+                    Box::new(left),
+                    Box::new(Expression::Member(member_name.clone(), None)),
+                )
+            }
+            _ => {}
+        };
+
         return Expression::WithSelector(Box::new(left), Box::new(right))
     }
 
@@ -1489,7 +1510,7 @@ fn parse_function_call(
     return Expression::FunctionCall(
         function_name_raw.clone(),
         args,
-        selector!(constructor),
+        Some(selector!(constructor)),
         *functions.get(&function_name_raw).unwrap_or(&false),
     )
 }

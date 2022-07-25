@@ -96,7 +96,7 @@ pub mod erc_721 {
         pub fn supports_interface(&self, interface_id: bytes4) -> Result<bool, Error> {
             return Ok(interface_id == type_of(ierc_721).interface_id
                 || interface_id == type_of(ierc_721_metadata).interface_id
-                || self.supports_interface(interface_id)?)
+                || super.supports_interface(interface_id)?)
         }
 
         /// @dev See {IERC721-balanceOf}.
@@ -137,7 +137,7 @@ pub mod erc_721 {
         pub fn token_uri(&self, token_id: u128) -> Result<String, Error> {
             self._require_minted(token_id)?;
             let base_uri: String = base_uri();
-            return Ok(bytes(base_uri).length > 0)
+            return Ok(self._bytes(base_uri)?.length > 0)
         }
 
         /// @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
@@ -150,7 +150,7 @@ pub mod erc_721 {
         /// @dev See {IERC721-approve}.
         #[ink(message)]
         pub fn approve(&mut self, to: AccountId, token_id: u128) -> Result<(), Error> {
-            let owner: AccountId = erc_721.owner_of(token_id);
+            let owner: AccountId = erc_721.owner_of(token_id)?;
             if to == owner {
                 return Err(Error::Custom(String::from(
                     "ERC721: approval to current owner",
@@ -280,10 +280,10 @@ pub mod erc_721 {
         /// Requirements:
         /// - `tokenId` must exist.
         fn _is_approved_or_owner(&self, spender: AccountId, token_id: u128) -> Result<bool, Error> {
-            let owner: AccountId = erc_721.owner_of(token_id);
+            let owner: AccountId = erc_721.owner_of(token_id)?;
             return Ok((spender == owner
-                || self.is_approved_for_all(owner, spender)
-                || self.get_approved(token_id)? == spender)?)
+                || self.is_approved_for_all(owner, spender)?
+                || self.get_approved(token_id)? == spender))
         }
 
         /// @dev Safely mints `tokenId` and transfers it to `to`.
@@ -347,7 +347,7 @@ pub mod erc_721 {
         /// - `tokenId` must exist.
         /// Emits a {Transfer} event.
         fn _burn(&mut self, token_id: u128) -> Result<(), Error> {
-            let owner: AccountId = erc_721.owner_of(token_id);
+            let owner: AccountId = erc_721.owner_of(token_id)?;
             self._before_token_transfer(owner, ZERO_ADDRESS.into(), token_id)?;
             // Clear approvals
             // Sol2Ink Not Implemented yet: delete _tokenApprovals[tokenId]
@@ -375,7 +375,7 @@ pub mod erc_721 {
             to: AccountId,
             token_id: u128,
         ) -> Result<(), Error> {
-            if erc_721.owner_of(token_id) != from {
+            if erc_721.owner_of(token_id)? != from {
                 return Err(Error::Custom(String::from(
                     "ERC721: transfer from incorrect owner",
                 )))
@@ -403,7 +403,7 @@ pub mod erc_721 {
         fn _approve(&mut self, to: AccountId, token_id: u128) -> Result<(), Error> {
             self.token_approvals.insert(&token_id, to);
             self.env().emit_event(Approval {
-                owner: erc_721.owner_of(token_id),
+                owner: erc_721.owner_of(token_id)?,
                 approved: to,
                 token_id,
             });
@@ -457,7 +457,7 @@ pub mod erc_721 {
                 if true {
                     // try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 retval) {
                     return Ok(retval == ierc_721_receiver.on_erc_721_received.selector)
-                } else {
+                } else if false {
                     // catch (bytes reason) {
                     if reason.length == 0 {
                         self._revert("ERC721: transfer to non ERC721Receiver implementer")?;
@@ -467,8 +467,8 @@ pub mod erc_721 {
                         // revert(add(32, reason), mload(reason))
                         // <<< Please handle assembly blocks manually
                     }
+                    // <<< Please handle try/catch blocks manually
                 }
-                // <<< Please handle try/catch blocks manually
             } else {
                 return Ok(true)
             }
