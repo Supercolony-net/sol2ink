@@ -32,37 +32,37 @@ contract example {
 		return (pid == first_pid && state != State.Zombie);
 	}
 
-	// // Returning a constant does not access storage at all, so
-	// // function can be declared pure
-	// function systemd_pid() public pure returns (uint32) {
-	// 	// Note that cast is required to change sign from
-	// 	// int32 to uint32
-	// 	return uint32(first_pid);
-	// }
+	// Returning a constant does not access storage at all, so
+	// function can be declared pure
+	function systemd_pid() public pure returns (uint32) {
+		// Note that cast is required to change sign from
+		// int32 to uint32
+		return uint32(first_pid);
+	}
 
-	// /// Convert celcius to fahrenheit
-	// function celcius2fahrenheit(int32 celcius) pure public returns (int32) {
-	// 	int32 fahrenheit = celcius * 9 / 5 + 32;
+	/// Convert celcius to fahrenheit
+	function celcius2fahrenheit(int32 celcius) pure public returns (int32) {
+		int32 fahrenheit = celcius * 9 / 5 + 32;
 
-	// 	return fahrenheit;
-	// }
+		return fahrenheit;
+	}
 
-	// /// Convert fahrenheit to celcius
-	// function fahrenheit2celcius(int32 fahrenheit) pure public returns (int32) {
-	// 	return (fahrenheit - 32) * 5 / 9;
-	// }
+	/// Convert fahrenheit to celcius
+	function fahrenheit2celcius(int32 fahrenheit) pure public returns (int32) {
+		return (fahrenheit - 32) * 5 / 9;
+	}
 
-	// /// is this number a power-of-two
-	// function is_power_of_2(uint n) pure public returns (bool) {
-	// 	return n != 0 && (n & (n - 1)) == 0;
-	// }
+	/// is this number a power-of-two
+	function is_power_of_2(uint n) pure public returns (bool) {
+		return n != 0 && (n & (n - 1)) == 0;
+	}
 
-	// /// calculate the population count (number of set bits) using Brian Kerningham's way
-	// function population_count(uint n) pure public returns (uint count) {
-	// 	for (count = 0; n != 0; count++) {
-	// 		n &= (n - 1);
-	// 	}
-	// }
+	/// calculate the population count (number of set bits) using Brian Kerningham's way
+	function population_count(uint n) pure public returns (uint count) {
+		for (count = 0; n != 0; count++) {
+			n &= (n - 1);
+		}
+	}
 
 	// /// calculate the power of base to exp
 	// function power(uint base, uint exp) pure public returns (uint) {

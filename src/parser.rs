@@ -169,14 +169,18 @@ lazy_static! {
         map.insert(String::from("+"), Operation::Add);
         map.insert(String::from("-"), Operation::Subtract);
         map.insert(String::from("="), Operation::Assign);
-        map.insert(String::from(">>"), Operation::Assign);
-        map.insert(String::from("<<"), Operation::Assign);
+        map.insert(String::from(">>"), Operation::ShiftRight);
+        map.insert(String::from("<<"), Operation::ShiftLeft);
         map.insert(String::from("+="), Operation::AddAssign);
         map.insert(String::from("-="), Operation::SubtractAssign);
         map.insert(String::from("*"), Operation::Mul);
         map.insert(String::from("*="), Operation::MulAssign);
         map.insert(String::from("/"), Operation::Div);
         map.insert(String::from("/="), Operation::DivAssign);
+        map.insert(String::from("&"), Operation::BitwiseAnd);
+        map.insert(String::from("|"), Operation::BitwiseOr);
+        map.insert(String::from("&="), Operation::AndAssign);
+        map.insert(String::from("|="), Operation::OrAssign);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -223,7 +227,7 @@ lazy_static! {
     static ref REGEX_ASSIGN: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<left>[0-9a-zA-Z_\[\].]+?)\s*
-        (?P<operation>[+\-*/]*=)\s*
+        (?P<operation>[+\-*/&|]*=)\s*
         (?P<right>.+)+?\s*$"#
     )
     .unwrap();
@@ -1491,7 +1495,7 @@ fn parse_member(
     let regex_logical = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*(?P<operation>[\|\&][\|\&])\s*
+        \s*(?P<operation>[|&]+)\s*
         (?P<right>.+)
         \s*$"#,
     )

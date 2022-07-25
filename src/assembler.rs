@@ -491,6 +491,7 @@ impl ToTokens for Operation {
         stream.extend(match self {
             Operation::Add => quote!(+),
             Operation::AddAssign => quote!(+=),
+            Operation::AndAssign => quote!(&=),
             Operation::Assign => quote!(=),
             Operation::BitwiseAnd => quote!(&),
             Operation::BitwiseOr => quote!(|),
@@ -507,6 +508,7 @@ impl ToTokens for Operation {
             Operation::MulAssign => quote!(*=),
             Operation::Not => quote!(!),
             Operation::NotEqual => quote!(!=),
+            Operation::OrAssign => quote!(|=),
             Operation::ShiftLeft => quote!(<<),
             Operation::ShiftRight => quote!(>>),
             Operation::Subtract => quote!(-),
