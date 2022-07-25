@@ -171,6 +171,12 @@ lazy_static! {
         map.insert(String::from("="), Operation::Assign);
         map.insert(String::from(">>"), Operation::Assign);
         map.insert(String::from("<<"), Operation::Assign);
+        map.insert(String::from("+="), Operation::AddAssign);
+        map.insert(String::from("-="), Operation::SubtractAssign);
+        map.insert(String::from("*"), Operation::Mul);
+        map.insert(String::from("*="), Operation::MulAssign);
+        map.insert(String::from("/"), Operation::Div);
+        map.insert(String::from("/="), Operation::DivAssign);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -217,7 +223,7 @@ lazy_static! {
     static ref REGEX_ASSIGN: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<left>[0-9a-zA-Z_\[\].]+?)\s*
-        (?P<operation>[+-])*=\s*
+        (?P<operation>[+\-*/]*=)\s*
         (?P<right>.+)+?\s*$"#
     )
     .unwrap();
@@ -1046,9 +1052,16 @@ fn parse_assign(
     let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
     return if let Expression::Mapping(name, indices, selector, None) = left {
-        let right_mapping = match operation {
-            Operation::Add => {
-                Some(Box::new(Expression::Addition(
+        let converted_operation = match operation {
+            Operation::AddAssign => Operation::Add,
+            Operation::MulAssign => Operation::Mul,
+            Operation::DivAssign => Operation::Div,
+            Operation::SubtractAssign => Operation::Subtract,
+            _ => operation,
+        };
+        let right_mapping = match converted_operation {
+            Operation::Add | Operation::Mul | Operation::Div | Operation::Subtract => {
+                Some(Box::new(Expression::Arithmetic(
                     Box::new(Expression::Mapping(
                         name.clone(),
                         indices.clone(),
@@ -1056,17 +1069,7 @@ fn parse_assign(
                         None,
                     )),
                     Box::new(right),
-                )))
-            }
-            Operation::Subtract => {
-                Some(Box::new(Expression::Subtraction(
-                    Box::new(Expression::Mapping(
-                        name.clone(),
-                        indices.clone(),
-                        selector.clone(),
-                        None,
-                    )),
-                    Box::new(right),
+                    converted_operation,
                 )))
             }
             _ => Some(Box::new(right)),
@@ -1466,72 +1469,23 @@ fn parse_member(
         return Expression::Member(format!("type_of({rest}"), None)
     }
 
-    let regex_subtraction = Regex::new(
+    let regex_arithmetic = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*\-[^=\-]\s*
-        (?P<right>.+)
+        \s*(?P<operation>[/+\-*]{1})
+        [^=\-]\s*(?P<right>.+)
         \s*$"#,
     )
     .unwrap();
-    if regex_subtraction.is_match(raw) {
-        let left_raw = capture_regex(&regex_subtraction, raw, "left").unwrap();
-        let right_raw = capture_regex(&regex_subtraction, raw, "right").unwrap();
+    if regex_arithmetic.is_match(raw) {
+        let left_raw = capture_regex(&regex_arithmetic, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_arithmetic, raw, "right").unwrap();
+        let operation_raw = capture_regex(&regex_arithmetic, raw, "operation").unwrap();
         let left = parse_member(&left_raw, constructor, storage, imports, functions);
         let right = parse_member(&right_raw, constructor, storage, imports, functions);
+        let operation = *OPERATIONS.get(&operation_raw).unwrap();
 
-        return Expression::Subtraction(Box::new(left), Box::new(right))
-    }
-
-    let regex_addition = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)
-        \s*\+[^=\-]\s*
-        (?P<right>.+)
-        \s*$"#,
-    )
-    .unwrap();
-    if regex_addition.is_match(raw) {
-        let left_raw = capture_regex(&regex_addition, raw, "left").unwrap();
-        let right_raw = capture_regex(&regex_addition, raw, "right").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions);
-        let right = parse_member(&right_raw, constructor, storage, imports, functions);
-
-        return Expression::Addition(Box::new(left), Box::new(right))
-    }
-
-    let regex_mul = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)
-        \s*\*[^=\-]\s*
-        (?P<right>.+)
-        \s*$"#,
-    )
-    .unwrap();
-    if regex_mul.is_match(raw) {
-        let left_raw = capture_regex(&regex_mul, raw, "left").unwrap();
-        let right_raw = capture_regex(&regex_mul, raw, "right").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions);
-        let right = parse_member(&right_raw, constructor, storage, imports, functions);
-
-        return Expression::Mul(Box::new(left), Box::new(right))
-    }
-
-    let regex_div = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)
-        \s*/[^=\-]\s*
-        (?P<right>.+)
-        \s*$"#,
-    )
-    .unwrap();
-    if regex_div.is_match(raw) {
-        let left_raw = capture_regex(&regex_div, raw, "left").unwrap();
-        let right_raw = capture_regex(&regex_div, raw, "right").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions);
-        let right = parse_member(&right_raw, constructor, storage, imports, functions);
-
-        return Expression::Div(Box::new(left), Box::new(right))
+        return Expression::Arithmetic(Box::new(left), Box::new(right), operation)
     }
 
     let regex_logical = Regex::new(

@@ -490,9 +490,12 @@ impl ToTokens for Operation {
     fn to_tokens(&self, stream: &mut TokenStream) {
         stream.extend(match self {
             Operation::Add => quote!(+),
+            Operation::AddAssign => quote!(+=),
             Operation::Assign => quote!(=),
             Operation::BitwiseAnd => quote!(&),
             Operation::BitwiseOr => quote!(|),
+            Operation::Div => quote!(/),
+            Operation::DivAssign => quote!(/=),
             Operation::Equal => quote!(==),
             Operation::GreaterThanEqual => quote!(>=),
             Operation::GreaterThan => quote!(>),
@@ -500,11 +503,14 @@ impl ToTokens for Operation {
             Operation::LessThan => quote!(<),
             Operation::LogicalAnd => quote!(&&),
             Operation::LogicalOr => quote!(||),
+            Operation::Mul => quote!(*),
+            Operation::MulAssign => quote!(*=),
             Operation::Not => quote!(!),
             Operation::NotEqual => quote!(!=),
             Operation::ShiftLeft => quote!(<<),
             Operation::ShiftRight => quote!(>>),
             Operation::Subtract => quote!(-),
+            Operation::SubtractAssign => quote!(-=),
             Operation::True => quote!(),
         })
     }
@@ -784,14 +790,13 @@ impl ToTokens for Statement {
 impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
-            Expression::Addition(left, right) => {
-                format!("{} + {}", left.to_string(), right.to_string())
-            }
-            Expression::Mul(left, right) => {
-                format!("{} * {}", left.to_string(), right.to_string())
-            }
-            Expression::Div(left, right) => {
-                format!("{} / {}", left.to_string(), right.to_string())
+            Expression::Arithmetic(left, right, operation) => {
+                format!(
+                    "{} {} {}",
+                    left.to_string(),
+                    operation.to_string(),
+                    right.to_string()
+                )
             }
             Expression::Cast(unique_cast, cast_type, expression) => {
                 if *unique_cast {
@@ -877,9 +882,6 @@ impl ToString for Expression {
                 } else {
                     format!("{name_and_selector}.get(&{indices}).unwrap()")
                 }
-            }
-            Expression::Subtraction(left, right) => {
-                format!("{} - {}", left.to_string(), right.to_string())
             }
             Expression::StructArg(field_name, value) => {
                 format!("{} : {}", field_name.to_case(Snake), value.to_string())

@@ -131,9 +131,12 @@ pub struct Condition {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Operation {
     Add,
+    AddAssign,
     Assign,
     BitwiseAnd,
     BitwiseOr,
+    Div,
+    DivAssign,
     Equal,
     GreaterThanEqual,
     GreaterThan,
@@ -141,9 +144,12 @@ pub enum Operation {
     LessThan,
     LogicalAnd,
     LogicalOr,
+    Mul,
+    MulAssign,
     Not,
     NotEqual,
     Subtract,
+    SubtractAssign,
     ShiftLeft,
     ShiftRight,
     True,
@@ -152,10 +158,13 @@ pub enum Operation {
 impl ToString for Operation {
     fn to_string(&self) -> String {
         return match self {
-            Operation::Add => String::from("+="),
+            Operation::Add => String::from("+"),
+            Operation::AddAssign => String::from("+="),
             Operation::Assign => String::from("="),
             Operation::BitwiseAnd => String::from("&"),
             Operation::BitwiseOr => String::from("|"),
+            Operation::Div => String::from("/"),
+            Operation::DivAssign => String::from("/="),
             Operation::Equal => String::from("=="),
             Operation::GreaterThanEqual => String::from(">="),
             Operation::GreaterThan => String::from(">"),
@@ -163,7 +172,10 @@ impl ToString for Operation {
             Operation::LessThan => String::from("<"),
             Operation::LogicalAnd => String::from("&&"),
             Operation::LogicalOr => String::from("||"),
-            Operation::Subtract => String::from("-="),
+            Operation::Mul => String::from("*"),
+            Operation::MulAssign => String::from("*="),
+            Operation::Subtract => String::from("-"),
+            Operation::SubtractAssign => String::from("-="),
             Operation::Not => String::from("!"),
             Operation::NotEqual => String::from("!="),
             Operation::ShiftLeft => String::from("<<"),
@@ -196,9 +208,7 @@ impl Operation {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
-    Addition(Box<Expression>, Box<Expression>),
-    Mul(Box<Expression>, Box<Expression>),
-    Div(Box<Expression>, Box<Expression>),
+    Arithmetic(Box<Expression>, Box<Expression>, Operation),
     Cast(bool, String, Box<Expression>),
     Condition(Box<Condition>),
     EnvCaller(Option<String>),
@@ -213,7 +223,6 @@ pub enum Expression {
         Option<String>,
         Option<Box<Expression>>,
     ),
-    Subtraction(Box<Expression>, Box<Expression>),
     StructArg(String, Box<Expression>),
     Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
     WithSelector(Box<Expression>, Box<Expression>),
