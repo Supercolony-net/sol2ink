@@ -17,6 +17,7 @@ pub mod example {
     ///Constants
     pub const bad_state: State = State.Zombie;
     pub const first_pid: i32 = 1;
+
     ///Process state
     pub enum State {
         Running,
@@ -51,7 +52,8 @@ pub mod example {
         ///can be declared view
         #[ink(message)]
         pub fn is_zombie_reaper(&self) -> Result<bool, Error> {
-            // Sol2Ink Not Implemented yet: /* must be pid 1 and not zombie ourselves */ return (pid == first_pid && state != State.Zombie)
+            // must be pid 1 and not zombie ourselves *
+            return Ok((pid == self.first_pid && self.state != state.zombie))
         }
 
     }

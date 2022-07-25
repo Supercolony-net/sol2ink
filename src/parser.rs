@@ -233,6 +233,9 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
 
     while let Some(ch) = chars.next() {
         if ch == SLASH && asterisk {
+            if buffer.trim().len() > 0 {
+                comments.push(format!(" {}", buffer.trim()));
+            }
             break
         } else {
             asterisk = false;
@@ -666,6 +669,11 @@ fn parse_function(
             if next_maybe == Some(SLASH) {
                 action = Action::Comment;
                 buffer.clear();
+            } else if next_maybe == Some(ASTERISK) {
+                for comment in parse_multiline_comment(chars).iter() {
+                    statements.push(Statement::Raw(format!("// {comment}")));
+                }
+                continue
             }
             buffer.push(ch);
             buffer.push(next_maybe.unwrap());
@@ -1616,7 +1624,6 @@ fn parse_condition(
             imports,
             functions,
         );
-        println!("operation: {}", tokens[1]);
         let operation = *OPERATIONS.get(&tokens[1]).unwrap();
         (Some(right), operation)
     } else {
