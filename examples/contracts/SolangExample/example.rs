@@ -33,6 +33,37 @@ pub mod example {
         StateCount,
     }
 
+    ///cards
+    pub enum suit {
+        club,
+        diamonds,
+        hearts,
+        spades,
+    }
+
+    pub enum value {
+        two,
+        three,
+        four,
+        five,
+        six,
+        seven,
+        eight,
+        nine,
+        ten,
+        jack,
+        queen,
+        king,
+        ace,
+    }
+
+    #[derive(Default, Encode, Decode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct card {
+        v: value,
+        s: suit,
+    }
+
     #[ink(storage)]
     #[derive(Default, SpreadAllocate)]
     pub struct example {
@@ -132,6 +163,77 @@ pub mod example {
             }
             // Sol2Ink Not Implemented yet End Block here
             return Ok(self._state(n_ % _uint_64(state.state_count))?)
+        }
+
+        ///Overloaded function with different return value!
+        fn _get_pid_state(&self) -> Result<u32, Error> {
+            return Ok(self.reaped)
+        }
+
+        #[ink(message)]
+        pub fn reap_processes(&mut self) -> Result<(), Error> {
+            let n: u32 = 0;
+            // Sol2Ink Not Implemented yet: while (n < 100) {
+            if self._get_pid_state(n)? == state.zombie {
+                // reap!
+                self.reaped += 1;
+            }
+            // Sol2Ink Not Implemented yet: n++
+            // Sol2Ink Not Implemented yet End Block here
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn run_queue(&self) -> Result<u16, Error> {
+            let count: u16 = 0;
+            // no initializer means its 0.
+            let n: u32 = 0;
+            // Sol2Ink Not Implemented yet: do {
+            if self._get_pid_state(n)? == state.waiting {
+                // Sol2Ink Not Implemented yet: count++
+            }
+            // Sol2Ink Not Implemented yet End Block here
+            // while (++n < 1000)
+            // Sol2Ink Not Implemented yet: 
+            return Ok(count)
+        }
+
+        ///card card1 = card(value.two, suit.club);
+        ///card card2 = card({s: suit.club, v: value.two});
+        ///This function does a lot of copying
+        #[ink(message)]
+        pub fn set_card_1(&mut self, c: card) -> Result<card, Error> {
+            previous = card_1;
+            card_1 = c;
+        }
+
+        ///return the ace of spades
+        #[ink(message)]
+        pub fn ace_of_spaces(&self) -> Result<card, Error> {
+            // return card({
+            // Sol2Ink Not Implemented yet: s: suit.spades, v: value.ace }
+            // Sol2Ink Not Implemented yet: )
+            // Sol2Ink Not Implemented yet: 
+        }
+
+        ///score card
+        #[ink(message)]
+        pub fn score_card(&self, c: card) -> Result<u32, Error> {
+            if c.s == suit.hearts {
+                if c.v == value.ace {
+                    score = 14;
+                }
+                if c.v == value.king {
+                    score = 13;
+                }
+                if c.v == value.queen {
+                    score = 12;
+                }
+                if c.v == value.jack {
+                    score = 11;
+                }
+            }
+            // all others score 0
         }
 
     }

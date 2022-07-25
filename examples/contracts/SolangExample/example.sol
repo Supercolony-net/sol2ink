@@ -101,76 +101,76 @@ contract example {
 		return State(n % uint64(State.StateCount));
 	}
 
-	// /// Overloaded function with different return value!
-	// function get_pid_state() view private returns (uint32) {
-	// 	return reaped;
-	// }
+	/// Overloaded function with different return value!
+	function get_pid_state() view private returns (uint32) {
+		return reaped;
+	}
 
-	// function reap_processes() public {
-	// 	uint32 n = 0;
+	function reap_processes() public {
+		uint32 n = 0;
 
-	// 	while (n < 100) {
-	// 		if (get_pid_state(n) == State.Zombie) {
-	// 			// reap!
-	// 			reaped += 1;
-	// 		}
-	// 		n++;
-	// 	}
-	// }
+		while (n < 100) {
+			if (get_pid_state(n) == State.Zombie) {
+				// reap!
+				reaped += 1;
+			}
+			n++;
+		}
+	}
 
-	// function run_queue() public pure returns (uint16) {
-	// 	uint16 count = 0;
-	// 	// no initializer means its 0.
-	// 	uint32 n=0;
+	function run_queue() public pure returns (uint16) {
+		uint16 count = 0;
+		// no initializer means its 0.
+		uint32 n=0;
 
-	// 	do {
-	// 		if (get_pid_state(n) == State.Waiting) {
-	// 			count++;
-	// 		}
-	// 	}
-	// 	while (++n < 1000);
+		do {
+			if (get_pid_state(n) == State.Waiting) {
+				count++;
+			}
+		}
+		// while (++n < 1000);
 
-	// 	return count;
-	// }
+		return count;
+	}
 
-	// // cards
-	// enum suit { club, diamonds, hearts, spades }
-	// enum value { two, three, four, five, six, seven, eight, nine, ten, jack, queen, king, ace }
-	// struct card {
-	// 	value v;
-	// 	suit s;
-	// }
+	// cards
+	enum suit { club, diamonds, hearts, spades }
+	enum value { two, three, four, five, six, seven, eight, nine, ten, jack, queen, king, ace }
+	struct card {
+		value v;
+		suit s;
+	}
 
 	// card card1 = card(value.two, suit.club);
 	// card card2 = card({s: suit.club, v: value.two});
 
-	// // This function does a lot of copying
-	// function set_card1(card memory c) public returns (card memory previous) {
-	// 	previous = card1;
-	// 	card1 = c;
-	// }
+	// This function does a lot of copying
+	function set_card1(card memory c) public returns (card memory previous) {
+		previous = card1;
+		card1 = c;
+	}
 
-	// /// return the ace of spades
-	// function ace_of_spaces() public pure returns (card memory) {
-	// 	return card({s: suit.spades, v: value.ace });
-	// }
+	/// return the ace of spades
+	function ace_of_spaces() public pure returns (card memory) {
+		// return card({s: suit.spades, v: value.ace });
+	}
 
-	// /// score card
-	// function score_card(card memory c) public pure returns (uint32 score) {
-	// 	if (c.s == suit.hearts) {
-	// 		if (c.v == value.ace) {
-	// 			score = 14;
-	// 		}
-	// 		if (c.v == value.king) {
-	// 			score = 13;
-	// 		}
-	// 		if (c.v == value.queen) {
-	// 			score = 12;
-	// 		}
-	// 		if (c.v == value.jack) {
-	// 			score = 11;
-	// 		}
-	// 	}
-	// 	// all others score 0
-	// }
+	/// score card
+	function score_card(card memory c) public pure returns (uint32 score) {
+		if (c.s == suit.hearts) {
+			if (c.v == value.ace) {
+				score = 14;
+			}
+			if (c.v == value.king) {
+				score = 13;
+			}
+			if (c.v == value.queen) {
+				score = 12;
+			}
+			if (c.v == value.jack) {
+				score = 11;
+			}
+		}
+		// all others score 0
+	}
 }
