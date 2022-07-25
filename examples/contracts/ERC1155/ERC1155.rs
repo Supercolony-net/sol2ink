@@ -105,7 +105,7 @@ pub mod ierc_1155_metadata_uri {
 
         /// @dev See {IERC165-supportsInterface}.
         #[ink(message)]
-        pub fn supports_interface(&self, interface_id: bytes4) -> Result<bool, Error> {
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> Result<bool, Error> {
             return Ok(interface_id == type_of(ierc_1155).interface_id
                 || interface_id == type_of(ierc_1155_metadata_uri).interface_id
                 || super.supports_interface(interface_id)?)

@@ -94,7 +94,7 @@ pub mod erc_721 {
 
         /// @dev See {IERC165-supportsInterface}.
         #[ink(message)]
-        pub fn supports_interface(&self, interface_id: bytes4) -> Result<bool, Error> {
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> Result<bool, Error> {
             return Ok(interface_id == type_of(ierc_721).interface_id
                 || interface_id == type_of(ierc_721_metadata).interface_id
                 || super.supports_interface(interface_id)?)
@@ -138,7 +138,7 @@ pub mod erc_721 {
         pub fn token_uri(&self, token_id: u128) -> Result<String, Error> {
             self._require_minted(token_id)?;
             let base_uri: String = base_uri();
-            return Ok(self._bytes(base_uri)?.length > 0)
+            return Ok(Vec::<u8>::from(base_uri).length > 0)
         }
 
         /// @dev Base URI for computing {tokenURI}. If set, the resulting URI for each

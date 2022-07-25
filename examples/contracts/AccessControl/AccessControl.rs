@@ -115,7 +115,7 @@ pub mod access_control {
 
         /// @dev See {IERC165-supportsInterface}.
         #[ink(message)]
-        pub fn supports_interface(&self, interface_id: bytes4) -> Result<bool, Error> {
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> Result<bool, Error> {
             return Ok(interface_id == type_of(i_access_control).interface_id
                 || super.supports_interface(interface_id)?)
         }

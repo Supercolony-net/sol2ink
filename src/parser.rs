@@ -34,14 +34,125 @@ macro_rules! selector {
 const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
-    static ref TYPES: HashMap<String, String> = {
+    static ref TYPES: HashMap<&'static str, (&'static str, Option<&'static str>, Option<&'static str>)> = {
         let mut map = HashMap::new();
-        map.insert("mapping".to_string(), "Mapping".to_string());
-        map.insert("uint".to_string(), "u128".to_string());
-        map.insert("string".to_string(), "String".to_string());
-        map.insert("uint32".to_string(), "u32".to_string());
-        map.insert("uint256".to_string(), "u128".to_string());
-        map.insert("address".to_string(), "AccountId".to_string());
+        map.insert(
+            "address",
+            ("AccountId", None, Some("brush::traits::AccountId")),
+        );
+        map.insert("bool", ("bool", None, None));
+        map.insert("bytes1", ("[u8; 1]", None, None));
+        map.insert("bytes2", ("[u8; 2]", None, None));
+        map.insert("bytes3", ("[u8; 3]", None, None));
+        map.insert("bytes4", ("[u8; 4]", None, None));
+        map.insert("bytes5", ("[u8; 5]", None, None));
+        map.insert("bytes6", ("[u8; 6]", None, None));
+        map.insert("bytes7", ("[u8; 7]", None, None));
+        map.insert("bytes8", ("[u8; 8]", None, None));
+        map.insert("bytes9", ("[u8; 9]", None, None));
+        map.insert("bytes10", ("[u8; 10]", None, None));
+        map.insert("bytes11", ("[u8; 11]", None, None));
+        map.insert("bytes12", ("[u8; 12]", None, None));
+        map.insert("bytes13", ("[u8; 13]", None, None));
+        map.insert("bytes14", ("[u8; 14]", None, None));
+        map.insert("bytes15", ("[u8; 15]", None, None));
+        map.insert("bytes16", ("[u8; 16]", None, None));
+        map.insert("bytes17", ("[u8; 17]", None, None));
+        map.insert("bytes18", ("[u8; 18]", None, None));
+        map.insert("bytes19", ("[u8; 19]", None, None));
+        map.insert("bytes20", ("[u8; 20]", None, None));
+        map.insert("bytes21", ("[u8; 21]", None, None));
+        map.insert("bytes22", ("[u8; 22]", None, None));
+        map.insert("bytes23", ("[u8; 23]", None, None));
+        map.insert("bytes24", ("[u8; 24]", None, None));
+        map.insert("bytes25", ("[u8; 25]", None, None));
+        map.insert("bytes26", ("[u8; 26]", None, None));
+        map.insert("bytes27", ("[u8; 27]", None, None));
+        map.insert("bytes28", ("[u8; 28]", None, None));
+        map.insert("bytes29", ("[u8; 29]", None, None));
+        map.insert("bytes30", ("[u8; 30]", None, None));
+        map.insert("bytes31", ("[u8; 31]", None, None));
+        map.insert("bytes32", ("[u8; 32]", None, None));
+        map.insert(
+            "bytes",
+            (
+                "Vec<u8>",
+                Some("Vec::<u8>::from"),
+                Some("ink::prelude::vec::Vec"),
+            ),
+        );
+        map.insert("byte", ("u8", None, None));
+        map.insert("int8", ("i8", None, None));
+        map.insert("int16", ("i16", None, None));
+        map.insert("int24", ("i32", None, None));
+        map.insert("int32", ("i32", None, None));
+        map.insert("int40", ("i64", None, None));
+        map.insert("int48", ("i64", None, None));
+        map.insert("int56", ("i64", None, None));
+        map.insert("int64", ("i64", None, None));
+        map.insert("int72", ("i128", None, None));
+        map.insert("int80", ("i128", None, None));
+        map.insert("int88", ("i128", None, None));
+        map.insert("int96", ("i128", None, None));
+        map.insert("int104", ("i128", None, None));
+        map.insert("int112", ("i128", None, None));
+        map.insert("int120", ("i128", None, None));
+        map.insert("int128", ("i128", None, None));
+        map.insert("int136", ("i128", None, None));
+        map.insert("int144", ("i128", None, None));
+        map.insert("int152", ("i128", None, None));
+        map.insert("int160", ("i128", None, None));
+        map.insert("int168", ("i128", None, None));
+        map.insert("int176", ("i128", None, None));
+        map.insert("int184", ("i128", None, None));
+        map.insert("int192", ("i128", None, None));
+        map.insert("int200", ("i128", None, None));
+        map.insert("int208", ("i128", None, None));
+        map.insert("int216", ("i128", None, None));
+        map.insert("int224", ("i128", None, None));
+        map.insert("int232", ("i128", None, None));
+        map.insert("int240", ("i128", None, None));
+        map.insert("int248", ("i128", None, None));
+        map.insert("int256", ("i128", None, None));
+        map.insert("int", ("i128", None, None));
+        map.insert("mapping", ("Mapping", None, None));
+        map.insert(
+            "string",
+            ("String", None, Some("ink::prelude::string::String")),
+        );
+        map.insert("uint8", ("u8", None, None));
+        map.insert("uint16", ("u16", None, None));
+        map.insert("uint24", ("u32", None, None));
+        map.insert("uint32", ("u32", None, None));
+        map.insert("uint40", ("u64", None, None));
+        map.insert("uint48", ("u64", None, None));
+        map.insert("uint56", ("u64", None, None));
+        map.insert("uint64", ("u64", None, None));
+        map.insert("uint72", ("u128", None, None));
+        map.insert("uint80", ("u128", None, None));
+        map.insert("uint88", ("u128", None, None));
+        map.insert("uint96", ("u128", None, None));
+        map.insert("uint104", ("u128", None, None));
+        map.insert("uint112", ("u128", None, None));
+        map.insert("uint120", ("u128", None, None));
+        map.insert("uint128", ("u128", None, None));
+        map.insert("uint136", ("u128", None, None));
+        map.insert("uint144", ("u128", None, None));
+        map.insert("uint152", ("u128", None, None));
+        map.insert("uint160", ("u128", None, None));
+        map.insert("uint168", ("u128", None, None));
+        map.insert("uint176", ("u128", None, None));
+        map.insert("uint184", ("u128", None, None));
+        map.insert("uint192", ("u128", None, None));
+        map.insert("uint200", ("u128", None, None));
+        map.insert("uint208", ("u128", None, None));
+        map.insert("uint216", ("u128", None, None));
+        map.insert("uint224", ("u128", None, None));
+        map.insert("uint232", ("u128", None, None));
+        map.insert("uint240", ("u128", None, None));
+        map.insert("uint248", ("u128", None, None));
+        map.insert("uint256", ("u128", None, None));
+        map.insert("uint", ("u128", None, None));
         map
     };
     static ref OPERATIONS: HashMap<String, Operation> = {
@@ -1548,17 +1659,33 @@ fn parse_function_call(
     let mut open_parentheses = 0;
     let mut close_parenthesis = 0;
 
-    if TYPES.contains_key(&function_name_raw) {
-        return Expression::Cast(
-            TYPES.get(&function_name_raw).unwrap().clone(),
-            Box::new(parse_member(
-                &args_raw,
-                constructor,
-                storage,
-                imports,
-                functions,
-            )),
-        )
+    if TYPES.contains_key(&function_name_raw.as_str()) {
+        let the_type = TYPES.get(&function_name_raw.as_str()).unwrap();
+        if let Some(unique_cast) = the_type.1 {
+            return Expression::Cast(
+                true,
+                unique_cast.to_string(),
+                Box::new(parse_member(
+                    &args_raw,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                )),
+            )
+        } else {
+            return Expression::Cast(
+                false,
+                the_type.0.to_string(),
+                Box::new(parse_member(
+                    &args_raw,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                )),
+            )
+        }
     }
 
     while let Some(ch) = chars.next() {
@@ -1961,19 +2088,13 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
     let output_type = match convert_int(no_array_arg_type.to_string()).as_str() {
         str if str.contains("uint") => str.replace("uint", "u"),
         str if str.contains("int") => str.replace("int", "i"),
-        "bytes" => {
-            imports.insert(String::from("use ink::prelude::vec::Vec;\n"));
-            String::from("Vec<u8>")
+        str if TYPES.contains_key(str) => {
+            let the_type = TYPES.get(str).unwrap();
+            if let Some(import) = the_type.2 {
+                imports.insert(format!("use {import};\n"));
+            }
+            the_type.0.to_string()
         }
-        "address" => {
-            imports.insert(String::from("use brush::traits::AccountId;\n"));
-            String::from("AccountId")
-        }
-        "string" => {
-            imports.insert(String::from("use ink::prelude::string::String;\n"));
-            String::from("String")
-        }
-        "bytes32" => String::from("[u8; 32]"),
         _ => arg_type,
     };
     return if is_vec {
