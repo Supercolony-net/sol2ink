@@ -146,12 +146,12 @@ pub mod access_control {
         /// /^AccessControl: account (0x[0-9a-f]{40}) is missing role (0x[0-9a-f]{64})$/
         fn _check_role(&self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             if !self.has_role(role, account)? {
-                self._revert(self._string(abi._encode_packed(
+                self._revert(abi._encode_packed(
                     "AccessControl: account ",
                     strings._to_hex_string(account)?,
                     " is missing role ",
-                    strings._to_hex_string(self._uint_256(role)?, 32)?,
-                )?)?)?;
+                    strings._to_hex_string(role as u128, 32)?,
+                )? as String)?;
             }
             Ok(())
         }

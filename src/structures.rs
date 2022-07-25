@@ -197,6 +197,7 @@ impl Operation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expression {
     Addition(Box<Expression>, Box<Expression>),
+    Cast(String, Box<Expression>),
     Condition(Box<Condition>),
     EnvCaller(Option<String>),
     FunctionCall(String, Vec<Expression>, Option<String>, bool),

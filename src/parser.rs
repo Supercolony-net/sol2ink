@@ -39,6 +39,7 @@ lazy_static! {
         map.insert("mapping".to_string(), "Mapping".to_string());
         map.insert("uint".to_string(), "u128".to_string());
         map.insert("string".to_string(), "String".to_string());
+        map.insert("uint32".to_string(), "u32".to_string());
         map.insert("uint256".to_string(), "u128".to_string());
         map.insert("address".to_string(), "AccountId".to_string());
         map
@@ -1547,6 +1548,19 @@ fn parse_function_call(
     let mut open_parentheses = 0;
     let mut close_parenthesis = 0;
 
+    if TYPES.contains_key(&function_name_raw) {
+        return Expression::Cast(
+            TYPES.get(&function_name_raw).unwrap().clone(),
+            Box::new(parse_member(
+                &args_raw,
+                constructor,
+                storage,
+                imports,
+                functions,
+            )),
+        )
+    }
+
     while let Some(ch) = chars.next() {
         match ch {
             PARENTHESIS_OPEN => {
@@ -1740,7 +1754,7 @@ fn parse_function_parameters(
 /// returns 0. external 1. view 2. payable
 fn parse_function_attributes(attributes: &String) -> (bool, bool, bool) {
     let external = attributes.contains("external") || attributes.contains("public");
-    let view = attributes.contains("view");
+    let view = attributes.contains("view") || attributes.contains("pure");
     let payable = attributes.contains("payable");
 
     (external, view, payable)
@@ -1916,29 +1930,27 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
         } else {
             (arg_type.as_str(), false)
         };
-    if arg_type.substring(0, 7) == "mapping" {
+    let regex_mapping: Regex = Regex::new(
+        r#"(?x)^\s*mapping\(
+                (?P<type_from>.+?)=>
+                (?P<type_to>.+)
+                \)\s*$"#,
+    )
+    .unwrap();
+    if regex_mapping.is_match(&arg_type) {
         imports.insert(String::from("use ink_storage::Mapping;\n"));
-        let type_args = split(
-            &arg_type.substring(8, arg_type.len() - 1).to_string(),
-            "=>",
-            None,
-        );
-        let to = convert_variable_type(
-            {
-                let mut arg_type_no_braces = type_args.last().unwrap().to_owned();
-                arg_type_no_braces.remove_matches(")");
-                arg_type_no_braces
-            },
-            imports,
-        );
-        let mut from_vec: Vec<String> =
-            vec![convert_variable_type(type_args[0].to_owned(), imports)];
-        for i in 1..type_args.len() - 1 {
-            from_vec.push(convert_variable_type(
-                type_args[i].substring(8, type_args[i].len()).to_owned(),
-                imports,
-            ));
+        let mut from_raw = capture_regex(&regex_mapping, &arg_type, "type_from").unwrap();
+        let mut to_raw = capture_regex(&regex_mapping, &arg_type, "type_to").unwrap();
+
+        let mut from_vec = vec![convert_variable_type(from_raw, imports)];
+        while regex_mapping.is_match(&to_raw) {
+            from_raw = capture_regex(&regex_mapping, &to_raw, "type_from").unwrap();
+            to_raw = capture_regex(&regex_mapping, &to_raw, "type_to").unwrap();
+            from_vec.push(convert_variable_type(from_raw, imports));
         }
+
+        let to = convert_variable_type(to_raw, imports);
+
         let from = if from_vec.len() > 1 {
             format!("({})", from_vec.join(", "))
         } else {
@@ -1973,36 +1985,33 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
 }
 
 fn convert_int(arg_type: String) -> String {
-    if arg_type.contains("int") {
-        let int_size = if arg_type == "int" || arg_type == "uint" {
+    let regex_int: Regex = Regex::new(
+        r#"(?x)^\s*
+        (?P<int_type>u*int)
+        (?P<int_size>[0-9]*)
+        \s*$"#,
+    )
+    .unwrap();
+
+    let int_type_raw = capture_regex(&regex_int, &arg_type, "int_type");
+    if let Some(int_type) = int_type_raw {
+        let int_size_raw = capture_regex(&regex_int, &arg_type, "int_size").unwrap();
+        let int_size_original = if int_size_raw.is_empty() {
             128
         } else {
-            let original_size = arg_type
-                .substring(
-                    if arg_type.substring(0, 3) == "int" {
-                        3
-                    } else {
-                        4
-                    },
-                    arg_type.len(),
-                )
-                .parse::<i32>()
-                .unwrap();
-
-            match original_size {
-                i if i <= 8 => 8,
-                i if i <= 16 => 16,
-                i if i <= 32 => 32,
-                i if i <= 64 => 64,
-                _ => 128,
-            }
+            int_size_raw.parse::<i32>().unwrap()
         };
-        return if arg_type.contains("uint") {
-            format!("uint{}", int_size)
-        } else {
-            format!("int{}", int_size)
-        }
+        let int_size = match int_size_original {
+            i if i <= 8 => 8,
+            i if i <= 16 => 16,
+            i if i <= 32 => 32,
+            i if i <= 64 => 64,
+            _ => 128,
+        };
+
+        return format!("{int_type}{int_size}")
     }
+
     arg_type
 }
 

@@ -641,7 +641,7 @@ pub mod ierc_1155_metadata_uri {
             Ok(())
         }
 
-        fn _as_singleton_array(&mut self, element: u128) -> Result<Vec<u128>, Error> {
+        fn _as_singleton_array(&self, element: u128) -> Result<Vec<u128>, Error> {
             let array: Vec<u128> = vec![u_128::default(); _1];
             array.insert(&0, element);
             return Ok(array)

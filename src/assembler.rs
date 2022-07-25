@@ -787,6 +787,9 @@ impl ToString for Expression {
             Expression::Addition(left, right) => {
                 format!("{} + {}", left.to_string(), right.to_string())
             }
+            Expression::Cast(cast_type, expression) => {
+                format!("{} as {cast_type}", expression.to_string())
+            }
             Expression::Condition(condition_raw) => {
                 let left = condition_raw.left.to_string();
                 let operation = condition_raw.operation.to_string();
