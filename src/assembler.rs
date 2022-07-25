@@ -787,6 +787,12 @@ impl ToString for Expression {
             Expression::Addition(left, right) => {
                 format!("{} + {}", left.to_string(), right.to_string())
             }
+            Expression::Mul(left, right) => {
+                format!("{} * {}", left.to_string(), right.to_string())
+            }
+            Expression::Div(left, right) => {
+                format!("{} / {}", left.to_string(), right.to_string())
+            }
             Expression::Cast(unique_cast, cast_type, expression) => {
                 if *unique_cast {
                     format!("{cast_type}({})", expression.to_string())

@@ -1500,6 +1500,40 @@ fn parse_member(
         return Expression::Addition(Box::new(left), Box::new(right))
     }
 
+    let regex_mul = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*\*[^=\-]\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_mul.is_match(raw) {
+        let left_raw = capture_regex(&regex_mul, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_mul, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::Mul(Box::new(left), Box::new(right))
+    }
+
+    let regex_div = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*/[^=\-]\s*
+        (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_div.is_match(raw) {
+        let left_raw = capture_regex(&regex_div, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_div, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::Div(Box::new(left), Box::new(right))
+    }
+
     let regex_logical = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
