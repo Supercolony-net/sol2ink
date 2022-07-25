@@ -64,15 +64,15 @@ contract example {
 		}
 	}
 
-	// /// calculate the power of base to exp
-	// function power(uint base, uint exp) pure public returns (uint) {
-	// 	return base ** exp;
-	// }
+	/// calculate the power of base to exp
+	function power(uint base, uint exp) pure public returns (uint) {
+		return base ** exp;
+	}
 
-	// /// returns true if the address is 0
-	// function is_address_zero(address a) pure public returns (bool) {
-	// 	return a == address(0);
-	// }
+	/// returns true if the address is 0
+	function is_address_zero(address a) pure public returns (bool) {
+		return a == address(0);
+	}
 
 	// /// reverse the bytes in an array of 8 (endian swap)
 	// function byte8reverse(bytes8 input) public pure returns (bytes8 out) {

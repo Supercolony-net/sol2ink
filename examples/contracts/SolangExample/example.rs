@@ -7,6 +7,11 @@
 ///example.sol
 #[brush::contract]
 pub mod example {
+    use brush::traits::{
+        AccountId,
+        AcountIdExt,
+        ZERO_ADDRESS,
+    };
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -90,6 +95,18 @@ pub mod example {
             // Sol2Ink Not Implemented yet: for(count = 0 n != 0 count++){
             n &= (n - 1);
             // Sol2Ink Not Implemented yet End Block here
+        }
+
+        ///calculate the power of base to exp
+        #[ink(message)]
+        pub fn power(&self, base: u128, exp: u128) -> Result<u128, Error> {
+            return Ok(base.pow(exp as u32))
+        }
+
+        ///returns true if the address is 0
+        #[ink(message)]
+        pub fn is_address_zero(&self, a: AccountId) -> Result<bool, Error> {
+            return Ok(a.is_zero())
         }
 
     }

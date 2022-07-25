@@ -181,6 +181,7 @@ lazy_static! {
         map.insert(String::from("|"), Operation::BitwiseOr);
         map.insert(String::from("&="), Operation::AndAssign);
         map.insert(String::from("|="), Operation::OrAssign);
+        map.insert(String::from("**"), Operation::Pow);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -1476,9 +1477,9 @@ fn parse_member(
     let regex_arithmetic = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*(?P<operation>[/+\-*]{1})
-        [^=\-]\s*(?P<right>.+)
-        \s*$"#,
+        \s*(?P<operation>[/+\-*]+)
+        [^=]\s*(?P<right>.+)
+        \s*$"#
     )
     .unwrap();
     if regex_arithmetic.is_match(raw) {

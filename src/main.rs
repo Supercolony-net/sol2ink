@@ -90,6 +90,14 @@ mod test {
     }
 
     #[test]
+    fn solang_example() {
+        assert_eq!(
+            run(&"examples/contracts/SolangExample/example.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
     fn ierc20() {
         assert_eq!(
             run(&"examples/interfaces/IERC20/IERC20.sol".to_string()),

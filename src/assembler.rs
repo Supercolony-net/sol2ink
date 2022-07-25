@@ -509,6 +509,7 @@ impl ToTokens for Operation {
             Operation::Not => quote!(!),
             Operation::NotEqual => quote!(!=),
             Operation::OrAssign => quote!(|=),
+            Operation::Pow => quote!(),
             Operation::ShiftLeft => quote!(<<),
             Operation::ShiftRight => quote!(>>),
             Operation::Subtract => quote!(-),
@@ -793,12 +794,16 @@ impl ToString for Expression {
     fn to_string(&self) -> String {
         return match self {
             Expression::Arithmetic(left, right, operation) => {
-                format!(
-                    "{} {} {}",
-                    left.to_string(),
-                    operation.to_string(),
-                    right.to_string()
-                )
+                return if operation == &Operation::Pow {
+                    format!("{}.pow({} as u32)", left.to_string(), right.to_string())
+                } else {
+                    format!(
+                        "{} {} {}",
+                        left.to_string(),
+                        operation.to_string(),
+                        right.to_string()
+                    )
+                }
             }
             Expression::Cast(unique_cast, cast_type, expression) => {
                 if *unique_cast {
