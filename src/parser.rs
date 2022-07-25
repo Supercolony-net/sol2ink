@@ -181,6 +181,8 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
                 if buffer == "pragma" || buffer == "import" {
                     read_until(&mut chars, vec![SEMICOLON]);
                     buffer = String::new();
+                } else if buffer == "abstract" {
+                    buffer.clear();
                 } else if buffer == "contract" {
                     let contract = parse_contract(&mut chars, comments)?;
                     return Ok((Some(contract), None))
@@ -290,6 +292,7 @@ fn parse_contract(
     let mut functions = Vec::<Function>::new();
     let mut imports = HashSet::<String>::new();
     let mut constructor = Function::default();
+    let mut modifiers = Vec::<Modifier>::new();
 
     while let Some(ch) = chars.next() {
         match ch {
@@ -343,6 +346,10 @@ fn parse_contract(
                     buffer.clear();
                 } else if buffer.trim() == "using" {
                     read_until(chars, vec![SEMICOLON]);
+                    buffer.clear();
+                } else if buffer.trim() == "modifier" {
+                    modifiers.push(parse_modifier(chars, &comments)?);
+                    comments.clear();
                     buffer.clear();
                 } else if ch == SEMICOLON {
                     fields.push(parse_contract_field(
@@ -662,6 +669,73 @@ fn parse_function(
     })
 }
 
+fn parse_modifier(chars: &mut Chars, comments: &Vec<String>) -> Result<Modifier, ParserError> {
+    // TODO: Remove duplicity
+    let mut open_braces = 0;
+    let mut close_braces = 0;
+    let mut statements = Vec::<Statement>::new();
+    let mut buffer = String::new();
+    let mut action = Action::None;
+    statements.push(Statement::Comment(String::from(
+        "Sol2Ink Parsing modifiers not implemented yet",
+    )));
+
+    while let Some(ch) = chars.next() {
+        if ch == CURLY_OPEN {
+            open_braces += 1;
+        } else if ch == CURLY_CLOSE {
+            close_braces += 1
+        }
+
+        if ch == NEW_LINE {
+            if action == Action::AssemblyStart {
+                action = Action::Assembly;
+            } else if action == Action::Comment || action == Action::Assembly {
+                statements.push(Statement::Comment(buffer.clone()));
+                if action == Action::Comment {
+                    action = Action::None;
+                }
+                buffer.clear();
+            } else {
+                buffer.push(SPACE);
+            }
+        } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
+            buffer.push(ch);
+            if open_braces == close_braces {
+                break
+            }
+            statements.push(Statement::Raw(buffer.clone()));
+            if action == Action::Assembly {
+                action = Action::None;
+            }
+            buffer.clear();
+        } else if ch == SLASH {
+            let next_maybe = chars.next();
+            if next_maybe == Some(SLASH) {
+                action = Action::Comment;
+                buffer.clear();
+            }
+            buffer.push(ch);
+            buffer.push(next_maybe.unwrap());
+        } else {
+            buffer.push(ch);
+            if trim(&buffer) == "assembly" {
+                action = Action::AssemblyStart;
+            } else if trim(&buffer) == "for" {
+                open_braces += 1;
+                let for_block = read_until(chars, vec!['{']);
+                statements.push(Statement::Comment(format!("for{for_block}{{")));
+                buffer.clear();
+            }
+        }
+    }
+
+    Ok(Modifier {
+        statements,
+        comments: comments.clone(),
+    })
+}
+
 fn parse_statements(
     function: &mut Function,
     storage: &HashMap<String, String>,
@@ -886,7 +960,7 @@ fn parse_emit(
                     args.push(Expression::StructArg(
                         events
                             .get(&event_name_raw)
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("Event {event_name_raw} not defined"))
                             .fields
                             .get(event_count)
                             .unwrap()
@@ -1204,58 +1278,6 @@ fn parse_member(
         return Expression::Member(format!("type_of({rest}"), None)
     }
 
-    let regex_mapping = Regex::new(
-        r#"(?x)
-        ^\s*(?P<mapping_name>.+?)\s*
-        (?P<index>(\[\s*.+\s*\]))+?
-        \s*$"#,
-    )
-    .unwrap();
-    if regex_mapping.is_match(raw) {
-        let mapping_name_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
-        let indices_raw = capture_regex(&regex_mapping, raw, "index").unwrap();
-        let mut indices = Vec::<Expression>::new();
-        let mut chars = indices_raw.chars();
-        let mut buffer = String::new();
-        let mut open_braces = 0;
-        let mut close_braces = 0;
-
-        while let Some(ch) = chars.next() {
-            match ch {
-                BRACKET_OPEN => {
-                    if open_braces > close_braces {
-                        buffer.push(ch)
-                    }
-                    open_braces += 1;
-                }
-                BRACKET_CLOSE => {
-                    close_braces += 1;
-                    if open_braces == close_braces {
-                        indices.push(parse_member(
-                            &buffer,
-                            constructor,
-                            storage,
-                            imports,
-                            functions,
-                        ));
-                        buffer.clear();
-                    } else {
-                        buffer.push(ch)
-                    }
-                }
-                _ => buffer.push(ch),
-            }
-        }
-
-        let selector = get_selector(storage, constructor, &mapping_name_raw);
-
-        return Expression::Mapping(mapping_name_raw, indices, selector, None)
-    }
-
-    if REGEX_FUNCTION_CALL.is_match(raw) {
-        return parse_function_call(raw, constructor, storage, imports, functions)
-    }
-
     let regex_subtraction = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
@@ -1345,6 +1367,67 @@ fn parse_member(
         let if_true = parse_member(&if_true_raw, constructor, storage, imports, functions);
         let if_false = parse_member(&if_false_raw, constructor, storage, imports, functions);
         return Expression::Ternary(Box::new(condition), Box::new(if_true), Box::new(if_false))
+    }
+    if REGEX_FUNCTION_CALL.is_match(raw) {
+        return parse_function_call(raw, constructor, storage, imports, functions)
+    }
+
+    let regex_with_selector = Regex::new(r#"(?x)^\s*(?P<left>.+?)\.(?P<right>.+?)\s*$"#).unwrap();
+    if regex_with_selector.is_match(raw) {
+        let left_raw = capture_regex(&regex_with_selector, raw, "left").unwrap();
+        let right_raw = capture_regex(&regex_with_selector, raw, "right").unwrap();
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        return Expression::WithSelector(Box::new(left), Box::new(right))
+    }
+
+    let regex_mapping = Regex::new(
+        r#"(?x)
+        ^\s*(?P<mapping_name>.+?)\s*
+        (?P<index>(\[\s*.+\s*\]))+?
+        \s*$"#,
+    )
+    .unwrap();
+    if regex_mapping.is_match(raw) {
+        let mapping_name_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
+        let indices_raw = capture_regex(&regex_mapping, raw, "index").unwrap();
+        let mut indices = Vec::<Expression>::new();
+        let mut chars = indices_raw.chars();
+        let mut buffer = String::new();
+        let mut open_braces = 0;
+        let mut close_braces = 0;
+
+        while let Some(ch) = chars.next() {
+            match ch {
+                BRACKET_OPEN => {
+                    if open_braces > close_braces {
+                        buffer.push(ch)
+                    }
+                    open_braces += 1;
+                }
+                BRACKET_CLOSE => {
+                    close_braces += 1;
+                    if open_braces == close_braces {
+                        indices.push(parse_member(
+                            &buffer,
+                            constructor,
+                            storage,
+                            imports,
+                            functions,
+                        ));
+                        buffer.clear();
+                    } else {
+                        buffer.push(ch)
+                    }
+                }
+                _ => buffer.push(ch),
+            }
+        }
+
+        let selector = get_selector(storage, constructor, &mapping_name_raw);
+
+        return Expression::Mapping(mapping_name_raw, indices, selector, None)
     }
 
     let selector = get_selector(storage, constructor, &raw);
@@ -1659,7 +1742,8 @@ fn parse_struct(
     chars: &mut Chars,
     comments: &Vec<String>,
 ) -> Struct {
-    let struct_raw = read_until(chars, vec![CURLY_CLOSE]);
+    let mut struct_raw = read_until(chars, vec![CURLY_CLOSE]);
+    struct_raw = struct_raw.replace(" => ", "=>");
     let split_brace = split(&struct_raw, "{", None);
     let fields = split(&split_brace[1].trim().to_string(), ";", None);
     let struct_name = split_brace[0].to_owned();

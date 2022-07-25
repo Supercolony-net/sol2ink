@@ -35,6 +35,11 @@ pub struct ContractField {
     pub comments: Vec<String>,
 }
 
+pub struct Modifier {
+    pub statements: Vec<Statement>,
+    pub comments: Vec<String>,
+}
+
 #[derive(Clone)]
 pub struct Event {
     pub name: String,
@@ -197,6 +202,7 @@ pub enum Expression {
     Subtraction(Box<Expression>, Box<Expression>),
     StructArg(String, Box<Expression>),
     Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
+    WithSelector(Box<Expression>, Box<Expression>),
     ZeroAddressInto,
 }
 

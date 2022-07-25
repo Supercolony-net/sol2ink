@@ -822,6 +822,11 @@ impl ToString for Expression {
                     if_false.to_string()
                 )
             }
+            Expression::WithSelector(left_raw, right_raw) => {
+                let left = left_raw.to_string();
+                let right = right_raw.to_string();
+                format!("{left}.{right}",)
+            }
             Expression::ZeroAddressInto => String::from("ZERO_ADDRESS.into()"),
         }
     }

@@ -60,7 +60,7 @@ contract ERC721 {
         return
             interfaceId == type(IERC721).interfaceId ||
             interfaceId == type(IERC721Metadata).interfaceId ||
-            supportsInterface(interfaceId);
+            super.supportsInterface(interfaceId);
     }
 
     /**
