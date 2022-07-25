@@ -57,6 +57,8 @@ lazy_static! {
         map.insert(String::from("+"), Operation::Add);
         map.insert(String::from("-"), Operation::Subtract);
         map.insert(String::from("="), Operation::Assign);
+        map.insert(String::from(">>"), Operation::Assign);
+        map.insert(String::from("<<"), Operation::Assign);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -504,21 +506,38 @@ pub fn parse_interface(
 ///
 /// returns the representation of contract field as `ContractField` struct
 fn parse_contract_field(
-    line: String,
+    line_raw: String,
     imports: &mut HashSet<String>,
     comments: &Vec<String>,
 ) -> ContractField {
-    let tokens = split(&line.replace(" => ", "=>"), " ", None);
-    let name_index = if tokens.len() > 2 { 2 } else { 1 };
+    let mut line = line_raw.replace(" => ", "=>");
+    line = line.replace(" ( ", "(");
+    line = line.replace(" ) ", ")");
+    let regex: Regex = Regex::new(
+        r#"(?x)^\s*
+        (?P<field_type>.+?)\s
+        (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*)*)*
+        (?P<field_name>.+?)\s*
+        (=\s*(?P<initial_value>.+)\s*)*
+        ;\s*$"#,
+    )
+    .unwrap();
 
-    let field_type = convert_variable_type(tokens[0].to_owned(), imports);
-    let name = tokens[name_index]
-        .substring(0, tokens[name_index].len() - 1)
-        .to_owned();
+    let field_type_raw = capture_regex(&regex, &line, "field_type").unwrap();
+    let attributes_raw = capture_regex(&regex, &line, "attributes");
+    let field_name = capture_regex(&regex, &line, "field_name").unwrap();
+    let initial_value = capture_regex(&regex, &line, "initial_value");
+    let constant = attributes_raw
+        .unwrap_or(String::from(""))
+        .contains("constant");
+    let field_type = convert_variable_type(field_type_raw, imports);
+
     ContractField {
         field_type,
-        name,
+        name: field_name,
         comments: comments.clone(),
+        initial_value,
+        constant,
     }
 }
 
@@ -1597,6 +1616,7 @@ fn parse_condition(
             imports,
             functions,
         );
+        println!("operation: {}", tokens[1]);
         let operation = *OPERATIONS.get(&tokens[1]).unwrap();
         (Some(right), operation)
     } else {

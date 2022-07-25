@@ -51,6 +51,7 @@ pub mod access_control {
         Custom(String),
     }
 
+    pub const default_admin_role: [u8; 32] = 0x00;
     /// @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`
     /// `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite
     /// {RoleAdminChanged} not being emitted signaling this.
@@ -103,7 +104,6 @@ pub mod access_control {
     #[derive(Default, SpreadAllocate)]
     pub struct AccessControl {
         roles: Mapping<[u8; 32], RoleData>,
-        constan: [u8; 32],
     }
 
     impl AccessControl {

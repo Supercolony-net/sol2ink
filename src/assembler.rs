@@ -20,8 +20,9 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let events = assemble_events(contract.events);
     let enums = assemble_enums(contract.enums);
     let structs = assemble_structs(contract.structs);
-    let storage = assemble_storage(&contract.name, contract.fields);
-    let constructor = assemble_constructor(contract.constructor);
+    let storage = assemble_storage(&contract.name, &contract.fields);
+    let constructor = assemble_constructor(contract.constructor, &contract.fields);
+    let constants = assemble_constants(contract.fields);
     let functions = assemble_functions(contract.functions);
     let comments = assemble_contract_comments(contract.comments);
 
@@ -42,6 +43,7 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
             }
             _blank_!();
 
+            #constants
             #events
             #enums
             #structs
@@ -200,13 +202,13 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 }
 
 /// Assembles ink! storage struct from the vec of parsed ContractField structs and return it as a vec of Strings
-fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> TokenStream {
+fn assemble_storage(contract_name: &String, fields: &Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
     let contract_name = format_ident!("{}", contract_name);
     let mut storage_fields = TokenStream::new();
 
     // assemble storage fields
-    for field in fields.iter() {
+    for field in fields.iter().filter(|field| !field.constant) {
         let field_name = format_ident!("{}", field.name.to_case(Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
 
@@ -228,6 +230,28 @@ fn assemble_storage(contract_name: &String, fields: Vec<ContractField>) -> Token
         }
         _blank_!();
     });
+
+    output
+}
+
+fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
+    let mut output = TokenStream::new();
+
+    // assemble storage fields
+    for field in fields.iter().filter(|field| field.constant) {
+        let field_name = format_ident!("{}", field.name.to_case(Snake));
+        let field_type = TokenStream::from_str(&field.field_type).unwrap();
+        let initial_value = TokenStream::from_str(&field.initial_value.clone().unwrap()).unwrap();
+
+        for comment in field.comments.iter() {
+            output.extend(quote! {
+                #[doc = #comment]
+            });
+        }
+        output.extend(quote! {
+            pub const #field_name: #field_type = #initial_value;
+        });
+    }
 
     output
 }
@@ -277,7 +301,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 }
 
 /// Assembles ink! cosntructor from the parsed Function struct and return it as a vec of Strings
-fn assemble_constructor(constructor: Function) -> TokenStream {
+fn assemble_constructor(constructor: Function, fields: &Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
     let mut comments = TokenStream::new();
@@ -306,6 +330,19 @@ fn assemble_constructor(constructor: Function) -> TokenStream {
     body.extend(quote! {
         #(#constructor_functions)*
     });
+
+    for field in fields
+        .iter()
+        .filter(|field| field.initial_value.is_some() && !field.constant)
+    {
+        let field_name = format_ident!("{}", field.name.to_case(Snake));
+        let intial_value =
+            TokenStream::from_str(field.initial_value.clone().unwrap().as_str()).unwrap();
+
+        body.extend(quote! {
+            self.#field_name = #intial_value;
+        });
+    }
 
     output.extend(quote! {
         #comments
@@ -448,7 +485,10 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
 impl ToTokens for Operation {
     fn to_tokens(&self, stream: &mut TokenStream) {
         stream.extend(match self {
+            Operation::Add => quote!(+),
             Operation::Assign => quote!(=),
+            Operation::BitwiseAnd => quote!(&),
+            Operation::BitwiseOr => quote!(|),
             Operation::Equal => quote!(==),
             Operation::GreaterThanEqual => quote!(>=),
             Operation::GreaterThan => quote!(>),
@@ -456,10 +496,11 @@ impl ToTokens for Operation {
             Operation::LessThan => quote!(<),
             Operation::LogicalAnd => quote!(&&),
             Operation::LogicalOr => quote!(||),
-            Operation::Subtract => quote!(-),
             Operation::Not => quote!(!),
             Operation::NotEqual => quote!(!=),
-            Operation::Add => quote!(+),
+            Operation::ShiftLeft => quote!(<<),
+            Operation::ShiftRight => quote!(>>),
+            Operation::Subtract => quote!(-),
             Operation::True => quote!(),
         })
     }

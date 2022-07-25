@@ -33,6 +33,8 @@ pub struct ContractField {
     pub field_type: String,
     pub name: String,
     pub comments: Vec<String>,
+    pub initial_value: Option<String>,
+    pub constant: bool,
 }
 
 pub struct Modifier {
@@ -130,6 +132,8 @@ pub struct Condition {
 pub enum Operation {
     Add,
     Assign,
+    BitwiseAnd,
+    BitwiseOr,
     Equal,
     GreaterThanEqual,
     GreaterThan,
@@ -140,13 +144,18 @@ pub enum Operation {
     Not,
     NotEqual,
     Subtract,
+    ShiftLeft,
+    ShiftRight,
     True,
 }
 
 impl ToString for Operation {
     fn to_string(&self) -> String {
         return match self {
+            Operation::Add => String::from("+="),
             Operation::Assign => String::from("="),
+            Operation::BitwiseAnd => String::from("&"),
+            Operation::BitwiseOr => String::from("|"),
             Operation::Equal => String::from("=="),
             Operation::GreaterThanEqual => String::from(">="),
             Operation::GreaterThan => String::from(">"),
@@ -157,7 +166,8 @@ impl ToString for Operation {
             Operation::Subtract => String::from("-="),
             Operation::Not => String::from("!"),
             Operation::NotEqual => String::from("!="),
-            Operation::Add => String::from("+="),
+            Operation::ShiftLeft => String::from("<<"),
+            Operation::ShiftRight => String::from(">>"),
             Operation::True => String::from(""),
         }
     }
@@ -166,7 +176,8 @@ impl ToString for Operation {
 impl Operation {
     pub fn negate(&self) -> Operation {
         match self {
-            Operation::Assign => Operation::Assign,
+            Operation::BitwiseAnd => Operation::BitwiseOr,
+            Operation::BitwiseOr => Operation::BitwiseAnd,
             Operation::Equal => Operation::NotEqual,
             Operation::GreaterThanEqual => Operation::LessThan,
             Operation::GreaterThan => Operation::LessThanEqual,
@@ -175,11 +186,10 @@ impl Operation {
             // TODO a and b = neg(a) or neg (b)
             Operation::LogicalAnd => Operation::LogicalOr,
             Operation::LogicalOr => Operation::LogicalAnd,
-            Operation::Subtract => Operation::Add,
             Operation::Not => Operation::True,
             Operation::NotEqual => Operation::Equal,
             Operation::Add => Operation::Subtract,
-            Operation::True => Operation::Not,
+            _ => Operation::Not,
         }
     }
 }
