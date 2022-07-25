@@ -253,6 +253,10 @@ fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
         });
     }
 
+    output.extend(quote! {
+        _blank_!();
+    });
+
     output
 }
 

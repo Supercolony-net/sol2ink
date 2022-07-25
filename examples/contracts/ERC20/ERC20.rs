@@ -44,6 +44,7 @@ pub mod erc_20 {
         Custom(String),
     }
 
+
     /// @dev Emitted when `value` tokens are moved from one account (`from`) to
     /// another (`to`).
     /// Note that `value` may be zero.

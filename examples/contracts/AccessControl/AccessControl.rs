@@ -52,6 +52,7 @@ pub mod access_control {
     }
 
     pub const default_admin_role: [u8; 32] = 0x00;
+
     /// @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`
     /// `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite
     /// {RoleAdminChanged} not being emitted signaling this.

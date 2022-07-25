@@ -33,6 +33,7 @@ pub mod ierc_1155_metadata_uri {
         Custom(String),
     }
 
+
     /// @dev Emitted when `value` tokens of token type `id` are transferred from `from` to `to` by `operator`.
     #[ink(event)]
     pub struct TransferSingle {

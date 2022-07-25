@@ -32,6 +32,7 @@ pub mod erc_721 {
         Custom(String),
     }
 
+
     /// @dev Emitted when `tokenId` token is transferred from `from` to `to`.
     #[ink(event)]
     pub struct Transfer {
