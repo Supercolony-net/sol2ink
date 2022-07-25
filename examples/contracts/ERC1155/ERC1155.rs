@@ -190,7 +190,7 @@ pub mod ierc_1155_metadata_uri {
             amount: u128,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            if from != self.env().caller() {
+            if from != self.env().caller() || self.is_approved_for_all(from, msg.sender)? {
                 return Err(Error::Custom(String::from(
                     "ERC1155: caller is not token owner nor approved",
                 )))
@@ -209,7 +209,7 @@ pub mod ierc_1155_metadata_uri {
             amounts: Vec<u128>,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            if from != self.env().caller() {
+            if from != self.env().caller() || self.is_approved_for_all(from, msg.sender)? {
                 return Err(Error::Custom(String::from(
                     "ERC1155: caller is not token owner nor approved",
                 )))

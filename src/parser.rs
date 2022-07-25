@@ -182,6 +182,7 @@ lazy_static! {
         map.insert(String::from("&="), Operation::AndAssign);
         map.insert(String::from("|="), Operation::OrAssign);
         map.insert(String::from("**"), Operation::Pow);
+        map.insert(String::from("%"), Operation::Modulo);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -237,6 +238,14 @@ lazy_static! {
         ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
         \s*(?P<args>.+)\s*
         \)\s*$"#,
+    )
+    .unwrap();
+    static ref REGEX_BOOLEAN: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<left>.+?)
+        \s*(?P<operation>[!=><]=*)\s*
+        (?P<right>.+)
+        \s*$"#,
     )
     .unwrap();
 }
@@ -1224,9 +1233,9 @@ fn parse_if(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    let condition_raw = capture_regex(&REGEX_IF, line, "condition");
+    let condition_raw = capture_regex(&REGEX_IF, line, "condition").unwrap();
     let condition = parse_condition(
-        &condition_raw.unwrap(),
+        &condition_raw,
         constructor,
         false,
         storage,
@@ -1526,19 +1535,6 @@ fn parse_member(
         return Expression::Logical(Box::new(left), operation, Box::new(right))
     }
 
-    let regex_boolean = Regex::new(
-        r#"(?x)
-        ^\s*(?P<left>.+?)
-        \s*[!=><]+=*\s*
-        (?P<right>.+)
-        \s*$"#,
-    )
-    .unwrap();
-    if regex_boolean.is_match(raw) {
-        let condition = parse_condition(raw, constructor, false, storage, imports, functions);
-        return Expression::Condition(Box::new(condition))
-    }
-
     let regex_ternary = Regex::new(
         r#"(?x)
         ^\s*(?P<condition>.+?)\s*\?
@@ -1547,6 +1543,7 @@ fn parse_member(
     )
     .unwrap();
     if regex_ternary.is_match(raw) {
+        println!("ternary_raw: {raw}");
         let condition_raw = capture_regex(&regex_ternary, raw, "condition").unwrap();
         let if_true_raw = capture_regex(&regex_ternary, raw, "if_true").unwrap();
         let if_false_raw = capture_regex(&regex_ternary, raw, "if_false").unwrap();
@@ -1562,6 +1559,11 @@ fn parse_member(
         let if_true = parse_member(&if_true_raw, constructor, storage, imports, functions);
         let if_false = parse_member(&if_false_raw, constructor, storage, imports, functions);
         return Expression::Ternary(Box::new(condition), Box::new(if_true), Box::new(if_false))
+    }
+
+    if REGEX_BOOLEAN.is_match(raw) {
+        let condition = parse_condition(raw, constructor, false, storage, imports, functions);
+        return Expression::Condition(Box::new(condition))
     }
 
     if REGEX_FUNCTION_CALL.is_match(raw) {
@@ -1760,30 +1762,26 @@ fn parse_condition(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
 ) -> Condition {
-    let tokens = split(&trim(line).replace(", ", ","), " ", None);
-    let mut left_raw = tokens[0].to_owned();
-    left_raw.remove_matches("!");
-    let mut left = parse_member(&left_raw, constructor, storage, imports, functions);
+    let (mut left, mut operation, mut right) = if REGEX_BOOLEAN.is_match(line) {
+        let left_raw = capture_regex(&REGEX_BOOLEAN, line, "left").unwrap();
+        let operation_raw = capture_regex(&REGEX_BOOLEAN, line, "operation").unwrap();
+        let right_raw = capture_regex(&REGEX_BOOLEAN, line, "right").unwrap();
 
-    let (mut right, mut operation) = if tokens.len() > 1 {
-        let right = parse_member(
-            &tokens[2].to_owned(),
-            constructor,
-            storage,
-            imports,
-            functions,
-        );
-        let operation = *OPERATIONS.get(&tokens[1]).unwrap();
-        (Some(right), operation)
+        let left = parse_member(&left_raw, constructor, storage, imports, functions);
+        let operation = *OPERATIONS.get(&operation_raw).unwrap();
+        let right = parse_member(&right_raw, constructor, storage, imports, functions);
+
+        (left, operation, Some(right))
     } else {
-        (
-            None,
-            if tokens[0].contains("!") {
-                Operation::Not
-            } else {
-                Operation::True
-            },
-        )
+        let regex_negative = Regex::new(r#"(?x)^\s*!(?P<value>.+?)\s*$"#).unwrap();
+        if regex_negative.is_match(line) {
+            let left_raw = capture_regex(&regex_negative, line, "value").unwrap();
+            let left = parse_member(&left_raw, constructor, storage, imports, functions);
+            (left, Operation::Not, None)
+        } else {
+            let left = parse_member(&line, constructor, storage, imports, functions);
+            (left, Operation::True, None)
+        }
     };
 
     if let Some(Expression::ZeroAddressInto) = right {

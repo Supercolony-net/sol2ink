@@ -504,6 +504,7 @@ impl ToTokens for Operation {
             Operation::LessThan => quote!(<),
             Operation::LogicalAnd => quote!(&&),
             Operation::LogicalOr => quote!(||),
+            Operation::Modulo => quote!(%),
             Operation::Mul => quote!(*),
             Operation::MulAssign => quote!(*=),
             Operation::Not => quote!(!),
@@ -809,7 +810,7 @@ impl ToString for Expression {
                 if *unique_cast {
                     format!("{cast_type}({})", expression.to_string())
                 } else {
-                    format!("{} as {cast_type}", expression.to_string())
+                    format!("({} as {cast_type})", expression.to_string())
                 }
             }
             Expression::Condition(condition_raw) => {

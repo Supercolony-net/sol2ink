@@ -75,30 +75,31 @@ contract example {
 	}
 
 	/// reverse the bytes in an array of 8 (endian swap)
-	function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
-		out = ((input << 56) & hex"ff00_0000_0000_0000") |
-			  ((input << 40) & hex"00ff_0000_0000_0000") |
-			  ((input << 24) & hex"0000_ff00_0000_0000") |
-			  ((input <<  8) & hex"0000_00ff_0000_0000") |
-			  ((input >>  8) & hex"0000_0000_ff00_0000") |
-			  ((input >> 24) & hex"0000_0000_00ff_0000") |
-			  ((input >> 40) & hex"0000_0000_0000_ff00") |
-			  ((input >> 56) & hex"0000_0000_0000_00ff");
-	}
-
-	// /// This mocks a pid state
-	// function get_pid_state(uint64 _pid) pure private returns (State) {
-	// 	uint64 n = 8;
-	// 	for (uint16 i = 1; i < 10; ++i) {
-	// 		if ((i % 3) == 0) {
-	// 			n *= _pid / uint64(i);
-	// 		} else {
-	// 			n /= 3;
-	// 		}
-	// 	}
-
-	// 	return State(n % uint64(State.StateCount));
+    // TODO: parse this
+	// function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
+	// 	out = ((input << 56) & hex"ff00_0000_0000_0000") |
+	// 		  ((input << 40) & hex"00ff_0000_0000_0000") |
+	// 		  ((input << 24) & hex"0000_ff00_0000_0000") |
+	// 		  ((input <<  8) & hex"0000_00ff_0000_0000") |
+	// 		  ((input >>  8) & hex"0000_0000_ff00_0000") |
+	// 		  ((input >> 24) & hex"0000_0000_00ff_0000") |
+	// 		  ((input >> 40) & hex"0000_0000_0000_ff00") |
+	// 		  ((input >> 56) & hex"0000_0000_0000_00ff");
 	// }
+
+	// This mocks a pid state
+	function get_pid_state(uint64 _pid) pure private returns (State) {
+		uint64 n = 8;
+		for (uint16 i = 1; i < 10; ++i) {
+			if ((i % 3) == 0) {
+				n *= _pid / uint64(i);
+			} else {
+				n /= 3;
+			}
+		}
+
+		return State(n % uint64(State.StateCount));
+	}
 
 	// /// Overloaded function with different return value!
 	// function get_pid_state() view private returns (uint32) {

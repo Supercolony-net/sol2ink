@@ -67,7 +67,7 @@ pub mod example {
         pub fn systemd_pid(&self) -> Result<u32, Error> {
             // Note that cast is required to change sign from
             // int32 to uint32
-            return Ok(self.first_pid as u32)
+            return Ok((self.first_pid as u32))
         }
 
         ///Convert celcius to fahrenheit
@@ -110,16 +110,28 @@ pub mod example {
         }
 
         ///reverse the bytes in an array of 8 (endian swap)
-        #[ink(message)]
-        pub fn byte_8_reverse(&self, input: [u8; 8]) -> Result<[u8; 8], Error> {
-            out = ((input << 56) & self._hex("ff_00_0000_0000_0000"))?
-                | ((input << 40) & self._hex("00_ff_0000_0000_0000"))?
-                | ((input << 24) & self._hex("0000_ff_00_0000_0000"))?
-                | ((input << 8) & self._hex("0000_00_ff_0000_0000"))?
-                | ((input >> 8) & self._hex("0000_0000_ff_00_0000"))?
-                | ((input >> 24) & self._hex("0000_0000_00_ff_0000"))?
-                | ((input >> 40) & self._hex("0000_0000_0000_ff_00"))?
-                | ((input >> 56) & self._hex("0000_0000_0000_00_ff"))?;
+        ///TODO: parse this
+        ///function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
+        ///out = ((input << 56) & hex"ff00_0000_0000_0000") |
+        ///((input << 40) & hex"00ff_0000_0000_0000") |
+        ///((input << 24) & hex"0000_ff00_0000_0000") |
+        ///((input <<  8) & hex"0000_00ff_0000_0000") |
+        ///((input >>  8) & hex"0000_0000_ff00_0000") |
+        ///((input >> 24) & hex"0000_0000_00ff_0000") |
+        ///((input >> 40) & hex"0000_0000_0000_ff00") |
+        ///((input >> 56) & hex"0000_0000_0000_00ff");
+        ///}
+        ///This mocks a pid state
+        fn _get_pid_state(&self, pid: u64) -> Result<State, Error> {
+            let n: u64 = 8;
+            // Sol2Ink Not Implemented yet: for(uint16 i = 1 i < 10 ++i){
+            if (i_ % _3) == 0 {
+                n *= pid / (i as u64);
+            } else {
+                n /= 3;
+            }
+            // Sol2Ink Not Implemented yet End Block here
+            return Ok(self._state(n_ % _uint_64(state.state_count))?)
         }
 
     }

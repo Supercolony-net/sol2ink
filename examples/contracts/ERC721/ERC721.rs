@@ -138,7 +138,11 @@ pub mod erc_721 {
         pub fn token_uri(&self, token_id: u128) -> Result<String, Error> {
             self._require_minted(token_id)?;
             let base_uri: String = base_uri();
-            return Ok(Vec::<u8>::from(base_uri).length > 0)
+            return Ok(if Vec::<u8>::from(base_uri).length > 0 {
+                (abi._encode_packed(base_uri, token_id.to_string())? as String)
+            } else {
+                ""
+            })
         }
 
         /// @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
@@ -157,7 +161,7 @@ pub mod erc_721 {
                     "ERC721: approval to current owner",
                 )))
             }
-            if self.env().caller() != owner {
+            if self.env().caller() != owner || self.is_approved_for_all(owner, msg.sender)? {
                 return Err(Error::Custom(String::from(
                     "ERC721: approve caller is not token owner nor approved for all",
                 )))
