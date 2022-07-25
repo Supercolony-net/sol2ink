@@ -1449,6 +1449,20 @@ fn parse_member(
         return expression.clone()
     }
 
+    let regex_hex = Regex::new(r#"(?x)^(?P<before>.*)hex"(?P<value>.+?)"(?P<after>.*)$"#).unwrap();
+    if regex_hex.is_match(raw) {
+        let before = capture_regex(&regex_hex, raw, "before").unwrap();
+        let value = capture_regex(&regex_hex, raw, "value").unwrap();
+        let after = capture_regex(&regex_hex, raw, "after").unwrap();
+        return parse_member(
+            &format!("{before}hex(\"{value}\"){after}"),
+            constructor,
+            storage,
+            imports,
+            functions,
+        )
+    }
+
     let regex_new_array = Regex::new(
         r#"(?x)^\s*new\s+(?P<array_type>.+?)\s*
         \[\s*\]\s*\((?P<array_size>.+?)\s*\)\s*$"#,
@@ -1479,7 +1493,7 @@ fn parse_member(
         ^\s*(?P<left>.+?)
         \s*(?P<operation>[/+\-*]+)
         [^=]\s*(?P<right>.+)
-        \s*$"#
+        \s*$"#,
     )
     .unwrap();
     if regex_arithmetic.is_match(raw) {
@@ -1549,6 +1563,7 @@ fn parse_member(
         let if_false = parse_member(&if_false_raw, constructor, storage, imports, functions);
         return Expression::Ternary(Box::new(condition), Box::new(if_true), Box::new(if_false))
     }
+
     if REGEX_FUNCTION_CALL.is_match(raw) {
         return parse_function_call(raw, constructor, storage, imports, functions)
     }

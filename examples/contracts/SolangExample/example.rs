@@ -109,5 +109,18 @@ pub mod example {
             return Ok(a.is_zero())
         }
 
+        ///reverse the bytes in an array of 8 (endian swap)
+        #[ink(message)]
+        pub fn byte_8_reverse(&self, input: [u8; 8]) -> Result<[u8; 8], Error> {
+            out = ((input << 56) & self._hex("ff_00_0000_0000_0000"))?
+                | ((input << 40) & self._hex("00_ff_0000_0000_0000"))?
+                | ((input << 24) & self._hex("0000_ff_00_0000_0000"))?
+                | ((input << 8) & self._hex("0000_00_ff_0000_0000"))?
+                | ((input >> 8) & self._hex("0000_0000_ff_00_0000"))?
+                | ((input >> 24) & self._hex("0000_0000_00_ff_0000"))?
+                | ((input >> 40) & self._hex("0000_0000_0000_ff_00"))?
+                | ((input >> 56) & self._hex("0000_0000_0000_00_ff"))?;
+        }
+
     }
 }
