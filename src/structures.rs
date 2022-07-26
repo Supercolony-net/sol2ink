@@ -91,6 +91,7 @@ pub struct FunctionHeader {
     pub payable: bool,
     pub return_params: Vec<FunctionParam>,
     pub comments: Vec<String>,
+    pub modifiers: Vec<String>
 }
 
 #[derive(Clone)]

@@ -377,6 +377,8 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         let mut return_params = TokenStream::new();
         let mut body = TokenStream::new();
         let mut comments = TokenStream::new();
+        let mut function_modifiers = TokenStream::new();
+        let statements = &function.body;
 
         // assemble comments
         for comment in function.header.comments.iter() {
@@ -384,7 +386,13 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 #[doc = #comment]
             });
         }
-        let statements = &function.body;
+
+        for function_modifier_raw in function.header.modifiers.iter() {
+            let function_modifier = TokenStream::from_str(&function_modifier_raw).unwrap();
+            function_modifiers.extend(quote! {
+                #[modifiers(#function_modifier)]
+            });
+        }
 
         // assemble message
         if function.header.external {
@@ -476,6 +484,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         output.extend(quote! {
             #comments
             #message
+            #function_modifiers
             #function_name(#view #params) -> Result<#return_params, Error> {
                 #body
             }

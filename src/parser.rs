@@ -505,17 +505,26 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
             contract_field.field_type.clone(),
         );
     }
+
     let mut functions_map = HashMap::<String, bool>::new();
     for function in functions.iter() {
         functions_map.insert(function.header.name.clone(), function.header.external);
     }
+
     let mut events_map = HashMap::<String, Event>::new();
     for event in events.iter() {
         events_map.insert(event.name.clone(), event.clone());
     }
 
+    let mut modifiers_map = HashMap::<String, ()>::new();
+    for modifier in modifiers.iter() {
+        modifiers_map.insert(modifier.header.name.clone(), ());
+    }
+
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
+        function.header.modifiers =
+            process_function_modifiers(&function.header.modifiers, &modifiers_map);
         function.body = parse_statements(
             &function.body,
             &storage,
@@ -706,8 +715,8 @@ fn parse_function_header(
     let regex_return_function = Regex::new(
         r#"(?x)
         ^\s*(?P<function_name>[a-zA-Z0-9_]*?)\s*
-        \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
-        .*returns\s*\(\s*(?P<return_parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
+        \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)\s*
+        (?P<attributes>.*)\s+returns\s*\(\s*(?P<return_parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
         .*$"#,
     )
     .unwrap();
@@ -717,34 +726,48 @@ fn parse_function_header(
         "return_parameters",
     );
 
-    let (name, params, return_params) = if let Some(return_parameters_raw) = return_parameters_maybe
-    {
-        let function_name = capture_regex(
-            &regex_return_function,
-            &function_header_raw,
-            "function_name",
-        )
-        .unwrap();
-        let parameters_raw =
-            capture_regex(&regex_return_function, &function_header_raw, "parameters").unwrap();
-        let parameters = parse_function_parameters(parameters_raw, imports);
-        let return_parameters = parse_return_parameters(return_parameters_raw, imports);
-        (function_name, parameters, return_parameters)
-    } else {
-        let regex_no_return = Regex::new(
-            r#"(?x)
+    let (name, params, return_params, modifiers) =
+        if let Some(return_parameters_raw) = return_parameters_maybe {
+            let function_name = capture_regex(
+                &regex_return_function,
+                &function_header_raw,
+                "function_name",
+            )
+            .unwrap();
+            let parameters_raw =
+                capture_regex(&regex_return_function, &function_header_raw, "parameters").unwrap();
+            let parameters = parse_function_parameters(parameters_raw, imports);
+            let return_parameters = parse_return_parameters(return_parameters_raw, imports);
+            let attribs_raw =
+                capture_regex(&regex_return_function, &function_header_raw, "attributes").unwrap();
+            (
+                function_name,
+                parameters,
+                return_parameters,
+                parse_modifiers(&attribs_raw),
+            )
+        } else {
+            let regex_no_return = Regex::new(
+                r#"(?x)
             ^\s*(?P<function_name>[a-zA-Z0-9_]*?)\s*
             \(\s*(?P<parameters>[a-zA-Z0-9_,\s\[\]]*?)\s*\)
-            .*$"#,
-        )
-        .unwrap();
-        let function_name =
-            capture_regex(&regex_no_return, &function_header_raw, "function_name").unwrap();
-        let parameters_raw =
-            capture_regex(&regex_no_return, &function_header_raw, "parameters").unwrap();
-        let parameters = parse_function_parameters(parameters_raw, imports);
-        (function_name, parameters, Vec::default())
-    };
+            \s*(?P<attributes>.*)\s*$"#,
+            )
+            .unwrap();
+            let function_name =
+                capture_regex(&regex_no_return, &function_header_raw, "function_name").unwrap();
+            let parameters_raw =
+                capture_regex(&regex_no_return, &function_header_raw, "parameters").unwrap();
+            let attribs_raw =
+                capture_regex(&regex_no_return, &function_header_raw, "attributes").unwrap();
+            let parameters = parse_function_parameters(parameters_raw, imports);
+            (
+                function_name,
+                parameters,
+                Vec::default(),
+                parse_modifiers(&attribs_raw),
+            )
+        };
 
     let (external, view, payable) = parse_function_attributes(&function_header_raw);
 
@@ -756,6 +779,7 @@ fn parse_function_header(
         payable,
         return_params,
         comments: comments.to_vec(),
+        modifiers,
     }
 }
 
@@ -851,6 +875,22 @@ fn parse_body(chars: &mut Chars) -> Vec<Statement> {
     }
 
     statements
+}
+
+fn process_function_modifiers(
+    raw_modifiers: &Vec<String>,
+    modifiers_map: &HashMap<String, ()>,
+) -> Vec<String> {
+    let regex_modifier_name = Regex::new(r#"(?x)^\s*(?P<name>.+?)\(.\)*"#).unwrap();
+    let mut out = Vec::default();
+    for raw_modifier in raw_modifiers.iter() {
+        let modifier_name =
+            capture_regex(&regex_modifier_name, raw_modifier, "name").unwrap_or(String::new());
+        if modifiers_map.contains_key(&modifier_name) {
+            out.push(raw_modifier.clone());
+        }
+    }
+    out
 }
 
 fn parse_statements(
@@ -1852,6 +1892,26 @@ fn parse_function_attributes(attributes: &String) -> (bool, bool, bool) {
     let payable = attributes.contains("payable");
 
     (external, view, payable)
+}
+
+fn parse_modifiers(attributes: &String) -> Vec<String> {
+    let mut adjusted = attributes.clone();
+    adjusted.remove_matches("payable");
+    adjusted.remove_matches("external");
+    adjusted.remove_matches("internal");
+    adjusted.remove_matches("virtual");
+    adjusted.remove_matches("override");
+    adjusted.remove_matches("public");
+    adjusted.remove_matches("private");
+    adjusted.remove_matches("view");
+    adjusted.remove_matches("pure");
+    adjusted = trim(&adjusted);
+    adjusted = adjusted.replace(", ", ",");
+    if adjusted.is_empty() {
+        Vec::default()
+    } else {
+        split(&adjusted, " ", None)
+    }
 }
 
 /// Parses return parameters of a function
