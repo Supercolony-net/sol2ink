@@ -37,7 +37,11 @@
 /// accounts that have been granted it.
 #[brush::contract]
 pub mod access_control {
-    use brush::traits::AccountId;
+    use brush::{
+        modifier_definition,
+        modifiers,
+        traits::AccountId,
+    };
     use ink::prelude::string::String;
     use ink_lang::codegen::{
         EmitEvent,
@@ -52,6 +56,21 @@ pub mod access_control {
     }
 
     pub const default_admin_role: [u8; 32] = 0x00;
+
+    /// @dev Modifier that checks that an account has a specific role. Reverts
+    /// with a standardized message including the required role.
+    /// The format of the revert reason is given by the following regular expression:
+    /// /^AccessControl: account (0x[0-9a-f]{40}) is missing role (0x[0-9a-f]{64})$/
+    /// _Available since v4.1._
+    #[modifier_definition]
+    pub fn only_role<T, F, R>(instance: &mut T, body: F, role: [u8; 32]) -> Result<R, Error>
+    where
+        T: AccessControl,
+        F: FnOnce(&mut T) -> Result<R, Error>,
+    {
+        self._check_role(role)?;
+        body(instance)
+    }
 
     /// @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`
     /// `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite

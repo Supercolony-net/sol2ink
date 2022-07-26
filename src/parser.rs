@@ -412,10 +412,7 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
 /// `lines` the solidity code of the contract
 ///
 /// returns the representation of the contract as `Contract` struct
-fn parse_contract(
-    chars: &mut Chars,
-    contract_comments: Vec<String>,
-) -> Result<Contract, ParserError> {
+fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contract, ParserError> {
     let mut buffer = String::new();
     let mut action = Action::None;
 
@@ -484,7 +481,7 @@ fn parse_contract(
                     read_until(chars, vec![SEMICOLON]);
                     buffer.clear();
                 } else if buffer.trim() == "modifier" {
-                    modifiers.push(parse_modifier(chars, &comments)?);
+                    modifiers.push(parse_modifier(&mut imports, chars, &comments)?);
                     comments.clear();
                     buffer.clear();
                 } else if ch == SEMICOLON {
@@ -527,6 +524,17 @@ fn parse_contract(
             &events_map,
         );
     }
+
+    for modifier in modifiers.iter_mut() {
+        parse_modifier_statements(
+            modifier,
+            &storage,
+            &mut imports,
+            &functions_map,
+            &events_map,
+        );
+    }
+
     parse_statements(
         &mut constructor,
         &storage,
@@ -544,7 +552,8 @@ fn parse_contract(
         structs,
         functions,
         imports,
-        comments: contract_comments,
+        contract_doc,
+        modifiers,
     })
 }
 
@@ -761,26 +770,34 @@ fn parse_function(
 ) -> Result<Function, ParserError> {
     Ok(Function {
         header: parse_function_header(chars, imports, comments),
-        body: parse_body(chars, &mut 1),
+        body: parse_body(chars),
     })
 }
 
-fn parse_modifier(chars: &mut Chars, comments: &Vec<String>) -> Result<Modifier, ParserError> {
+fn parse_modifier(
+    imports: &mut HashSet<String>,
+    chars: &mut Chars,
+    comments: &Vec<String>,
+) -> Result<Modifier, ParserError> {
+    imports.insert(String::from("use brush::modifier_definition;"));
+    imports.insert(String::from("use brush::modifiers;"));
     Ok(Modifier {
-        statements: parse_body(chars, &mut 0),
+        header: parse_function_header(chars, imports, comments),
+        statements: parse_body(chars),
         comments: comments.clone(),
     })
 }
 
-fn parse_body(chars: &mut Chars, open_braces: &mut i32) -> Vec<Statement> {
+fn parse_body(chars: &mut Chars) -> Vec<Statement> {
     let mut buffer = String::new();
+    let mut open_braces = 1;
     let mut close_braces = 0;
     let mut statements = Vec::<Statement>::new();
     let mut action = Action::None;
 
     while let Some(ch) = chars.next() {
         if ch == CURLY_OPEN {
-            *open_braces += 1;
+            open_braces += 1;
         } else if ch == CURLY_CLOSE {
             close_braces += 1
         }
@@ -796,7 +813,7 @@ fn parse_body(chars: &mut Chars, open_braces: &mut i32) -> Vec<Statement> {
             }
         } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
             buffer.push(ch);
-            if *open_braces == close_braces {
+            if open_braces == close_braces {
                 break
             }
             statements.push(Statement::Raw(buffer.clone()));
@@ -822,7 +839,7 @@ fn parse_body(chars: &mut Chars, open_braces: &mut i32) -> Vec<Statement> {
             if trim(&buffer) == "assembly" {
                 action = Action::AssemblyStart;
             } else if trim(&buffer) == "for" {
-                *open_braces += 1;
+                open_braces += 1;
                 let for_block = read_until(chars, vec!['{']);
                 statements.push(Statement::Raw(format!("for{for_block}{{")));
                 buffer.clear();
@@ -867,6 +884,40 @@ fn parse_statements(
     function.body = out;
 }
 
+fn parse_modifier_statements(
+    modifier: &mut Modifier,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    events: &HashMap<String, Event>,
+) {
+    let mut iterator = modifier.statements.iter();
+    let mut stack = VecDeque::<Block>::new();
+    let mut out = Vec::default();
+
+    while let Some(statement) = iterator.next() {
+        match statement {
+            Statement::Raw(content) => {
+                let mut adjusted = content.clone();
+                adjusted.remove_matches(";");
+                out.push(parse_statement(
+                    &adjusted,
+                    false,
+                    &storage,
+                    imports,
+                    &functions,
+                    &mut stack,
+                    &mut iterator,
+                    events,
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    modifier.statements = out;
+}
+
 /// Parses the statement of a Solidity function
 ///
 /// `line` the statement
@@ -887,7 +938,9 @@ fn parse_statement(
     line = line.replace(" calldata ", " ");
     line = line.replace(" storage ", " ");
 
-    if REGEX_RETURN.is_match(&line) {
+    if line == "_" {
+        return Statement::ModifierBody
+    } else if REGEX_RETURN.is_match(&line) {
         return parse_return(&line, storage, imports, functions)
     } else if REGEX_DECLARE.is_match(&line) {
         return parse_declaration(&line, constructor, storage, imports, functions)

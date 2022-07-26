@@ -8,7 +8,10 @@ use convert_case::{
     Case::Snake,
     Casing,
 };
-use proc_macro2::TokenStream;
+use proc_macro2::{
+    Ident,
+    TokenStream,
+};
 use quote::*;
 
 /// Assembles ink! contract from the parsed contract struct and return it as a vec of Strings
@@ -24,7 +27,8 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
     let constructor = assemble_constructor(contract.constructor, &contract.fields);
     let constants = assemble_constants(contract.fields);
     let functions = assemble_functions(contract.functions);
-    let comments = assemble_contract_comments(contract.comments);
+    let comments = assemble_contract_doc(contract.contract_doc);
+    let modifiers = assemble_modifiers(contract.modifiers, &contract_name);
 
     let contract = quote! {
         #![cfg_attr(not(feature = "std"), no_std)]
@@ -44,6 +48,7 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
             _blank_!();
 
             #constants
+            #modifiers
             #events
             #enums
             #structs
@@ -87,7 +92,7 @@ pub fn assemble_interface(interface: Interface) -> TokenStream {
     interface
 }
 
-fn assemble_contract_comments(comments: Vec<String>) -> TokenStream {
+fn assemble_contract_doc(comments: Vec<String>) -> TokenStream {
     let mut output = TokenStream::new();
 
     // assemble comments
@@ -484,6 +489,59 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     output
 }
 
+/// Assembles ink! functions from the vec of parsed Function structs and return them as a vec of Strings
+fn assemble_modifiers(modifiers: Vec<Modifier>, contract_name: &Ident) -> TokenStream {
+    let mut output = TokenStream::new();
+
+    for modifier in modifiers.iter() {
+        let modifier_name = format_ident!("{}", modifier.header.name.to_case(Snake));
+        let mut body = TokenStream::new();
+        let mut comments = TokenStream::new();
+        let mut params = TokenStream::new();
+
+        // assemble comments
+        for comment in modifier.comments.iter() {
+            comments.extend(quote! {
+                #[doc = #comment]
+            });
+        }
+        let statements = &modifier.statements;
+
+        // assemble params
+        for param in modifier.header.params.iter() {
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
+            let param_type = TokenStream::from_str(&param.param_type).unwrap();
+
+            params.extend(quote! {
+                , #param_name: #param_type
+            });
+        }
+
+        // body
+        body.extend(quote! {
+            #(#statements)*
+        });
+
+        output.extend(quote! {
+            #comments
+            #[modifier_definition]
+            pub fn #modifier_name<T, F, R>(instance: &mut T, body: F #params) -> Result<R, Error>
+            where
+                T: #contract_name,
+                F: FnOnce(&mut T) -> Result<R, Error>
+            {
+                #body
+            }
+        });
+
+        output.extend(quote! {
+            _blank_!();
+        });
+    }
+
+    output
+}
+
 /// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
 fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
     let mut output = TokenStream::new();
@@ -742,6 +800,11 @@ impl ToTokens for Statement {
                 })
             }
             Statement::IfEnd => {}
+            Statement::ModifierBody => {
+                stream.extend(quote! {
+                    body(instance)
+                })
+            }
             Statement::Raw(_) => {}
             Statement::Require(condition_raw, error_raw) => {
                 let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();

@@ -16,7 +16,8 @@ pub struct Contract {
     pub structs: Vec<Struct>,
     pub functions: Vec<Function>,
     pub imports: HashSet<String>,
-    pub comments: Vec<String>,
+    pub contract_doc: Vec<String>,
+    pub modifiers: Vec<Modifier>,
 }
 
 pub struct Interface {
@@ -38,6 +39,7 @@ pub struct ContractField {
 }
 
 pub struct Modifier {
+    pub header: FunctionHeader,
     pub statements: Vec<Statement>,
     pub comments: Vec<String>,
 }
@@ -113,6 +115,7 @@ pub enum Statement {
     FunctionCall(Expression),
     If(Condition, Vec<Statement>),
     IfEnd,
+    ModifierBody,
     Raw(String),
     Require(Condition, String),
     Return(Expression),
@@ -208,7 +211,6 @@ impl Operation {
             Operation::LogicalOr => Operation::LogicalAnd,
             Operation::Not => Operation::True,
             Operation::NotEqual => Operation::Equal,
-            Operation::Add => Operation::Subtract,
             _ => Operation::Not,
         }
     }
