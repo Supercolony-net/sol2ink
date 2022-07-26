@@ -516,31 +516,34 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        parse_statements(
-            function,
+        function.body = parse_statements(
+            &function.body,
             &storage,
             &mut imports,
             &functions_map,
             &events_map,
+            false,
         );
     }
 
     for modifier in modifiers.iter_mut() {
-        parse_modifier_statements(
-            modifier,
+        modifier.statements = parse_statements(
+            &modifier.statements,
             &storage,
             &mut imports,
             &functions_map,
             &events_map,
+            false,
         );
     }
 
-    parse_statements(
-        &mut constructor,
+    constructor.body = parse_statements(
+        &constructor.body,
         &storage,
         &mut imports,
         &functions_map,
         &events_map,
+        true,
     );
 
     Ok(Contract {
@@ -851,13 +854,14 @@ fn parse_body(chars: &mut Chars) -> Vec<Statement> {
 }
 
 fn parse_statements(
-    function: &mut Function,
+    statements: &Vec<Statement>,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     events: &HashMap<String, Event>,
-) {
-    let mut iterator = function.body.iter();
+    constructor: bool,
+) -> Vec<Statement> {
+    let mut iterator = statements.iter();
     let mut stack = VecDeque::<Block>::new();
     let mut out = Vec::default();
 
@@ -868,7 +872,7 @@ fn parse_statements(
                 adjusted.remove_matches(";");
                 out.push(parse_statement(
                     &adjusted,
-                    function.header.name.is_empty(),
+                    constructor,
                     &storage,
                     imports,
                     &functions,
@@ -881,41 +885,7 @@ fn parse_statements(
         }
     }
 
-    function.body = out;
-}
-
-fn parse_modifier_statements(
-    modifier: &mut Modifier,
-    storage: &HashMap<String, String>,
-    imports: &mut HashSet<String>,
-    functions: &HashMap<String, bool>,
-    events: &HashMap<String, Event>,
-) {
-    let mut iterator = modifier.statements.iter();
-    let mut stack = VecDeque::<Block>::new();
-    let mut out = Vec::default();
-
-    while let Some(statement) = iterator.next() {
-        match statement {
-            Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
-                out.push(parse_statement(
-                    &adjusted,
-                    false,
-                    &storage,
-                    imports,
-                    &functions,
-                    &mut stack,
-                    &mut iterator,
-                    events,
-                ));
-            }
-            _ => {}
-        }
-    }
-
-    modifier.statements = out;
+    out
 }
 
 /// Parses the statement of a Solidity function
