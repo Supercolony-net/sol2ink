@@ -268,7 +268,6 @@ enum Action {
     None,
     AssemblyStart,
     Assembly,
-    Comment,
     ContractName,
     ContractNamed,
     Contract,
@@ -760,16 +759,28 @@ fn parse_function(
     chars: &mut Chars,
     comments: &Vec<String>,
 ) -> Result<Function, ParserError> {
-    let mut open_braces = 1;
-    let mut close_braces = 0;
-    let function_header = parse_function_header(chars, imports, comments);
-    let mut statements = Vec::<Statement>::new();
+    Ok(Function {
+        header: parse_function_header(chars, imports, comments),
+        body: parse_body(chars, &mut 1),
+    })
+}
+
+fn parse_modifier(chars: &mut Chars, comments: &Vec<String>) -> Result<Modifier, ParserError> {
+    Ok(Modifier {
+        statements: parse_body(chars, &mut 0),
+        comments: comments.clone(),
+    })
+}
+
+fn parse_body(chars: &mut Chars, open_braces: &mut i32) -> Vec<Statement> {
     let mut buffer = String::new();
+    let mut close_braces = 0;
+    let mut statements = Vec::<Statement>::new();
     let mut action = Action::None;
 
     while let Some(ch) = chars.next() {
         if ch == CURLY_OPEN {
-            open_braces += 1;
+            *open_braces += 1;
         } else if ch == CURLY_CLOSE {
             close_braces += 1
         }
@@ -777,18 +788,15 @@ fn parse_function(
         if ch == NEW_LINE {
             if action == Action::AssemblyStart {
                 action = Action::Assembly;
-            } else if action == Action::Comment || action == Action::Assembly {
+            } else if action == Action::Assembly {
                 statements.push(Statement::Raw(buffer.clone()));
-                if action == Action::Comment {
-                    action = Action::None;
-                }
                 buffer.clear();
             } else {
                 buffer.push(SPACE);
             }
         } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
             buffer.push(ch);
-            if open_braces == close_braces {
+            if *open_braces == close_braces {
                 break
             }
             statements.push(Statement::Raw(buffer.clone()));
@@ -799,8 +807,8 @@ fn parse_function(
         } else if ch == SLASH {
             let next_maybe = chars.next();
             if next_maybe == Some(SLASH) {
-                action = Action::Comment;
-                buffer.clear();
+                statements.push(Statement::Raw(format!("// {}", parse_comment(chars))));
+                continue
             } else if next_maybe == Some(ASTERISK) {
                 for comment in parse_multiline_comment(chars).iter() {
                     statements.push(Statement::Raw(format!("// {comment}")));
@@ -814,7 +822,7 @@ fn parse_function(
             if trim(&buffer) == "assembly" {
                 action = Action::AssemblyStart;
             } else if trim(&buffer) == "for" {
-                open_braces += 1;
+                *open_braces += 1;
                 let for_block = read_until(chars, vec!['{']);
                 statements.push(Statement::Raw(format!("for{for_block}{{")));
                 buffer.clear();
@@ -822,77 +830,7 @@ fn parse_function(
         }
     }
 
-    Ok(Function {
-        header: function_header,
-        body: statements,
-    })
-}
-
-fn parse_modifier(chars: &mut Chars, comments: &Vec<String>) -> Result<Modifier, ParserError> {
-    // TODO: Remove duplicity
-    let mut open_braces = 0;
-    let mut close_braces = 0;
-    let mut statements = Vec::<Statement>::new();
-    let mut buffer = String::new();
-    let mut action = Action::None;
-    statements.push(Statement::Comment(String::from(
-        "Sol2Ink Parsing modifiers not implemented yet",
-    )));
-
-    while let Some(ch) = chars.next() {
-        if ch == CURLY_OPEN {
-            open_braces += 1;
-        } else if ch == CURLY_CLOSE {
-            close_braces += 1
-        }
-
-        if ch == NEW_LINE {
-            if action == Action::AssemblyStart {
-                action = Action::Assembly;
-            } else if action == Action::Comment || action == Action::Assembly {
-                statements.push(Statement::Comment(buffer.clone()));
-                if action == Action::Comment {
-                    action = Action::None;
-                }
-                buffer.clear();
-            } else {
-                buffer.push(SPACE);
-            }
-        } else if ch == SEMICOLON || ch == CURLY_CLOSE || ch == CURLY_OPEN {
-            buffer.push(ch);
-            if open_braces == close_braces {
-                break
-            }
-            statements.push(Statement::Raw(buffer.clone()));
-            if action == Action::Assembly {
-                action = Action::None;
-            }
-            buffer.clear();
-        } else if ch == SLASH {
-            let next_maybe = chars.next();
-            if next_maybe == Some(SLASH) {
-                action = Action::Comment;
-                buffer.clear();
-            }
-            buffer.push(ch);
-            buffer.push(next_maybe.unwrap());
-        } else {
-            buffer.push(ch);
-            if trim(&buffer) == "assembly" {
-                action = Action::AssemblyStart;
-            } else if trim(&buffer) == "for" {
-                open_braces += 1;
-                let for_block = read_until(chars, vec!['{']);
-                statements.push(Statement::Comment(format!("for{for_block}{{")));
-                buffer.clear();
-            }
-        }
-    }
-
-    Ok(Modifier {
-        statements,
-        comments: comments.clone(),
-    })
+    statements
 }
 
 fn parse_statements(

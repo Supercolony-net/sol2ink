@@ -194,7 +194,6 @@ pub mod example {
             }
             // Sol2Ink Not Implemented yet End Block here
             // while (++n < 1000)
-            // Sol2Ink Not Implemented yet: 
             return Ok(count)
         }
 
@@ -210,10 +209,7 @@ pub mod example {
         ///return the ace of spades
         #[ink(message)]
         pub fn ace_of_spaces(&self) -> Result<card, Error> {
-            // return card({
-            // Sol2Ink Not Implemented yet: s: suit.spades, v: value.ace }
-            // Sol2Ink Not Implemented yet: )
-            // Sol2Ink Not Implemented yet: 
+            // return card({s: suit.spades, v: value.ace })
         }
 
         ///score card
