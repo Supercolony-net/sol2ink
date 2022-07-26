@@ -129,4 +129,5 @@ pub trait ERC721 {
     /// See {setApprovalForAll}
     #[ink(message)]
     fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> Result<bool, Error>;
+
 }

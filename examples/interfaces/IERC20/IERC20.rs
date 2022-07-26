@@ -76,4 +76,5 @@ pub trait ERC20 {
         to: AccountId,
         amount: u128,
     ) -> Result<bool, Error>;
+
 }

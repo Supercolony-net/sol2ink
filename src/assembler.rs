@@ -158,8 +158,7 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
 fn assemble_events(events: Vec<Event>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for i in 0..events.len() {
-        let event = &events[i];
+    for event in events.iter() {
         let event_name = TokenStream::from_str(&format!("{}", event.name)).unwrap();
         let mut event_comments = TokenStream::new();
         let mut event_fields = TokenStream::new();
@@ -264,8 +263,7 @@ fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
 fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
     let mut output = TokenStream::new();
 
-    for i in 0..structs.len() {
-        let structure = &structs[i];
+    for structure in structs.iter() {
         let struct_name = TokenStream::from_str(&structure.name).unwrap();
         let mut struct_comments = TokenStream::new();
         let mut struct_fields = TokenStream::new();
@@ -486,6 +484,117 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
     output
 }
 
+/// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
+fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
+    let mut output = TokenStream::new();
+
+    for header in function_headers.iter() {
+        let mut function_comments = TokenStream::new();
+        let mut message = TokenStream::new();
+        let mut function_name = TokenStream::new();
+        let mut view = TokenStream::new();
+        let mut params = TokenStream::new();
+        let mut return_params = TokenStream::new();
+
+        // assemble comments
+        for comment in header.comments.iter() {
+            function_comments.extend(quote! {
+                #[doc = #comment]
+            });
+        }
+
+        // assemble message
+        if header.external {
+            if header.payable {
+                message.extend(quote! {
+                    #[ink(message, payable)]
+                });
+            } else {
+                message.extend(quote! {
+                    #[ink(message)]
+                });
+            }
+        }
+
+        // assemble function name
+        function_name
+            .extend(TokenStream::from_str(&format!("fn {}", header.name.to_case(Snake))).unwrap());
+
+        // assemble view
+        view.extend(
+            TokenStream::from_str(match header.view {
+                true => "&self",
+                false => "&mut self",
+            })
+            .unwrap(),
+        );
+
+        // assemble params
+        for param in header.params.iter() {
+            let param_name = format_ident!("{}", param.name.to_case(Snake));
+            let param_type = TokenStream::from_str(&param.param_type).unwrap();
+
+            params.extend(quote! {
+                , #param_name: #param_type
+            });
+        }
+
+        // assemble return params
+        if header.return_params.len() > 0 {
+            let mut params = TokenStream::new();
+            for i in 0..header.return_params.len() {
+                let param_type =
+                    TokenStream::from_str(&header.return_params[i].param_type).unwrap();
+
+                if i > 0 {
+                    params.extend(quote! {,});
+                }
+                params.extend(quote! {
+                    #param_type
+                });
+            }
+
+            if header.return_params.len() > 1 {
+                return_params.extend(quote! {
+                    (#params)
+                });
+            } else {
+                return_params.extend(quote! {
+                    #params
+                });
+            }
+        } else {
+            return_params.extend(quote! {
+                ()
+            });
+        }
+
+        output.extend(quote! {
+            #function_comments
+            #message
+            #function_name(#view #params) -> Result<#return_params, Error>;
+        });
+
+        output.extend(quote! {
+            _blank_!();
+        });
+    }
+
+    output
+}
+
+/// Adds a signature to the beginning of the file :)
+fn signature() -> TokenStream {
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    let version = &format!("Generated with Sol2Ink v{}\n", VERSION);
+    let link = "https://github.com/Supercolony-net/sol2ink\n";
+    quote! {
+        _comment_!(#version);
+        _comment_!(#link);
+        _blank_!();
+    }
+}
+
 impl ToTokens for Operation {
     fn to_tokens(&self, stream: &mut TokenStream) {
         stream.extend(match self {
@@ -517,121 +626,6 @@ impl ToTokens for Operation {
             Operation::SubtractAssign => quote!(-=),
             Operation::True => quote!(),
         })
-    }
-}
-
-/// Assembles ink! trait function headers from the vec of parsed FunctionHeader structs and return them as a vec of Strings
-fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStream {
-    let mut output = TokenStream::new();
-
-    for i in 0..function_headers.len() {
-        let function = &function_headers[i];
-        let mut function_comments = TokenStream::new();
-        let mut message = TokenStream::new();
-        let mut function_name = TokenStream::new();
-        let mut view = TokenStream::new();
-        let mut params = TokenStream::new();
-        let mut return_params = TokenStream::new();
-
-        // assemble comments
-        for comment in function.comments.iter() {
-            function_comments.extend(quote! {
-                #[doc = #comment]
-            });
-        }
-
-        // assemble message
-        if function.external {
-            if function.payable {
-                message.extend(quote! {
-                    #[ink(message, payable)]
-                });
-            } else {
-                message.extend(quote! {
-                    #[ink(message)]
-                });
-            }
-        }
-
-        // assemble function name
-        function_name.extend(
-            TokenStream::from_str(&format!("fn {}", function.name.to_case(Snake))).unwrap(),
-        );
-
-        // assemble view
-        view.extend(
-            TokenStream::from_str(match function.view {
-                true => "&self",
-                false => "&mut self",
-            })
-            .unwrap(),
-        );
-
-        // assemble params
-        for param in function.params.iter() {
-            let param_name = format_ident!("{}", param.name.to_case(Snake));
-            let param_type = TokenStream::from_str(&param.param_type).unwrap();
-
-            params.extend(quote! {
-                , #param_name: #param_type
-            });
-        }
-
-        // assemble return params
-        if function.return_params.len() > 0 {
-            let mut params = TokenStream::new();
-            for i in 0..function.return_params.len() {
-                let param_type =
-                    TokenStream::from_str(&function.return_params[i].param_type).unwrap();
-
-                if i > 0 {
-                    params.extend(quote! {,});
-                }
-                params.extend(quote! {
-                    #param_type
-                });
-            }
-
-            if function.return_params.len() > 1 {
-                return_params.extend(quote! {
-                    (#params)
-                });
-            } else {
-                return_params.extend(quote! {
-                    #params
-                });
-            }
-        } else {
-            return_params.extend(quote! {
-                ()
-            });
-        }
-
-        output.extend(quote! {
-            #function_comments
-            #message
-            #function_name(#view #params) -> Result<#return_params, Error>;
-        });
-
-        if i < function_headers.len() - 1 {
-            output.extend(quote! {
-                _blank_!();
-            });
-        }
-    }
-
-    output
-}
-
-/// Adds a signature to the beginning of the file :)
-fn signature() -> TokenStream {
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    let version = &format!("Generated with Sol2Ink v{}\n", VERSION);
-    let link = "https://github.com/Supercolony-net/sol2ink\n";
-    quote! {
-        _comment_!(#version);
-        _comment_!(#link);
-        _blank_!();
     }
 }
 

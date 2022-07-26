@@ -84,4 +84,5 @@ pub trait AccessControl {
     /// - the caller must be `account`.
     #[ink(message)]
     fn renounce_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error>;
+
 }

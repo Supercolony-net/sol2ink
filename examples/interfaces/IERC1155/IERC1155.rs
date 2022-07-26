@@ -122,4 +122,5 @@ pub trait ERC1155 {
         amounts: Vec<u128>,
         data: Vec<u8>,
     ) -> Result<(), Error>;
+
 }
