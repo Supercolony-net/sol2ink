@@ -1113,6 +1113,34 @@ fn parse_assign(
     let operation = *OPERATIONS.get(&operation_raw).unwrap();
     let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
+    if REGEX_DOUBLE_SIGN_LEFT.is_match(&right_raw) {
+        let value_raw = capture_regex(&REGEX_DOUBLE_SIGN_LEFT, &right_raw, "value").unwrap();
+        let value = parse_member(&value_raw, constructor, storage, imports, functions);
+        let assign = Statement::Assign(left, value, operation);
+        let arithmetic = parse_double_sign(
+            &right_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_LEFT,
+        );
+        return Statement::Group(vec![arithmetic, assign])
+    } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&right_raw) {
+        let value_raw = capture_regex(&REGEX_DOUBLE_SIGN_RIGHT, &right_raw, "value").unwrap();
+        let value = parse_member(&value_raw, constructor, storage, imports, functions);
+        let assign = Statement::Assign(left, value, operation);
+        let arithmetic = parse_double_sign(
+            &right_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_RIGHT,
+        );
+        return Statement::Group(vec![assign, arithmetic])
+    }
+
     return if let Expression::Mapping(name, indices, selector, None) = left {
         let converted_operation = match operation {
             Operation::AddAssign => Operation::Add,

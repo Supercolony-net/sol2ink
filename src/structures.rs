@@ -91,7 +91,7 @@ pub struct FunctionHeader {
     pub payable: bool,
     pub return_params: Vec<FunctionParam>,
     pub comments: Vec<String>,
-    pub modifiers: Vec<String>
+    pub modifiers: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -102,7 +102,6 @@ pub struct FunctionParam {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    AddAssign(Expression, Expression),
     Assembly(Vec<Statement>),
     AssemblyEnd,
     Assign(Expression, Expression, Operation),
@@ -114,13 +113,13 @@ pub enum Statement {
     ElseIf(Condition, Vec<Statement>),
     Emit(String, Vec<Expression>),
     FunctionCall(Expression),
+    Group(Vec<Statement>),
     If(Condition, Vec<Statement>),
     IfEnd,
     ModifierBody,
     Raw(String),
     Require(Condition, String),
     Return(Expression),
-    SubAssign(Expression, Expression),
     Try(Vec<Statement>),
     TryEnd,
 }

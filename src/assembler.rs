@@ -710,13 +710,6 @@ impl ToTokens for Statement {
                     #left #operation #right;
                 })
             }
-            Statement::AddAssign(left_raw, right_raw) => {
-                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
-                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
-                stream.extend(quote! {
-                    #left += #right;
-                })
-            }
             Statement::Assembly(statements) => {
                 stream.extend(quote! {
                         #(#statements)*
@@ -746,6 +739,11 @@ impl ToTokens for Statement {
                 } else {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
+            }
+            Statement::Group(statements) => {
+                stream.extend(quote! {
+                        #(#statements)*
+                })
             }
             Statement::Else(statements) => {
                 stream.extend(quote! {
@@ -837,13 +835,6 @@ impl ToTokens for Statement {
                 let output = TokenStream::from_str(&output_raw.to_string()).unwrap();
                 stream.extend(quote! {
                     return Ok(#output)
-                })
-            }
-            Statement::SubAssign(left_raw, right_raw) => {
-                let left = TokenStream::from_str(&left_raw.to_string()).unwrap();
-                let right = TokenStream::from_str(&right_raw.to_string()).unwrap();
-                stream.extend(quote! {
-                    #left -= #right;
                 })
             }
             Statement::Try(statements) => {
