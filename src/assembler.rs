@@ -950,6 +950,9 @@ impl ToString for Expression {
                     format!("{name_and_selector}.get(&{indices}).unwrap()")
                 }
             }
+            Expression::NewArray(array_type, array_size) => {
+                format!("vec![{array_type}::default(); {}]", array_size.to_string())
+            }
             Expression::StructArg(field_name, value) => {
                 format!("{} : {}", field_name.to_case(Snake), value.to_string())
             }

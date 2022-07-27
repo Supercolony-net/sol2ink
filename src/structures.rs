@@ -237,6 +237,7 @@ pub enum Expression {
         Option<String>,
         Option<Box<Expression>>,
     ),
+    NewArray(String, Box<Expression>),
     StructArg(String, Box<Expression>),
     Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
     WithSelector(Box<Expression>, Box<Expression>),

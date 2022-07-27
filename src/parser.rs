@@ -31,6 +31,12 @@ macro_rules! selector {
     };
 }
 
+macro_rules! bx {
+    ($e:expr) => {
+        Box::new($e)
+    };
+}
+
 const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
@@ -1151,18 +1157,18 @@ fn parse_assign(
         };
         let right_mapping = match converted_operation {
             Operation::Add | Operation::Mul | Operation::Div | Operation::Subtract => {
-                Some(Box::new(Expression::Arithmetic(
-                    Box::new(Expression::Mapping(
+                Some(bx!(Expression::Arithmetic(
+                    bx!(Expression::Mapping(
                         name.clone(),
                         indices.clone(),
                         selector.clone(),
                         None,
                     )),
-                    Box::new(right),
+                    bx!(right),
                     converted_operation,
                 )))
             }
-            _ => Some(Box::new(right)),
+            _ => Some(bx!(right)),
         };
         Statement::FunctionCall(Expression::Mapping(name, indices, selector, right_mapping))
     } else {
@@ -1229,7 +1235,7 @@ fn parse_emit(
                             .unwrap()
                             .name
                             .clone(),
-                        Box::new(parse_member(
+                        bx!(parse_member(
                             &trim(&buffer),
                             constructor,
                             storage,
@@ -1256,7 +1262,7 @@ fn parse_emit(
             .unwrap()
             .name
             .clone(),
-        Box::new(parse_member(
+        bx!(parse_member(
             &trim(&buffer),
             constructor,
             storage,
@@ -1571,10 +1577,11 @@ fn parse_member(
     .unwrap();
     if regex_new_array.is_match(raw) {
         let array_type_raw = capture_regex(&regex_new_array, raw, "array_type").unwrap();
-        let array_size = capture_regex(&regex_new_array, raw, "array_size").unwrap();
+        let array_size_raw = capture_regex(&regex_new_array, raw, "array_size").unwrap();
 
         let array_type = convert_variable_type(array_type_raw, imports);
-        return Expression::Member(format!("vec![{array_type}::default(); {array_size}]"), None)
+        let array_size = parse_member(&array_size_raw, constructor, storage, imports, functions);
+        return Expression::NewArray(array_type, bx!(array_size))
     }
 
     let regex_type = Regex::new(
@@ -1605,7 +1612,7 @@ fn parse_member(
         let right = parse_member(&right_raw, constructor, storage, imports, functions);
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
 
-        return Expression::Arithmetic(Box::new(left), Box::new(right), operation)
+        return Expression::Arithmetic(bx!(left), bx!(right), operation)
     }
 
     let regex_logical = Regex::new(
@@ -1624,7 +1631,7 @@ fn parse_member(
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
         let right = parse_member(&right_raw, constructor, storage, imports, functions);
 
-        return Expression::Logical(Box::new(left), operation, Box::new(right))
+        return Expression::Logical(bx!(left), operation, bx!(right))
     }
 
     let regex_ternary = Regex::new(
@@ -1650,12 +1657,12 @@ fn parse_member(
         );
         let if_true = parse_member(&if_true_raw, constructor, storage, imports, functions);
         let if_false = parse_member(&if_false_raw, constructor, storage, imports, functions);
-        return Expression::Ternary(Box::new(condition), Box::new(if_true), Box::new(if_false))
+        return Expression::Ternary(bx!(condition), bx!(if_true), bx!(if_false))
     }
 
     if REGEX_BOOLEAN.is_match(raw) {
         let condition = parse_condition(raw, constructor, false, storage, imports, functions);
-        return Expression::Condition(Box::new(condition))
+        return Expression::Condition(bx!(condition))
     }
 
     if REGEX_FUNCTION_CALL.is_match(raw) {
@@ -1672,8 +1679,8 @@ fn parse_member(
         match &right {
             Expression::FunctionCall(function_name, expressions, _, external) => {
                 return Expression::WithSelector(
-                    Box::new(left),
-                    Box::new(Expression::FunctionCall(
+                    bx!(left),
+                    bx!(Expression::FunctionCall(
                         function_name.clone(),
                         expressions.clone(),
                         None,
@@ -1683,14 +1690,14 @@ fn parse_member(
             }
             Expression::Member(member_name, _) => {
                 return Expression::WithSelector(
-                    Box::new(left),
-                    Box::new(Expression::Member(member_name.clone(), None)),
+                    bx!(left),
+                    bx!(Expression::Member(member_name.clone(), None)),
                 )
             }
             _ => {}
         };
 
-        return Expression::WithSelector(Box::new(left), Box::new(right))
+        return Expression::WithSelector(bx!(left), bx!(right))
     }
 
     let regex_mapping = Regex::new(
@@ -1767,7 +1774,7 @@ fn parse_function_call(
             return Expression::Cast(
                 true,
                 unique_cast.to_string(),
-                Box::new(parse_member(
+                bx!(parse_member(
                     &args_raw,
                     constructor,
                     storage,
@@ -1779,7 +1786,7 @@ fn parse_function_call(
             return Expression::Cast(
                 false,
                 the_type.0.to_string(),
-                Box::new(parse_member(
+                bx!(parse_member(
                     &args_raw,
                     constructor,
                     storage,
@@ -1883,7 +1890,7 @@ fn parse_condition(
             _ => operation,
         };
         right = None;
-        left = Expression::IsZero(Box::new(left));
+        left = Expression::IsZero(bx!(left));
         imports.insert(String::from("use brush::traits::AcountIdExt;\n"));
     }
 

@@ -149,7 +149,7 @@ pub mod ierc_1155_metadata_uri {
                     "ERC1155: accounts and ids length mismatch",
                 )))
             }
-            let batch_balances: Vec<u128> = vec![u_128::default(); _accounts.length];
+            let batch_balances: Vec<u128> = vec![u128::default(); accounts.length];
             // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < accounts.length; ++i){
             batch_balances.insert(
                 &i,
@@ -642,7 +642,7 @@ pub mod ierc_1155_metadata_uri {
         }
 
         fn _as_singleton_array(&self, element: u128) -> Result<Vec<u128>, Error> {
-            let array: Vec<u128> = vec![u_128::default(); _1];
+            let array: Vec<u128> = vec![u128::default(); 1];
             array.insert(&0, element);
             return Ok(array)
         }
