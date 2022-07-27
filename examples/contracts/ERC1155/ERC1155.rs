@@ -150,7 +150,7 @@ pub mod ierc_1155_metadata_uri {
                 )))
             }
             let batch_balances: Vec<u128> = vec![u_128::default(); _accounts.length];
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0 i < accounts.length ++i){
+            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < accounts.length; ++i){
             batch_balances.insert(
                 &i,
                 self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?,
@@ -290,7 +290,7 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, from, to, ids, amounts, data)?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0 i < ids.length ++i){
+            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; ++i){
             let id: u128 = ids.get(&i).unwrap();
             let amount: u128 = amounts.get(&i).unwrap();
             let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
@@ -403,7 +403,7 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, ZERO_ADDRESS.into(), to, ids, amounts, data)?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0 i < ids.length i++){
+            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; i++){
             self.balances.insert(
                 &(ids.get(&i).unwrap(), to),
                 self.balances.get(&(ids.get(&i).unwrap(), to)).unwrap() + amounts.get(&i).unwrap(),
@@ -485,7 +485,7 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, from, ZERO_ADDRESS.into(), ids, amounts, "")?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0 i < ids.length i++){
+            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; i++){
             let id: u128 = ids.get(&i).unwrap();
             let amount: u128 = amounts.get(&i).unwrap();
             let from_balance: u128 = self.balances.get(&(id, from)).unwrap();

@@ -195,18 +195,18 @@ lazy_static! {
         map.insert(String::from("msg.sender"), Expression::EnvCaller(None));
         map
     };
-    static ref REGEX_RETURN: Regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+)\s*$"#).unwrap();
+    static ref REGEX_RETURN: Regex = Regex::new(r#"(?x)^\s*return\s+(?P<output>.+);\s*$"#).unwrap();
     static ref REGEX_DECLARE: Regex = Regex::new(
         r#"(?x)^\s*
         (?P<field_type>[a-zA-Z0-9\[\]]+)\s+
         (?P<field_name>[_a-zA-Z0-9]+)\s*
-        (=\s*(?P<value>.+))*\s*$"#
+        (=\s*(?P<value>.+))*;\s*$"#
     )
     .unwrap();
     static ref REGEX_REQUIRE: Regex = Regex::new(
         r#"(?x)
         ^\s*require\s*\((?P<condition>.+?)\s*
-        (,\s*"(?P<error>.*)"\s*)*\)\s*$"#
+        (,\s*"(?P<error>.*)"\s*)*\);\s*$"#
     )
     .unwrap();
     static ref REGEX_COMMENT: Regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)\s*$"#).unwrap();
@@ -223,21 +223,21 @@ lazy_static! {
     static ref REGEX_EMIT: Regex = Regex::new(
         r#"(?x)
         ^\s*emit\s+(?P<event_name>.+?)\s*\(\s*
-        (?P<args>.+)+?\)\s*$"#
+        (?P<args>.+)+?\);\s*$"#
     )
     .unwrap();
     static ref REGEX_ASSIGN: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<left>[0-9a-zA-Z_\[\].]+?)\s*
         (?P<operation>[+\-*/&|]*=)\s*
-        (?P<right>.+)+?\s*$"#
+        (?P<right>.+)+?;\s*$"#
     )
     .unwrap();
     static ref REGEX_FUNCTION_CALL: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
         \s*(?P<args>.+)\s*
-        \)\s*$"#,
+        \);*\s*$"#,
     )
     .unwrap();
     static ref REGEX_BOOLEAN: Regex = Regex::new(
@@ -923,10 +923,8 @@ fn parse_statements(
     while let Some(statement) = iterator.next() {
         match statement {
             Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
                 out.push(parse_statement(
-                    &adjusted,
+                    &content,
                     constructor,
                     &storage,
                     imports,
@@ -963,7 +961,7 @@ fn parse_statement(
     line = line.replace(" calldata ", " ");
     line = line.replace(" storage ", " ");
 
-    if line == "_" {
+    if line == "_;" {
         return Statement::ModifierBody
     } else if REGEX_RETURN.is_match(&line) {
         return parse_return(&line, storage, imports, functions)
@@ -1216,10 +1214,8 @@ fn parse_block(
     while let Some(statement_raw) = iterator.next() {
         match statement_raw {
             Statement::Raw(content) => {
-                let mut adjusted = content.clone();
-                adjusted.remove_matches(";");
                 let statement = parse_statement(
-                    &adjusted,
+                    &content,
                     constructor,
                     storage,
                     imports,
@@ -1586,7 +1582,7 @@ fn parse_member(
         return parse_function_call(raw, constructor, storage, imports, functions)
     }
 
-    let regex_with_selector = Regex::new(r#"(?x)^\s*(?P<left>.+?)\.(?P<right>.+?)\s*$"#).unwrap();
+    let regex_with_selector = Regex::new(r#"(?x)^\s*(?P<left>.+?)\.(?P<right>.+?);*\s*$"#).unwrap();
     if regex_with_selector.is_match(raw) {
         let left_raw = capture_regex(&regex_with_selector, raw, "left").unwrap();
         let right_raw = capture_regex(&regex_with_selector, raw, "right").unwrap();

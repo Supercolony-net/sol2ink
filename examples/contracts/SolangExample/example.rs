@@ -123,7 +123,7 @@ pub mod example {
         ///calculate the population count (number of set bits) using Brian Kerningham's way
         #[ink(message)]
         pub fn population_count(&self, n: u128) -> Result<u128, Error> {
-            // Sol2Ink Not Implemented yet: for(count = 0 n != 0 count++){
+            // Sol2Ink Not Implemented yet: for(count = 0; n != 0; count++){
             n &= (n - 1);
             // Sol2Ink Not Implemented yet End Block here
         }
@@ -155,7 +155,7 @@ pub mod example {
         ///This mocks a pid state
         fn _get_pid_state(&self, pid: u64) -> Result<State, Error> {
             let n: u64 = 8;
-            // Sol2Ink Not Implemented yet: for(uint16 i = 1 i < 10 ++i){
+            // Sol2Ink Not Implemented yet: for(uint16 i = 1; i < 10; ++i){
             if (i_ % _3) == 0 {
                 n *= pid / (i as u64);
             } else {
@@ -178,7 +178,7 @@ pub mod example {
                 // reap!
                 self.reaped += 1;
             }
-            // Sol2Ink Not Implemented yet: n++
+            // Sol2Ink Not Implemented yet: n++;
             // Sol2Ink Not Implemented yet End Block here
             Ok(())
         }
@@ -190,10 +190,10 @@ pub mod example {
             let n: u32 = 0;
             // Sol2Ink Not Implemented yet: do {
             if self._get_pid_state(n)? == state.waiting {
-                // Sol2Ink Not Implemented yet: count++
+                // Sol2Ink Not Implemented yet: count++;
             }
             // Sol2Ink Not Implemented yet End Block here
-            // while (++n < 1000)
+            // while (++n < 1000);
             return Ok(count)
         }
 
@@ -209,7 +209,7 @@ pub mod example {
         ///return the ace of spades
         #[ink(message)]
         pub fn ace_of_spaces(&self) -> Result<card, Error> {
-            // return card({s: suit.spades, v: value.ace })
+            // return card({s: suit.spades, v: value.ace });
         }
 
         ///score card
