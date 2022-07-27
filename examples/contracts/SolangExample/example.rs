@@ -178,7 +178,7 @@ pub mod example {
                 // reap!
                 self.reaped += 1;
             }
-            // Sol2Ink Not Implemented yet: n++;
+            n += 1;
             // Sol2Ink Not Implemented yet End Block here
             Ok(())
         }
@@ -190,7 +190,7 @@ pub mod example {
             let n: u32 = 0;
             // Sol2Ink Not Implemented yet: do {
             if self._get_pid_state(n)? == state.waiting {
-                // Sol2Ink Not Implemented yet: count++;
+                count += 1;
             }
             // Sol2Ink Not Implemented yet End Block here
             // while (++n < 1000);

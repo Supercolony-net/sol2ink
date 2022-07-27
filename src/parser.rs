@@ -183,6 +183,8 @@ lazy_static! {
         map.insert(String::from("|="), Operation::OrAssign);
         map.insert(String::from("**"), Operation::Pow);
         map.insert(String::from("%"), Operation::Modulo);
+        map.insert(String::from("++"), Operation::AddOne);
+        map.insert(String::from("--"), Operation::SubtractOne);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -245,6 +247,20 @@ lazy_static! {
         ^\s*(?P<left>.+?)
         \s*(?P<operation>[!=><]=*)\s*
         (?P<right>.+)
+        \s*$"#,
+    )
+    .unwrap();
+    static ref REGEX_DOUBLE_SIGN_RIGHT: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<value>.+?)
+        \s*(?P<operation>[+-]{2});*
+        \s*$"#,
+    )
+    .unwrap();
+    static ref REGEX_DOUBLE_SIGN_LEFT: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<operation>[+-]{2})
+        \s*(?P<value>.+?);*
         \s*$"#,
     )
     .unwrap();
@@ -1055,6 +1071,24 @@ fn parse_statement(
         return parse_emit(&line, constructor, storage, imports, functions, events)
     } else if REGEX_ASSIGN.is_match(&line) {
         return parse_assign(&line, constructor, storage, imports, functions)
+    } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&line) {
+        return parse_double_sign(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_RIGHT,
+        )
+    } else if REGEX_DOUBLE_SIGN_LEFT.is_match(&line) {
+        return parse_double_sign(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_LEFT,
+        )
     } else if REGEX_FUNCTION_CALL.is_match(&line) {
         let expression = parse_function_call(&line, constructor, storage, imports, functions);
         return Statement::FunctionCall(expression)
@@ -1106,6 +1140,24 @@ fn parse_assign(
     } else {
         Statement::Assign(left, right, operation)
     }
+}
+
+fn parse_double_sign(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    regex: &Regex,
+) -> Statement {
+    let member_raw = capture_regex(regex, line, "value").unwrap();
+    let operation_raw = capture_regex(regex, line, "operation").unwrap_or(String::from("="));
+
+    let member = parse_member(&member_raw, constructor, storage, imports, functions).to_string();
+    let operation = OPERATIONS.get(&operation_raw).unwrap().to_string();
+
+    let new_line = format!("{member}{operation};");
+    parse_assign(&new_line, constructor, storage, imports, functions)
 }
 
 fn parse_emit(

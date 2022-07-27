@@ -136,6 +136,7 @@ pub struct Condition {
 pub enum Operation {
     Add,
     AddAssign,
+    AddOne,
     AndAssign,
     Assign,
     BitwiseAnd,
@@ -157,6 +158,7 @@ pub enum Operation {
     OrAssign,
     Pow,
     Subtract,
+    SubtractOne,
     SubtractAssign,
     ShiftLeft,
     ShiftRight,
@@ -167,6 +169,7 @@ impl ToString for Operation {
     fn to_string(&self) -> String {
         return match self {
             Operation::Add => String::from("+"),
+            Operation::AddOne => String::from("+= 1"),
             Operation::AddAssign => String::from("+="),
             Operation::AndAssign => String::from("&="),
             Operation::Assign => String::from("="),
@@ -191,6 +194,7 @@ impl ToString for Operation {
             Operation::ShiftLeft => String::from("<<"),
             Operation::ShiftRight => String::from(">>"),
             Operation::Subtract => String::from("-"),
+            Operation::SubtractOne => String::from("-= 1"),
             Operation::SubtractAssign => String::from("-="),
             Operation::True => String::from(""),
         }

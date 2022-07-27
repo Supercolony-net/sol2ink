@@ -693,7 +693,7 @@ impl ToTokens for Operation {
             Operation::ShiftRight => quote!(>>),
             Operation::Subtract => quote!(-),
             Operation::SubtractAssign => quote!(-=),
-            Operation::True => quote!(),
+            _ => quote!(),
         })
     }
 }
