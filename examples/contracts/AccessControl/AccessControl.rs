@@ -62,6 +62,8 @@ pub mod access_control {
     /// The format of the revert reason is given by the following regular expression:
     /// /^AccessControl: account (0x[0-9a-f]{40}) is missing role (0x[0-9a-f]{64})$/
     /// _Available since v4.1._
+    ///The type of `T` should be the trait which implements the storage
+    ///This will be implemented in Sol2Ink in upcoming version
     #[modifier_definition]
     pub fn only_role<T, F, R>(instance: &mut T, body: F, role: [u8; 32]) -> Result<R, Error>
     where
@@ -192,7 +194,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleGranted} event.
         #[ink(message)]
-        #[modifiers(onlyRole(getRoleAdmin(role)))]
+        #[modifiers(_only_role(get_role_admin(role)))]
         pub fn grant_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._grant_role(role, account)?;
             Ok(())
@@ -204,7 +206,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleRevoked} event.
         #[ink(message)]
-        #[modifiers(onlyRole(getRoleAdmin(role)))]
+        #[modifiers(_only_role(get_role_admin(role)))]
         pub fn revoke_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._revoke_role(role, account)?;
             Ok(())

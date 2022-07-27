@@ -523,8 +523,13 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
 
     // now we know the contracts members and we can parse statements
     for function in functions.iter_mut() {
-        function.header.modifiers =
-            process_function_modifiers(&function.header.modifiers, &modifiers_map);
+        function.header.modifiers = process_function_modifiers(
+            &function.header.modifiers,
+            &modifiers_map,
+            &storage,
+            &mut imports,
+            &functions_map,
+        );
         function.body = parse_statements(
             &function.body,
             &storage,
@@ -880,6 +885,9 @@ fn parse_body(chars: &mut Chars) -> Vec<Statement> {
 fn process_function_modifiers(
     raw_modifiers: &Vec<String>,
     modifiers_map: &HashMap<String, ()>,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
 ) -> Vec<String> {
     let regex_modifier_name = Regex::new(r#"(?x)^\s*(?P<name>.+?)\(.\)*"#).unwrap();
     let mut out = Vec::default();
@@ -887,7 +895,14 @@ fn process_function_modifiers(
         let modifier_name =
             capture_regex(&regex_modifier_name, raw_modifier, "name").unwrap_or(String::new());
         if modifiers_map.contains_key(&modifier_name) {
-            out.push(raw_modifier.clone());
+            let function_call =
+                parse_function_call(&raw_modifier, false, storage, imports, functions);
+            let mut function_call_string_raw = function_call.to_string();
+            // openbrush modifiers do not support function calls
+            // so if such situation occurs, we remove self. and ? for formatting
+            function_call_string_raw.remove_matches("self.");
+            function_call_string_raw.remove_matches("?");
+            out.push(function_call_string_raw)
         }
     }
     out

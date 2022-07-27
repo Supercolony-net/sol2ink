@@ -533,6 +533,8 @@ fn assemble_modifiers(modifiers: Vec<Modifier>, contract_name: &Ident) -> TokenS
 
         output.extend(quote! {
             #comments
+            #[doc = "The type of `T` should be the trait which implements the storage"]
+            #[doc = "This will be implemented in Sol2Ink in upcoming version"]
             #[modifier_definition]
             pub fn #modifier_name<T, F, R>(instance: &mut T, body: F #params) -> Result<R, Error>
             where
