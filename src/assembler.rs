@@ -846,6 +846,17 @@ impl ToTokens for Statement {
                 })
             }
             Statement::TryEnd => {}
+            Statement::While(assign, condition_raw, modification, statements) => {
+                let condition = TokenStream::from_str(&condition_raw.to_string()).unwrap();
+                stream.extend(quote! {
+                    #assign
+                    while #condition {
+                        #(#statements)*
+                        #modification
+                    }
+                })
+            }
+            Statement::WhileEnd => {}
         }
     }
 }

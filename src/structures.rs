@@ -113,6 +113,7 @@ pub enum Statement {
     ElseIf(Condition, Vec<Statement>),
     Emit(String, Vec<Expression>),
     FunctionCall(Expression),
+    While(Box<Statement>, Expression, Box<Statement>, Vec<Statement>),
     Group(Vec<Statement>),
     If(Condition, Vec<Statement>),
     IfEnd,
@@ -122,6 +123,7 @@ pub enum Statement {
     Return(Expression),
     Try(Vec<Statement>),
     TryEnd,
+    WhileEnd,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -252,4 +254,5 @@ pub enum Block {
     If,
     Try,
     Unchecked,
+    While,
 }

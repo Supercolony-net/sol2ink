@@ -150,12 +150,14 @@ pub mod ierc_1155_metadata_uri {
                 )))
             }
             let batch_balances: Vec<u128> = vec![u128::default(); accounts.length];
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < accounts.length; ++i){
-            batch_balances.insert(
-                &i,
-                self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?,
-            );
-            // Sol2Ink Not Implemented yet End Block here
+            let i: u128 = 0;
+            while i < accounts.length {
+                batch_balances.insert(
+                    &i,
+                    self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?,
+                );
+                i += 1;
+            }
             return Ok(batch_balances)
         }
 
@@ -290,21 +292,23 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, from, to, ids, amounts, data)?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; ++i){
-            let id: u128 = ids.get(&i).unwrap();
-            let amount: u128 = amounts.get(&i).unwrap();
-            let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
-            if from_balance < amount {
-                return Err(Error::Custom(String::from(
-                    "ERC1155: insufficient balance for transfer",
-                )))
+            let i: u128 = 0;
+            while i < ids.length {
+                let id: u128 = ids.get(&i).unwrap();
+                let amount: u128 = amounts.get(&i).unwrap();
+                let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+                if from_balance < amount {
+                    return Err(Error::Custom(String::from(
+                        "ERC1155: insufficient balance for transfer",
+                    )))
+                }
+                // Please handle unchecked blocks manually >>>
+                self.balances.insert(&(id, from), from_balance - amount);
+                // <<< Please handle unchecked blocks manually
+                self.balances
+                    .insert(&(id, to), self.balances.get(&(id, to)).unwrap() + amount);
+                i += 1;
             }
-            // Please handle unchecked blocks manually >>>
-            self.balances.insert(&(id, from), from_balance - amount);
-            // <<< Please handle unchecked blocks manually
-            self.balances
-                .insert(&(id, to), self.balances.get(&(id, to)).unwrap() + amount);
-            // Sol2Ink Not Implemented yet End Block here
             self.env().emit_event(TransferBatch {
                 operator,
                 from,
@@ -403,12 +407,15 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, ZERO_ADDRESS.into(), to, ids, amounts, data)?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; i++){
-            self.balances.insert(
-                &(ids.get(&i).unwrap(), to),
-                self.balances.get(&(ids.get(&i).unwrap(), to)).unwrap() + amounts.get(&i).unwrap(),
-            );
-            // Sol2Ink Not Implemented yet End Block here
+            let i: u128 = 0;
+            while i < ids.length {
+                self.balances.insert(
+                    &(ids.get(&i).unwrap(), to),
+                    self.balances.get(&(ids.get(&i).unwrap(), to)).unwrap()
+                        + amounts.get(&i).unwrap(),
+                );
+                i += 1;
+            }
             self.env().emit_event(TransferBatch {
                 operator,
                 from: ZERO_ADDRESS.into(),
@@ -485,19 +492,21 @@ pub mod ierc_1155_metadata_uri {
             }
             let operator: AccountId = self.env().caller();
             self._before_token_transfer(operator, from, ZERO_ADDRESS.into(), ids, amounts, "")?;
-            // Sol2Ink Not Implemented yet: for(uint256 i = 0; i < ids.length; i++){
-            let id: u128 = ids.get(&i).unwrap();
-            let amount: u128 = amounts.get(&i).unwrap();
-            let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
-            if from_balance < amount {
-                return Err(Error::Custom(String::from(
-                    "ERC1155: burn amount exceeds balance",
-                )))
+            let i: u128 = 0;
+            while i < ids.length {
+                let id: u128 = ids.get(&i).unwrap();
+                let amount: u128 = amounts.get(&i).unwrap();
+                let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+                if from_balance < amount {
+                    return Err(Error::Custom(String::from(
+                        "ERC1155: burn amount exceeds balance",
+                    )))
+                }
+                // Please handle unchecked blocks manually >>>
+                self.balances.insert(&(id, from), from_balance - amount);
+                // <<< Please handle unchecked blocks manually
+                i += 1;
             }
-            // Please handle unchecked blocks manually >>>
-            self.balances.insert(&(id, from), from_balance - amount);
-            // <<< Please handle unchecked blocks manually
-            // Sol2Ink Not Implemented yet End Block here
             self.env().emit_event(TransferBatch {
                 operator,
                 from,

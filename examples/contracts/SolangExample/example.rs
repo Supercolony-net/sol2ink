@@ -123,9 +123,11 @@ pub mod example {
         ///calculate the population count (number of set bits) using Brian Kerningham's way
         #[ink(message)]
         pub fn population_count(&self, n: u128) -> Result<u128, Error> {
-            // Sol2Ink Not Implemented yet: for(count = 0; n != 0; count++){
-            n &= (n - 1);
-            // Sol2Ink Not Implemented yet End Block here
+            count = 0;
+            while n != 0 {
+                n &= (n - 1);
+                count += 1;
+            }
         }
 
         ///calculate the power of base to exp
@@ -155,13 +157,15 @@ pub mod example {
         ///This mocks a pid state
         fn _get_pid_state(&self, pid: u64) -> Result<State, Error> {
             let n: u64 = 8;
-            // Sol2Ink Not Implemented yet: for(uint16 i = 1; i < 10; ++i){
-            if (i_ % _3) == 0 {
-                n *= pid / (i as u64);
-            } else {
-                n /= 3;
+            let i: u16 = 1;
+            while i < 10 {
+                if (i_ % _3) == 0 {
+                    n *= pid / (i as u64);
+                } else {
+                    n /= 3;
+                }
+                i += 1;
             }
-            // Sol2Ink Not Implemented yet End Block here
             return Ok(self._state(n_ % _uint_64(state.state_count))?)
         }
 

@@ -270,6 +270,15 @@ lazy_static! {
         \s*$"#,
     )
     .unwrap();
+    static ref REGEX_FOR: Regex = Regex::new(
+        r#"(?x)
+        ^\s*for\s*\(\s*
+        (?P<assignment>.+?;)\s*
+        (?P<condition>.+?)\s*;
+        (?P<modification>.+)\s*
+        \)\s*\{$"#,
+    )
+    .unwrap();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -1044,11 +1053,24 @@ fn parse_statement(
             Block::Else => return Statement::IfEnd,
             Block::ElseIf => return Statement::IfEnd,
             Block::Try => return Statement::TryEnd,
+            Block::While => return Statement::WhileEnd,
         }
         return Statement::Comment(String::from("<<< Please handle unchecked blocks manually"))
     } else if REGEX_TRY.is_match(&line) {
         stack.push_back(Block::Try);
         return parse_try(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
+    } else if REGEX_FOR.is_match(&line) {
+        stack.push_back(Block::While);
+        return parse_for(
             &line,
             constructor,
             storage,
@@ -1445,6 +1467,59 @@ fn parse_try(
     );
 
     Statement::Try(statements)
+}
+
+fn parse_for(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    let assignment_raw = capture_regex(&REGEX_FOR, &line, "assignment").unwrap();
+    let condition_raw = capture_regex(&REGEX_FOR, &line, "condition").unwrap();
+    let modification_raw = capture_regex(&REGEX_FOR, &line, "modification").unwrap();
+
+    let assignment = parse_statement(
+        &assignment_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+    );
+    let condition = parse_member(&condition_raw, constructor, storage, imports, functions);
+    let modification = parse_statement(
+        &modification_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+    );
+
+    let mut statements = Vec::default();
+
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::WhileEnd,
+    );
+
+    Statement::While(bx!(assignment), condition, bx!(modification), statements)
 }
 
 fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -> Statement {
