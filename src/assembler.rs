@@ -111,8 +111,7 @@ fn assemble_contract_doc(comments: Vec<String>) -> TokenStream {
 /// Sorts the imports inside the HashSet and return it as a Vec of Strings
 fn assemble_imports(imports: HashSet<String>) -> TokenStream {
     let mut output = TokenStream::new();
-    let mut output_vec = Vec::from_iter(imports);
-    output_vec.sort();
+    let output_vec = Vec::from_iter(imports);
 
     for import in output_vec {
         output.extend(TokenStream::from_str(&import).unwrap());
@@ -241,6 +240,7 @@ fn assemble_storage(contract_name: &String, fields: &[ContractField]) -> TokenSt
     output
 }
 
+/// Assembles constant fields of the contract
 fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
     let mut output = TokenStream::new();
 
@@ -446,16 +446,25 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         // assemble return params
         if !function.header.return_params.is_empty() {
             let mut params = TokenStream::new();
+
             for i in 0..function.header.return_params.len() {
-                let param_type =
-                    TokenStream::from_str(&function.header.return_params[i].param_type).unwrap();
+                let param = &function.header.return_params[i];
+                let param_type = TokenStream::from_str(&param.param_type).unwrap();
 
                 if i > 0 {
                     params.extend(quote! {,});
                 }
+
                 params.extend(quote! {
                     #param_type
                 });
+
+                if param.name != "_" {
+                    let param_name = TokenStream::from_str(&param.name.to_case(Snake)).unwrap();
+                    body.extend(quote! {
+                        let mut #param_name = #param_type::default();
+                    })
+                }
             }
 
             if function.header.return_params.len() > 1 {
@@ -482,6 +491,28 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
             body.extend(quote! {
                 Ok(())
             });
+        } else if function.header.return_params[0].name != "_" {
+            let out = TokenStream::from_str(
+                &function
+                    .header
+                    .return_params
+                    .iter()
+                    .map(|param| param.name.clone())
+                    .collect::<Vec<String>>()
+                    .join(","),
+            )
+            .unwrap();
+            body.extend(
+                if function.header.return_params.len() > 1 {
+                    quote! {
+                        Ok((#out))
+                    }
+                } else {
+                    quote! {
+                        Ok(#out)
+                    }
+                },
+            );
         }
 
         output.extend(quote! {

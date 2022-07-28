@@ -123,11 +123,13 @@ pub mod example {
         ///calculate the population count (number of set bits) using Brian Kerningham's way
         #[ink(message)]
         pub fn population_count(&self, n: u128) -> Result<u128, Error> {
+            let mut count = u128::default();
             count = 0;
             while n != 0 {
                 n &= (n - 1);
                 count += 1;
             }
+            Ok(count)
         }
 
         ///calculate the power of base to exp
@@ -206,8 +208,10 @@ pub mod example {
         ///This function does a lot of copying
         #[ink(message)]
         pub fn set_card_1(&mut self, c: card) -> Result<card, Error> {
+            let mut previous = card::default();
             previous = card_1;
             card_1 = c;
+            Ok(previous)
         }
 
         ///return the ace of spades
@@ -219,6 +223,7 @@ pub mod example {
         ///score card
         #[ink(message)]
         pub fn score_card(&self, c: card) -> Result<u32, Error> {
+            let mut score = u32::default();
             if c.s == suit.hearts {
                 if c.v == value.ace {
                     score = 14;
@@ -234,6 +239,7 @@ pub mod example {
                 }
             }
             // all others score 0
+            Ok(score)
         }
 
     }
