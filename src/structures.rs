@@ -64,6 +64,7 @@ pub struct Enum {
     pub comments: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct Struct {
     pub name: String,
     pub fields: Vec<StructField>,
@@ -246,6 +247,7 @@ pub enum Expression {
     ),
     NewArray(String, Box<Expression>),
     StructArg(String, Box<Expression>),
+    StructInit(String, Vec<Expression>),
     Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
     WithSelector(Box<Expression>, Box<Expression>),
     ZeroAddressInto,

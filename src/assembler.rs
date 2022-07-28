@@ -1001,6 +1001,17 @@ impl ToString for Expression {
             Expression::StructArg(field_name, value) => {
                 format!("{} : {}", field_name.to_case(Snake), value.to_string())
             }
+            Expression::StructInit(struct_name, struct_args) => {
+                format!(
+                    "{} {{{}}}",
+                    struct_name.to_case(Pascal),
+                    struct_args
+                        .iter()
+                        .map(Expression::to_string)
+                        .collect::<Vec<String>>()
+                        .join(",")
+                )
+            }
             Expression::Ternary(condition_raw, if_true, if_false) => {
                 let left = condition_raw.left.to_string();
                 let operation = condition_raw.operation.to_string();

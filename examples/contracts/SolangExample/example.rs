@@ -217,9 +217,10 @@ pub mod example {
         ///return the ace of spades
         #[ink(message)]
         pub fn ace_of_spaces(&self) -> Result<card, Error> {
-            // Sol2Ink Not Implemented yet: return card({
-            // Sol2Ink Not Implemented yet: s: suit.spades, v: value.ace }
-            // Sol2Ink Not Implemented yet: );
+            return Ok(Card {
+                s: suit.spades,
+                v: value.ace,
+            })
         }
 
         ///score card
