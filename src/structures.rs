@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, Eq, PartialEq, Default)]
 pub enum ContractType {
     #[default]
     INTERFACE,
@@ -113,7 +113,12 @@ pub enum Statement {
     ElseIf(Condition, Vec<Statement>),
     Emit(String, Vec<Expression>),
     FunctionCall(Expression),
-    While(Option<Box<Statement>>, Expression, Option<Box<Statement>>, Vec<Statement>),
+    While(
+        Option<Box<Statement>>,
+        Expression,
+        Option<Box<Statement>>,
+        Vec<Statement>,
+    ),
     Group(Vec<Statement>),
     If(Condition, Vec<Statement>),
     IfEnd,
@@ -168,7 +173,7 @@ pub enum Operation {
 
 impl ToString for Operation {
     fn to_string(&self) -> String {
-        return match self {
+        match self {
             Operation::Add => String::from("+"),
             Operation::AddOne => String::from("+= 1"),
             Operation::AddAssign => String::from("+="),

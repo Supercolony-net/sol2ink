@@ -35,20 +35,20 @@ fn run(path: &String) -> Result<(), parser::ParserError> {
 
     let output = parser::parse_file(content)?;
     match output {
-        (None, None) | (Some(_), Some(_)) => return Err(ParserError::FileCorrupted),
+        (None, None) | (Some(_), Some(_)) => Err(ParserError::FileCorrupted),
         (Some(contract), None) => {
             let ink_contract = assembler::assemble_contract(contract);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(ink_contract, Some(file_name))?;
             println!("File saved!");
-            return Ok(())
+            Ok(())
         }
         (None, Some(interface)) => {
             let ink_trait = assembler::assemble_interface(interface);
             let file_name = path.replace(".sol", ".rs");
             file_utils::write_file(ink_trait, Some(file_name))?;
             println!("File saved!");
-            return Ok(())
+            Ok(())
         }
     }
 }

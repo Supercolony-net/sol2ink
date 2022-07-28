@@ -15,10 +15,10 @@ use std::{
 };
 use substring::Substring;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 enum ArgsReader {
-    ARGTYPE,
-    ARGNAME,
+    ArgType,
+    ArgName,
 }
 
 macro_rules! selector {
@@ -336,7 +336,7 @@ pub fn parse_file(string: String) -> Result<(Option<Contract>, Option<Interface>
             SLASH if action == Action::None => action = Action::Slash,
             SLASH if action == Action::Slash => {
                 let comment = parse_comment(&mut chars);
-                if comment.len() > 0 {
+                if !comment.is_empty() {
                     comments.push(comment);
                 }
                 action = Action::None;
@@ -374,7 +374,7 @@ fn parse_comment(chars: &mut Chars) -> String {
     let mut buffer = String::new();
     let mut reading = false;
 
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         match ch {
             SLASH if !reading => {
                 reading = true;
@@ -400,9 +400,9 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
     let mut new_line = false;
     let mut asterisk = false;
 
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if ch == SLASH && asterisk {
-            if buffer.trim().len() > 0 {
+            if !buffer.trim().is_empty() {
                 comments.push(format!(" {}", buffer.trim()));
             }
             break
@@ -417,7 +417,7 @@ fn parse_multiline_comment(chars: &mut Chars) -> Vec<String> {
                 new_line = false;
             }
             NEW_LINE => {
-                if buffer.trim().len() > 0 {
+                if !buffer.trim().is_empty() {
                     comments.push(format!(" {}", buffer.trim()));
                     buffer.clear();
                 }
@@ -471,7 +471,7 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
             SLASH if action == Action::Contract => action = Action::Slash,
             SLASH if action == Action::Slash => {
                 let comment = parse_comment(chars);
-                if comment.len() > 0 {
+                if !comment.is_empty() {
                     comments.push(comment);
                 }
                 action = Action::Contract;
@@ -639,7 +639,7 @@ pub fn parse_interface(
             SLASH if action == Action::Contract => action = Action::Slash,
             SLASH if action == Action::Slash => {
                 let comment = parse_comment(chars);
-                if comment.len() > 0 {
+                if !comment.is_empty() {
                     comments.push(comment);
                 }
                 action = Action::Contract;
@@ -706,7 +706,7 @@ pub fn parse_interface(
 fn parse_contract_field(
     line_raw: String,
     imports: &mut HashSet<String>,
-    comments: &Vec<String>,
+    comments: &[String],
 ) -> ContractField {
     let mut line = line_raw.replace(" => ", "=>");
     line = line.replace(" ( ", "(");
@@ -726,14 +726,14 @@ fn parse_contract_field(
     let field_name = capture_regex(&regex, &line, "field_name").unwrap();
     let initial_value = capture_regex(&regex, &line, "initial_value");
     let constant = attributes_raw
-        .unwrap_or(String::from(""))
+        .unwrap_or_else(|| String::from(""))
         .contains("constant");
     let field_type = convert_variable_type(field_type_raw, imports);
 
     ContractField {
         field_type,
         name: field_name,
-        comments: comments.clone(),
+        comments: comments.to_vec(),
         initial_value,
         constant,
     }
@@ -748,7 +748,7 @@ fn parse_contract_field(
 fn parse_function_header(
     chars: &mut Chars,
     imports: &mut HashSet<String>,
-    comments: &Vec<String>,
+    comments: &[String],
 ) -> FunctionHeader {
     let mut function_header_raw = read_until(chars, vec![SEMICOLON, CURLY_OPEN]);
     function_header_raw.remove_matches(" memory");
@@ -836,7 +836,7 @@ fn parse_function_header(
 fn parse_function(
     imports: &mut HashSet<String>,
     chars: &mut Chars,
-    comments: &Vec<String>,
+    comments: &[String],
 ) -> Result<Function, ParserError> {
     Ok(Function {
         header: parse_function_header(chars, imports, comments),
@@ -847,14 +847,14 @@ fn parse_function(
 fn parse_modifier(
     imports: &mut HashSet<String>,
     chars: &mut Chars,
-    comments: &Vec<String>,
+    comments: &[String],
 ) -> Result<Modifier, ParserError> {
     imports.insert(String::from("use brush::modifier_definition;"));
     imports.insert(String::from("use brush::modifiers;"));
     Ok(Modifier {
         header: parse_function_header(chars, imports, comments),
         statements: parse_body(chars),
-        comments: comments.clone(),
+        comments: comments.to_vec(),
     })
 }
 
@@ -921,7 +921,7 @@ fn parse_body(chars: &mut Chars) -> Vec<Statement> {
 }
 
 fn process_function_modifiers(
-    raw_modifiers: &Vec<String>,
+    raw_modifiers: &[String],
     modifiers_map: &HashMap<String, ()>,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -931,10 +931,10 @@ fn process_function_modifiers(
     let mut out = Vec::default();
     for raw_modifier in raw_modifiers.iter() {
         let modifier_name =
-            capture_regex(&regex_modifier_name, raw_modifier, "name").unwrap_or(String::new());
+            capture_regex(&regex_modifier_name, raw_modifier, "name").unwrap_or_default();
         if modifiers_map.contains_key(&modifier_name) {
             let function_call =
-                parse_function_call(&raw_modifier, false, storage, imports, functions);
+                parse_function_call(raw_modifier, false, storage, imports, functions);
             let mut function_call_string_raw = function_call.to_string();
             // openbrush modifiers do not support function calls
             // so if such situation occurs, we remove self. and ? for formatting
@@ -947,7 +947,7 @@ fn process_function_modifiers(
 }
 
 fn parse_statements(
-    statements: &Vec<Statement>,
+    statements: &[Statement],
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
@@ -959,20 +959,17 @@ fn parse_statements(
     let mut out = Vec::default();
 
     while let Some(statement) = iterator.next() {
-        match statement {
-            Statement::Raw(content) => {
-                out.push(parse_statement(
-                    &content,
-                    constructor,
-                    &storage,
-                    imports,
-                    &functions,
-                    &mut stack,
-                    &mut iterator,
-                    events,
-                ));
-            }
-            _ => {}
+        if let Statement::Raw(line_raw) = statement {
+            out.push(parse_statement(
+                line_raw,
+                constructor,
+                storage,
+                imports,
+                functions,
+                &mut stack,
+                &mut iterator,
+                events,
+            ));
         }
     }
 
@@ -985,7 +982,7 @@ fn parse_statements(
 ///
 /// returns the statement as `Statement` struct
 fn parse_statement(
-    line_raw: &String,
+    line_raw: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1145,7 +1142,7 @@ fn parse_statement(
 }
 
 fn parse_assign(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1153,7 +1150,7 @@ fn parse_assign(
 ) -> Statement {
     let left_raw = capture_regex(&REGEX_ASSIGN, line, "left").unwrap();
     let operation_raw =
-        capture_regex(&REGEX_ASSIGN, line, "operation").unwrap_or(String::from("="));
+        capture_regex(&REGEX_ASSIGN, line, "operation").unwrap_or_else(|| String::from("="));
     let right_raw = capture_regex(&REGEX_ASSIGN, line, "right").unwrap();
 
     let left = parse_member(&left_raw, constructor, storage, imports, functions);
@@ -1188,7 +1185,7 @@ fn parse_assign(
         return Statement::Group(vec![assign, arithmetic])
     }
 
-    return if let Expression::Mapping(name, indices, selector, None) = left {
+    if let Expression::Mapping(name, indices, selector, None) = left {
         let converted_operation = match operation {
             Operation::AddAssign => Operation::Add,
             Operation::MulAssign => Operation::Mul,
@@ -1218,7 +1215,7 @@ fn parse_assign(
 }
 
 fn parse_double_sign(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1226,7 +1223,8 @@ fn parse_double_sign(
     regex: &Regex,
 ) -> Statement {
     let member_raw = capture_regex(regex, line, "value").unwrap();
-    let operation_raw = capture_regex(regex, line, "operation").unwrap_or(String::from("="));
+    let operation_raw =
+        capture_regex(regex, line, "operation").unwrap_or_else(|| String::from("="));
 
     let member = parse_member(&member_raw, constructor, storage, imports, functions).to_string();
     let operation = OPERATIONS.get(&operation_raw).unwrap().to_string();
@@ -1236,7 +1234,7 @@ fn parse_double_sign(
 }
 
 fn parse_emit(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1249,13 +1247,12 @@ fn parse_emit(
     let args_raw = capture_regex(&REGEX_EMIT, line, "args").unwrap();
 
     let mut args = Vec::<Expression>::new();
-    let mut chars = args_raw.chars();
     let mut buffer = String::new();
     let mut open_parentheses = 0;
     let mut close_parenthesis = 0;
     let mut event_count = 0;
 
-    while let Some(ch) = chars.next() {
+    for ch in args_raw.chars() {
         match ch {
             PARENTHESIS_OPEN => {
                 open_parentheses += 1;
@@ -1316,7 +1313,7 @@ fn parse_emit(
 }
 
 fn parse_return(
-    line: &String,
+    line: &str,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
@@ -1339,31 +1336,28 @@ fn parse_block(
     until: Statement,
 ) {
     while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content) => {
-                let statement = parse_statement(
-                    &content,
-                    constructor,
-                    storage,
-                    imports,
-                    functions,
-                    stack,
-                    iterator,
-                    events,
-                );
-                if statement == until {
-                    break
-                } else {
-                    statements.push(statement)
-                }
+        if let Statement::Raw(line_raw) = statement_raw {
+            let statement = parse_statement(
+                line_raw,
+                constructor,
+                storage,
+                imports,
+                functions,
+                stack,
+                iterator,
+                events,
+            );
+            if statement == until {
+                break
+            } else {
+                statements.push(statement)
             }
-            _ => {}
         }
     }
 }
 
 fn parse_if(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1425,7 +1419,7 @@ fn parse_else(
 }
 
 fn parse_else_if(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1461,7 +1455,7 @@ fn parse_else_if(
 }
 
 fn parse_try(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1471,7 +1465,7 @@ fn parse_try(
     events: &HashMap<String, Event>,
 ) -> Statement {
     let mut statements = Vec::default();
-    statements.push(Statement::Comment(line.clone()));
+    statements.push(Statement::Comment(line.to_owned()));
 
     parse_block(
         constructor,
@@ -1489,7 +1483,7 @@ fn parse_try(
 }
 
 fn parse_for(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1498,9 +1492,9 @@ fn parse_for(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    let assignment_raw = capture_regex(&REGEX_FOR, &line, "assignment").unwrap();
-    let condition_raw = capture_regex(&REGEX_FOR, &line, "condition").unwrap();
-    let modification_raw = capture_regex(&REGEX_FOR, &line, "modification").unwrap();
+    let assignment_raw = capture_regex(&REGEX_FOR, line, "assignment").unwrap();
+    let condition_raw = capture_regex(&REGEX_FOR, line, "condition").unwrap();
+    let modification_raw = capture_regex(&REGEX_FOR, line, "modification").unwrap();
 
     let assignment = parse_statement(
         &assignment_raw,
@@ -1547,7 +1541,7 @@ fn parse_for(
 }
 
 fn parse_while(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1556,7 +1550,7 @@ fn parse_while(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
 ) -> Statement {
-    let condition_raw = capture_regex(&REGEX_WHILE, &line, "condition").unwrap();
+    let condition_raw = capture_regex(&REGEX_WHILE, line, "condition").unwrap();
     let condition = parse_member(&condition_raw, constructor, storage, imports, functions);
     let mut statements = Vec::default();
 
@@ -1581,19 +1575,16 @@ fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -
         "Please handle assembly blocks manually >>>",
     )));
 
-    while let Some(statement_raw) = iterator.next() {
-        match statement_raw {
-            Statement::Raw(content_raw) => {
-                let content = trim(&content_raw);
-                if content == "}" {
-                    stack.pop_back();
-                    statements.push(Statement::AssemblyEnd);
-                    break
-                } else {
-                    statements.push(Statement::Comment(content.clone()));
-                }
+    for statement_raw in iterator.by_ref() {
+        if let Statement::Raw(content_raw) = statement_raw {
+            let content = trim(content_raw);
+            if content == "}" {
+                stack.pop_back();
+                statements.push(Statement::AssemblyEnd);
+                break
+            } else {
+                statements.push(Statement::Comment(content.clone()));
             }
-            _ => {}
         }
     }
 
@@ -1605,7 +1596,7 @@ fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -
 }
 
 fn parse_catch(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1615,7 +1606,7 @@ fn parse_catch(
     events: &HashMap<String, Event>,
 ) -> Statement {
     let mut statements = Vec::default();
-    statements.push(Statement::Comment(line.clone()));
+    statements.push(Statement::Comment(line.to_owned()));
 
     parse_block(
         constructor,
@@ -1633,7 +1624,7 @@ fn parse_catch(
 }
 
 fn parse_require(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1653,11 +1644,14 @@ fn parse_require(
         functions,
     );
     let error_output = if constructor {
-        format!("panic!(\"{}\")", error.unwrap_or(DEFAULT_ERROR.to_owned()))
+        format!(
+            "panic!(\"{}\")",
+            error.unwrap_or_else(|| DEFAULT_ERROR.to_owned())
+        )
     } else {
         format!(
             "return Err(Error::Custom(String::from(\"{}\")))",
-            error.unwrap_or(DEFAULT_ERROR.to_owned())
+            error.unwrap_or_else(|| DEFAULT_ERROR.to_owned())
         )
     };
 
@@ -1839,12 +1833,11 @@ fn parse_member(
         let mapping_name_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
         let indices_raw = capture_regex(&regex_mapping, raw, "index").unwrap();
         let mut indices = Vec::<Expression>::new();
-        let mut chars = indices_raw.chars();
         let mut buffer = String::new();
         let mut open_braces = 0;
         let mut close_braces = 0;
 
-        while let Some(ch) = chars.next() {
+        for ch in indices_raw.chars() {
             match ch {
                 BRACKET_OPEN => {
                     if open_braces > close_braces {
@@ -1876,13 +1869,13 @@ fn parse_member(
         return Expression::Mapping(mapping_name_raw, indices, selector, None)
     }
 
-    let selector = get_selector(storage, constructor, &raw);
+    let selector = get_selector(storage, constructor, raw);
 
-    return Expression::Member(raw.clone(), selector)
+    Expression::Member(raw.clone(), selector)
 }
 
 fn parse_function_call(
-    raw: &String,
+    raw: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -1891,7 +1884,6 @@ fn parse_function_call(
     let function_name_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "function_name").unwrap();
     let args_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "args").unwrap();
     let mut args = Vec::<Expression>::new();
-    let mut chars = args_raw.chars();
     let mut buffer = String::new();
     let mut open_parentheses = 0;
     let mut close_parenthesis = 0;
@@ -1925,7 +1917,7 @@ fn parse_function_call(
         }
     }
 
-    while let Some(ch) = chars.next() {
+    for ch in args_raw.chars() {
         match ch {
             PARENTHESIS_OPEN => {
                 open_parentheses += 1;
@@ -2006,7 +1998,7 @@ fn parse_condition(
             let left = parse_member(&left_raw, constructor, storage, imports, functions);
             (left, Operation::Not, None)
         } else {
-            let left = parse_member(&line, constructor, storage, imports, functions);
+            let left = parse_member(line, constructor, storage, imports, functions);
             (left, Operation::True, None)
         }
     };
@@ -2034,7 +2026,7 @@ fn parse_condition(
 }
 
 #[inline(always)]
-fn capture_regex(regex: &Regex, line: &String, capture_name: &str) -> Option<String> {
+fn capture_regex(regex: &Regex, line: &str, capture_name: &str) -> Option<String> {
     regex.captures(line).and_then(|cap| {
         cap.name(capture_name)
             .map(|value| value.as_str().to_string())
@@ -2042,7 +2034,7 @@ fn capture_regex(regex: &Regex, line: &String, capture_name: &str) -> Option<Str
 }
 
 fn parse_declaration(
-    line: &String,
+    line: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -2053,7 +2045,7 @@ fn parse_declaration(
     let value_raw = capture_regex(&REGEX_DECLARE, line, "value");
     let field_type = convert_variable_type(field_type_raw, imports);
 
-    return if let Some(value) = value_raw {
+    if let Some(value) = value_raw {
         let expression = parse_member(&value, constructor, storage, imports, functions);
         Statement::Declaration(field_name, field_type, Some(expression))
     } else {
@@ -2064,7 +2056,7 @@ fn parse_declaration(
 fn is_literal(line: &String) -> bool {
     let string_regex = Regex::new(r#"^\s*".*"\s*$"#).unwrap();
     let char_regex = Regex::new(r#"^\s*'.*'\s*$"#).unwrap();
-    return line.parse::<i32>().is_ok()
+    line.parse::<i32>().is_ok()
         || string_regex.is_match(line)
         || char_regex.is_match(line)
         || line == "true"
@@ -2083,23 +2075,23 @@ fn parse_function_parameters(
 ) -> Vec<FunctionParam> {
     let mut out = Vec::<FunctionParam>::new();
 
-    if parameters.len() > 0 {
+    if !parameters.is_empty() {
         let tokens = split(&parameters, " ", Some(remove_commas()));
 
-        let mut mode = ArgsReader::ARGNAME;
+        let mut mode = ArgsReader::ArgName;
         let mut param_type = convert_variable_type(tokens[0].to_owned(), imports);
 
-        for j in 1..tokens.len() {
-            if mode == ArgsReader::ARGTYPE {
-                param_type = convert_variable_type(tokens[j].to_owned(), imports);
-                mode = ArgsReader::ARGNAME;
-            } else if mode == ArgsReader::ARGNAME {
-                let name = tokens[j].to_owned();
+        for item in tokens.iter().skip(1) {
+            if mode == ArgsReader::ArgType {
+                param_type = convert_variable_type(item.to_owned(), imports);
+                mode = ArgsReader::ArgName;
+            } else if mode == ArgsReader::ArgName {
+                let name = item.to_owned();
                 out.push(FunctionParam {
                     name,
                     param_type: param_type.to_owned(),
                 });
-                mode = ArgsReader::ARGTYPE;
+                mode = ArgsReader::ArgType;
             }
         }
     }
@@ -2112,7 +2104,7 @@ fn parse_function_parameters(
 /// `attributes` the raw representation of the attributes of the function
 ///
 /// returns 0. external 1. view 2. payable
-fn parse_function_attributes(attributes: &String) -> (bool, bool, bool) {
+fn parse_function_attributes(attributes: &str) -> (bool, bool, bool) {
     let external = attributes.contains("external") || attributes.contains("public");
     let view = attributes.contains("view") || attributes.contains("pure");
     let payable = attributes.contains("payable");
@@ -2120,8 +2112,8 @@ fn parse_function_attributes(attributes: &String) -> (bool, bool, bool) {
     (external, view, payable)
 }
 
-fn parse_modifiers(attributes: &String) -> Vec<String> {
-    let mut adjusted = attributes.clone();
+fn parse_modifiers(attributes: &str) -> Vec<String> {
+    let mut adjusted = attributes.to_owned();
     adjusted.remove_matches("payable");
     adjusted.remove_matches("external");
     adjusted.remove_matches("internal");
@@ -2157,7 +2149,7 @@ fn parse_return_parameters(
     while let Some(token) = iterator.next() {
         token.to_owned().remove_matches(",");
         let param_type = convert_variable_type(token.to_owned(), imports);
-        let name = if tokens.len() >= (parameters.matches(",").count() + 1) * 2 {
+        let name = if tokens.len() >= (parameters.matches(',').count() + 1) * 2 {
             iterator.next().unwrap()
         } else {
             "_"
@@ -2178,14 +2170,14 @@ fn parse_return_parameters(
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the event definition as `Event` struct
-fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &Vec<String>) -> Event {
+fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &[String]) -> Event {
     let event_raw = read_until(chars, vec![SEMICOLON])
         .trim()
         .replace("( ", "(")
         .replace(" )", ")");
 
     let tokens = split(&event_raw, " ", None);
-    let mut args_reader = ArgsReader::ARGNAME;
+    let mut args_reader = ArgsReader::ArgName;
     let mut indexed = false;
 
     let split_brace = split(&tokens[0], "(", None);
@@ -2194,14 +2186,14 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &Vec<
     let mut field_type = convert_variable_type(split_brace[1].to_owned(), imports);
     let mut fields = Vec::<EventField>::new();
 
-    for i in 1..tokens.len() {
-        let mut token = tokens[i].to_owned();
+    for item in tokens.iter().skip(1) {
+        let mut token = item.clone();
         if token == "indexed" {
             indexed = true;
             continue
-        } else if args_reader == ArgsReader::ARGTYPE {
+        } else if args_reader == ArgsReader::ArgType {
             field_type = convert_variable_type(token, imports);
-            args_reader = ArgsReader::ARGNAME;
+            args_reader = ArgsReader::ArgName;
         } else {
             token.remove_matches(&[',', ')'][..]);
             fields.push(EventField {
@@ -2210,7 +2202,7 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &Vec<
                 name: token.to_owned(),
             });
             indexed = false;
-            args_reader = ArgsReader::ARGTYPE;
+            args_reader = ArgsReader::ArgType;
         }
     }
 
@@ -2228,15 +2220,11 @@ fn parse_event(imports: &mut HashSet<String>, chars: &mut Chars, comments: &Vec<
 /// `iterator` the iterator over lines of the contract file
 ///
 /// returns the struct definition as `Struct` struct
-fn parse_struct(
-    imports: &mut HashSet<String>,
-    chars: &mut Chars,
-    comments: &Vec<String>,
-) -> Struct {
+fn parse_struct(imports: &mut HashSet<String>, chars: &mut Chars, comments: &[String]) -> Struct {
     let mut struct_raw = read_until(chars, vec![CURLY_CLOSE]);
     struct_raw = struct_raw.replace(" => ", "=>");
     let split_brace = split(&struct_raw, "{", None);
-    let fields = split(&split_brace[1].trim().to_string(), ";", None);
+    let fields = split(split_brace[1].trim(), ";", None);
     let struct_name = split_brace[0].to_owned();
 
     let mut struct_fields = Vec::<StructField>::new();
@@ -2249,7 +2237,7 @@ fn parse_struct(
     }
 
     Struct {
-        name: struct_name.to_owned(),
+        name: struct_name,
         fields: struct_fields,
         comments: comments.to_vec(),
     }
@@ -2274,14 +2262,14 @@ fn parse_struct_field(line: String, imports: &mut HashSet<String>) -> StructFiel
 /// `line` the Solidity definition of enum
 ///
 /// returns the enum as `Enum` struct
-fn parse_enum(chars: &mut Chars, comments: &Vec<String>) -> Enum {
+fn parse_enum(chars: &mut Chars, comments: &[String]) -> Enum {
     let enum_raw = read_until(chars, vec![CURLY_CLOSE]);
     let tokens = split(&enum_raw, " ", None);
     let name = tokens[0].to_owned();
     let mut values = Vec::<String>::new();
 
-    for i in 1..tokens.len() {
-        let mut token = tokens[i].to_owned();
+    for item in tokens.iter().skip(1) {
+        let mut token = item.clone();
         if token == "{" {
             continue
         } else {
@@ -2391,7 +2379,7 @@ fn convert_int(arg_type: String) -> String {
 
 fn read_until(chars: &mut Chars, until: Vec<char>) -> String {
     let mut buffer = String::new();
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if until.contains(&ch) {
             break
         }

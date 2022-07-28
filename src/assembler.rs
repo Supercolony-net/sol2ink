@@ -68,7 +68,7 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
 
 /// Assembles ink! interface(trait) from the parsed interface struct and return it as a vec of Strings
 pub fn assemble_interface(interface: Interface) -> TokenStream {
-    let interface_name = TokenStream::from_str(&format!("{}", interface.name)).unwrap();
+    let interface_name = TokenStream::from_str(&interface.name).unwrap();
     let interface_name_ref = TokenStream::from_str(&format!("{}Ref", interface.name)).unwrap();
     let signature = signature();
     let imports = assemble_imports(interface.imports);
@@ -167,7 +167,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
     let mut output = TokenStream::new();
 
     for event in events.iter() {
-        let event_name = TokenStream::from_str(&format!("{}", event.name)).unwrap();
+        let event_name = TokenStream::from_str(&event.name).unwrap();
         let mut event_comments = TokenStream::new();
         let mut event_fields = TokenStream::new();
 
@@ -209,7 +209,7 @@ fn assemble_events(events: Vec<Event>) -> TokenStream {
 }
 
 /// Assembles ink! storage struct from the vec of parsed ContractField structs and return it as a vec of Strings
-fn assemble_storage(contract_name: &String, fields: &Vec<ContractField>) -> TokenStream {
+fn assemble_storage(contract_name: &String, fields: &[ContractField]) -> TokenStream {
     let mut output = TokenStream::new();
     let contract_name = format_ident!("{}", contract_name);
     let mut storage_fields = TokenStream::new();
@@ -311,7 +311,7 @@ fn assemble_structs(structs: Vec<Struct>) -> TokenStream {
 }
 
 /// Assembles ink! cosntructor from the parsed Function struct and return it as a vec of Strings
-fn assemble_constructor(constructor: Function, fields: &Vec<ContractField>) -> TokenStream {
+fn assemble_constructor(constructor: Function, fields: &[ContractField]) -> TokenStream {
     let mut output = TokenStream::new();
     let mut params = TokenStream::new();
     let mut comments = TokenStream::new();
@@ -391,7 +391,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         for function_modifier_raw in function.header.modifiers.iter() {
-            let function_modifier = TokenStream::from_str(&function_modifier_raw).unwrap();
+            let function_modifier = TokenStream::from_str(function_modifier_raw).unwrap();
             function_modifiers.extend(quote! {
                 #[modifiers(#function_modifier)]
             });
@@ -444,7 +444,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
         }
 
         // assemble return params
-        if function.header.return_params.len() > 0 {
+        if !function.header.return_params.is_empty() {
             let mut params = TokenStream::new();
             for i in 0..function.header.return_params.len() {
                 let param_type =
@@ -612,7 +612,7 @@ fn assemble_function_headers(function_headers: Vec<FunctionHeader>) -> TokenStre
         }
 
         // assemble return params
-        if header.return_params.len() > 0 {
+        if !header.return_params.is_empty() {
             let mut params = TokenStream::new();
             for i in 0..header.return_params.len() {
                 let param_type =
@@ -821,7 +821,7 @@ impl ToTokens for Statement {
             Statement::Require(condition_raw, error_raw) => {
                 let left = TokenStream::from_str(&condition_raw.left.to_string()).unwrap();
                 let operation = condition_raw.operation;
-                let error = TokenStream::from_str(&error_raw).unwrap();
+                let error = TokenStream::from_str(error_raw).unwrap();
                 let condition = if let Some(condition) = &condition_raw.right {
                     let right = TokenStream::from_str(&condition.to_string()).unwrap();
                     quote!(#left #operation #right)
@@ -955,7 +955,7 @@ impl ToString for Expression {
                 let name_and_selector = if let Some(selector) = selector_raw {
                     format!("{selector}.{name}")
                 } else {
-                    format!("{name}")
+                    name
                 };
                 if let Some(insert_raw) = insert_maybe {
                     let insert = insert_raw.to_string();
