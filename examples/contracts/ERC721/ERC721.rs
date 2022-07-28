@@ -95,8 +95,8 @@ pub mod erc_721 {
         /// @dev See {IERC165-supportsInterface}.
         #[ink(message)]
         pub fn supports_interface(&self, interface_id: [u8; 4]) -> Result<bool, Error> {
-            return Ok(interface_id == type_of(ierc_721).interface_id
-                || interface_id == type_of(ierc_721_metadata).interface_id
+            return Ok(interface_id == ierc_721.interface_id
+                || interface_id == ierc_721_metadata.interface_id
                 || super.supports_interface(interface_id)?)
         }
 

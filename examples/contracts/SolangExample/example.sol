@@ -152,7 +152,7 @@ contract example {
 
 	/// return the ace of spades
 	function ace_of_spaces() public pure returns (card memory) {
-		// return card({s: suit.spades, v: value.ace });
+		return card({s: suit.spades, v: value.ace });
 	}
 
 	/// score card

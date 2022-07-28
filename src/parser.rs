@@ -196,10 +196,6 @@ lazy_static! {
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
         let mut map = HashMap::new();
         map.insert(String::from("address(0)"), Expression::ZeroAddressInto);
-        map.insert(
-            String::from("type(uint256).max"),
-            Expression::Literal(String::from("u128::MAX")),
-        );
         map.insert(String::from("msg.sender"), Expression::EnvCaller(None));
         map
     };
@@ -1676,6 +1672,8 @@ fn parse_member(
         }
 
         return expression.clone()
+    } else if let Some(new_type) = TYPES.get(raw.as_str()) {
+        return Expression::Literal(new_type.0.to_owned())
     }
 
     let regex_hex = Regex::new(r#"(?x)^(?P<before>.*)hex"(?P<value>.+?)"(?P<after>.*)$"#).unwrap();
@@ -1708,14 +1706,18 @@ fn parse_member(
 
     let regex_type = Regex::new(
         r#"(?x)
-        ^\s*type\((?P<rest>.+?)
-        \s*$"#,
+        ^\s*type\s*\(\s*(?P<selector>.+?)
+        \)\.(?P<member>.+?)\s*$"#,
     )
     .unwrap();
     if regex_type.is_match(raw) {
-        // TODO: type(IERC721).interfaceId
-        let rest = capture_regex(&regex_type, raw, "rest").unwrap();
-        return Expression::Member(format!("type_of({rest}"), None)
+        let selector_raw = capture_regex(&regex_type, raw, "selector").unwrap();
+        let member_raw = capture_regex(&regex_type, raw, "member").unwrap();
+
+        let selector = parse_member(&selector_raw, constructor, storage, imports, functions);
+        let member = parse_member(&member_raw, constructor, storage, imports, functions);
+
+        return Expression::WithSelector(bx!(selector), bx!(member))
     }
 
     let regex_arithmetic = Regex::new(

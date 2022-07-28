@@ -384,7 +384,7 @@ pub mod erc_20 {
             amount: u128,
         ) -> Result<(), Error> {
             let current_allowance: u128 = self.allowance(owner, spender)?;
-            if current_allowance != u128::MAX {
+            if current_allowance != u128.max {
                 if current_allowance < amount {
                     return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
                 }
