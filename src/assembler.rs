@@ -5,7 +5,10 @@ use std::{
 
 use crate::structures::*;
 use convert_case::{
-    Case::Snake,
+    Case::{
+        Pascal,
+        Snake,
+    },
     Casing,
 };
 use proc_macro2::{
@@ -127,7 +130,7 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
     let mut output = TokenStream::new();
 
     for enumeration in enums.iter() {
-        let enum_name = TokenStream::from_str(&format!("{}", enumeration.name)).unwrap();
+        let enum_name = TokenStream::from_str(&enumeration.name.to_case(Pascal)).unwrap();
         let mut enum_comments = TokenStream::new();
         let mut values = TokenStream::new();
 
@@ -140,7 +143,7 @@ fn assemble_enums(enums: Vec<Enum>) -> TokenStream {
 
         // assemble enum values
         for value in enumeration.values.iter() {
-            let value_name = TokenStream::from_str(value).unwrap();
+            let value_name = TokenStream::from_str(&value.to_case(Pascal)).unwrap();
 
             values.extend(quote! {
                 #value_name,

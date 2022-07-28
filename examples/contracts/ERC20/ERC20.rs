@@ -70,8 +70,8 @@ pub mod erc_20 {
 
     /// This enum is added just to test enum parsing
     pub enum Enum {
-        FIRST,
-        SECOND,
+        First,
+        Second,
     }
 
     /// This struct is added just to test struct parsing

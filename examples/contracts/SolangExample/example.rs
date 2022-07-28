@@ -34,27 +34,27 @@ pub mod example {
     }
 
     ///cards
-    pub enum suit {
-        club,
-        diamonds,
-        hearts,
-        spades,
+    pub enum Suit {
+        Club,
+        Diamonds,
+        Hearts,
+        Spades,
     }
 
-    pub enum value {
-        two,
-        three,
-        four,
-        five,
-        six,
-        seven,
-        eight,
-        nine,
-        ten,
-        jack,
-        queen,
-        king,
-        ace,
+    pub enum Value {
+        Two,
+        Three,
+        Four,
+        Five,
+        Six,
+        Seven,
+        Eight,
+        Nine,
+        Ten,
+        Jack,
+        Queen,
+        King,
+        Ace,
     }
 
     #[derive(Default, Encode, Decode)]
@@ -177,13 +177,13 @@ pub mod example {
         #[ink(message)]
         pub fn reap_processes(&mut self) -> Result<(), Error> {
             let n: u32 = 0;
-            // Sol2Ink Not Implemented yet: while (n < 100) {
-            if self._get_pid_state(n)? == state.zombie {
-                // reap!
-                self.reaped += 1;
+            while n < 100 {
+                if self._get_pid_state(n)? == state.zombie {
+                    // reap!
+                    self.reaped += 1;
+                }
+                n += 1;
             }
-            n += 1;
-            // Sol2Ink Not Implemented yet End Block here
             Ok(())
         }
 

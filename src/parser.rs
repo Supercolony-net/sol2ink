@@ -279,6 +279,13 @@ lazy_static! {
         \)\s*\{$"#,
     )
     .unwrap();
+    static ref REGEX_WHILE: Regex = Regex::new(
+        r#"(?x)
+        ^\s*while\s*\(\s*
+        (?P<condition>.+?)\s*
+        \)\s*\{$"#,
+    )
+    .unwrap();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -1080,6 +1087,18 @@ fn parse_statement(
             iterator,
             events,
         )
+    } else if REGEX_WHILE.is_match(&line) {
+        stack.push_back(Block::While);
+        return parse_while(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+        )
     } else if REGEX_ASSEMBLY.is_match(&line) {
         stack.push_back(Block::Assembly);
         return parse_assembly(stack, iterator)
@@ -1519,7 +1538,41 @@ fn parse_for(
         Statement::WhileEnd,
     );
 
-    Statement::While(bx!(assignment), condition, bx!(modification), statements)
+    Statement::While(
+        Some(bx!(assignment)),
+        condition,
+        Some(bx!(modification)),
+        statements,
+    )
+}
+
+fn parse_while(
+    line: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+) -> Statement {
+    let condition_raw = capture_regex(&REGEX_WHILE, &line, "condition").unwrap();
+    let condition = parse_member(&condition_raw, constructor, storage, imports, functions);
+    let mut statements = Vec::default();
+
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::WhileEnd,
+    );
+
+    Statement::While(None, condition, None, statements)
 }
 
 fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -> Statement {
