@@ -309,15 +309,22 @@ enum Action {
     Slash,
 }
 
+const AMPERSAND: char = '&';
 const ASTERISK: char = '*';
 const BRACKET_CLOSE: char = ']';
 const BRACKET_OPEN: char = '[';
 const COMMA: char = ',';
+const EXCLAMAITON: char = '!';
+const EQUALS: char = '=';
 const CURLY_CLOSE: char = '}';
 const CURLY_OPEN: char = '{';
+const MINUS: char = '-';
 const NEW_LINE: char = '\n';
 const PARENTHESIS_CLOSE: char = ')';
 const PARENTHESIS_OPEN: char = '(';
+const PERCENT: char = '%';
+const PIPE: char = '|';
+const PLUS: char = '+';
 const SEMICOLON: char = ';';
 const SLASH: char = '/';
 const SPACE: char = ' ';
@@ -570,6 +577,7 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
             &mut imports,
             &functions_map,
             &structs_map,
+            &HashMap::default(),
         );
         function.body = parse_statements(
             &function.body,
@@ -934,27 +942,32 @@ fn parse_body(chars: &mut Chars) -> Vec<Statement> {
 }
 
 fn process_function_modifiers(
-    raw_modifiers: &[String],
+    raw_modifiers: &[Expression],
     modifiers_map: &HashMap<String, ()>,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
-) -> Vec<String> {
+    enclosed_expressions: &HashMap<String, Expression>,
+) -> Vec<Expression> {
     let regex_modifier_name = Regex::new(r#"(?x)^\s*(?P<name>.+?)\(.\)*"#).unwrap();
     let mut out = Vec::default();
     for raw_modifier in raw_modifiers.iter() {
-        let modifier_name =
-            capture_regex(&regex_modifier_name, raw_modifier, "name").unwrap_or_default();
-        if modifiers_map.contains_key(&modifier_name) {
-            let function_call =
-                parse_function_call(raw_modifier, false, storage, imports, functions, structs);
-            let mut function_call_string_raw = function_call.to_string();
-            // openbrush modifiers do not support function calls
-            // so if such situation occurs, we remove self. and ? for formatting
-            function_call_string_raw.remove_matches("self.");
-            function_call_string_raw.remove_matches("?");
-            out.push(function_call_string_raw)
+        if let Expression::Modifier(modifier) = raw_modifier {
+            let modifier_name =
+                capture_regex(&regex_modifier_name, modifier, "name").unwrap_or_default();
+            if modifiers_map.contains_key(&modifier_name) {
+                let function_call = parse_function_call(
+                    modifier,
+                    false,
+                    storage,
+                    imports,
+                    functions,
+                    structs,
+                    enclosed_expressions,
+                );
+                out.push(function_call)
+            }
         }
     }
     out
@@ -1016,11 +1029,34 @@ fn parse_statement(
     if line == "_;" {
         return Statement::ModifierBody
     } else if REGEX_RETURN.is_match(&line) {
-        return parse_return(&line, storage, imports, functions, structs)
+        return parse_return(
+            &line,
+            storage,
+            imports,
+            functions,
+            structs,
+            &HashMap::default(),
+        )
     } else if REGEX_DECLARE.is_match(&line) {
-        return parse_declaration(&line, constructor, storage, imports, functions, structs)
+        return parse_declaration(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            &HashMap::default(),
+        )
     } else if REGEX_REQUIRE.is_match(&line) {
-        return parse_require(&line, constructor, storage, imports, functions, structs)
+        return parse_require(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            &HashMap::default(),
+        )
     } else if REGEX_COMMENT.is_match(&line) {
         let comment = capture_regex(&REGEX_COMMENT, &line, "comment").unwrap();
         return Statement::Comment(comment)
@@ -1036,6 +1072,7 @@ fn parse_statement(
             iterator,
             events,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_ELSE.is_match(&line) {
         stack.push_back(Block::Else);
@@ -1061,6 +1098,7 @@ fn parse_statement(
             iterator,
             events,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_UNCHECKED.is_match(&line) {
         stack.push_back(Block::Unchecked);
@@ -1105,6 +1143,7 @@ fn parse_statement(
             iterator,
             events,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_WHILE.is_match(&line) {
         stack.push_back(Block::While);
@@ -1118,6 +1157,7 @@ fn parse_statement(
             iterator,
             events,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_ASSEMBLY.is_match(&line) {
         stack.push_back(Block::Assembly);
@@ -1144,9 +1184,18 @@ fn parse_statement(
             functions,
             events,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_ASSIGN.is_match(&line) {
-        return parse_assign(&line, constructor, storage, imports, functions, structs)
+        return parse_assign(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            &HashMap::default(),
+        )
     } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&line) {
         return parse_double_sign(
             &line,
@@ -1156,6 +1205,7 @@ fn parse_statement(
             functions,
             &REGEX_DOUBLE_SIGN_RIGHT,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_DOUBLE_SIGN_LEFT.is_match(&line) {
         return parse_double_sign(
@@ -1166,10 +1216,18 @@ fn parse_statement(
             functions,
             &REGEX_DOUBLE_SIGN_LEFT,
             structs,
+            &HashMap::default(),
         )
     } else if REGEX_FUNCTION_CALL.is_match(&line) {
-        let expression =
-            parse_function_call(&line, constructor, storage, imports, functions, structs);
+        let expression = parse_function_call(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            &HashMap::default(),
+        );
         return Statement::FunctionCall(expression)
     }
 
@@ -1183,13 +1241,22 @@ fn parse_assign(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let left_raw = capture_regex(&REGEX_ASSIGN, line, "left").unwrap();
     let operation_raw =
         capture_regex(&REGEX_ASSIGN, line, "operation").unwrap_or_else(|| String::from("="));
     let right_raw = capture_regex(&REGEX_ASSIGN, line, "right").unwrap();
 
-    let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+    let left = parse_member(
+        &left_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
     let operation = *OPERATIONS.get(&operation_raw).unwrap();
     let right = parse_member(
         &right_raw,
@@ -1198,6 +1265,7 @@ fn parse_assign(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
 
     if REGEX_DOUBLE_SIGN_LEFT.is_match(&right_raw) {
@@ -1209,6 +1277,7 @@ fn parse_assign(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let assign = Statement::Assign(left, value, operation);
         let arithmetic = parse_double_sign(
@@ -1219,6 +1288,7 @@ fn parse_assign(
             functions,
             &REGEX_DOUBLE_SIGN_LEFT,
             structs,
+            enclosed_expressions,
         );
         return Statement::Group(vec![arithmetic, assign])
     } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&right_raw) {
@@ -1230,6 +1300,7 @@ fn parse_assign(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let assign = Statement::Assign(left, value, operation);
         let arithmetic = parse_double_sign(
@@ -1240,6 +1311,7 @@ fn parse_assign(
             functions,
             &REGEX_DOUBLE_SIGN_RIGHT,
             structs,
+            enclosed_expressions,
         );
         return Statement::Group(vec![assign, arithmetic])
     }
@@ -1281,6 +1353,7 @@ fn parse_double_sign(
     functions: &HashMap<String, bool>,
     regex: &Regex,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let member_raw = capture_regex(regex, line, "value").unwrap();
     let operation_raw =
@@ -1293,12 +1366,16 @@ fn parse_double_sign(
         imports,
         functions,
         structs,
-    )
-    .to_string();
-    let operation = OPERATIONS.get(&operation_raw).unwrap().to_string();
+        enclosed_expressions,
+    );
+    let original_operation = *OPERATIONS.get(&operation_raw).unwrap();
+    let operation = match original_operation {
+        Operation::AddOne => Operation::AddAssign,
+        Operation::SubtractOne => Operation::SubtractAssign,
+        _ => original_operation,
+    };
 
-    let new_line = format!("{member}{operation};");
-    parse_assign(&new_line, constructor, storage, imports, functions, structs)
+    Statement::Assign(member, Expression::Literal(String::from("1")), operation)
 }
 
 fn parse_emit(
@@ -1309,6 +1386,7 @@ fn parse_emit(
     functions: &HashMap<String, bool>,
     events: &HashMap<String, Event>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     imports.insert(String::from("use ink_lang::codegen::EmitEvent;"));
 
@@ -1348,7 +1426,8 @@ fn parse_emit(
                             storage,
                             imports,
                             functions,
-                            structs
+                            structs,
+                            enclosed_expressions
                         )),
                     ));
                     event_count += 1;
@@ -1376,7 +1455,8 @@ fn parse_emit(
             storage,
             imports,
             functions,
-            structs
+            structs,
+            enclosed_expressions
         )),
     ));
 
@@ -1389,9 +1469,18 @@ fn parse_return(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let raw_output = capture_regex(&REGEX_RETURN, line, "output").unwrap();
-    let output = parse_member(&raw_output, false, storage, imports, functions, structs);
+    let output = parse_member(
+        &raw_output,
+        false,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
 
     Statement::Return(output)
 }
@@ -1440,6 +1529,7 @@ fn parse_if(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let condition_raw = capture_regex(&REGEX_IF, line, "condition").unwrap();
     let condition = parse_condition(
@@ -1450,6 +1540,7 @@ fn parse_if(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
     let mut statements = Vec::default();
 
@@ -1507,6 +1598,7 @@ fn parse_else_if(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let condition_raw = capture_regex(&REGEX_IF, line, "condition");
     let condition = parse_condition(
@@ -1517,6 +1609,7 @@ fn parse_else_if(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
     let mut statements = Vec::default();
 
@@ -1576,6 +1669,7 @@ fn parse_for(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let assignment_raw = capture_regex(&REGEX_FOR, line, "assignment").unwrap();
     let condition_raw = capture_regex(&REGEX_FOR, line, "condition").unwrap();
@@ -1599,6 +1693,7 @@ fn parse_for(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
     let modification = parse_statement(
         &modification_raw,
@@ -1645,6 +1740,7 @@ fn parse_while(
     iterator: &mut Iter<Statement>,
     events: &HashMap<String, Event>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let condition_raw = capture_regex(&REGEX_WHILE, line, "condition").unwrap();
     let condition = parse_member(
@@ -1654,6 +1750,7 @@ fn parse_while(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
     let mut statements = Vec::default();
 
@@ -1736,6 +1833,7 @@ fn parse_require(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     imports.insert(String::from("use ink::prelude::string::String;"));
 
@@ -1750,6 +1848,7 @@ fn parse_require(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     );
     let error_output = if constructor {
         format!(
@@ -1773,6 +1872,7 @@ fn parse_member(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Expression {
     if is_literal(raw) {
         return Expression::Literal(raw.clone())
@@ -1789,6 +1889,31 @@ fn parse_member(
         return Expression::Literal(new_type.0.to_owned())
     }
 
+    if let Some(expression) = enclosed_expressions.get(raw) {
+        return Expression::Enclosed(bx!(expression.clone()))
+    }
+
+    let extracted = extract_parentheses(
+        raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
+    if extracted.1 > 0 {
+        return parse_member(
+            &extracted.0.clone(),
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            &extracted.2.clone(),
+        )
+    }
+
     let regex_hex = Regex::new(r#"(?x)^(?P<before>.*)hex"(?P<value>.+?)"(?P<after>.*)$"#).unwrap();
     if regex_hex.is_match(raw) {
         let before = capture_regex(&regex_hex, raw, "before").unwrap();
@@ -1801,6 +1926,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         )
     }
 
@@ -1837,6 +1963,7 @@ fn parse_member(
                         imports,
                         functions,
                         structs,
+                        enclosed_expressions,
                     );
                     Expression::StructArg(param_name, bx!(value))
                 })
@@ -1853,6 +1980,7 @@ fn parse_member(
                     imports,
                     functions,
                     structs,
+                    enclosed_expressions,
                 );
                 let param_name = structs
                     .get(&struct_name_raw)
@@ -1865,6 +1993,18 @@ fn parse_member(
             }
             return Expression::StructInit(struct_name_raw, args)
         }
+    }
+
+    if REGEX_FUNCTION_CALL.is_match(raw) {
+        return parse_function_call(
+            raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        )
     }
 
     let regex_new_array = Regex::new(
@@ -1884,6 +2024,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         return Expression::NewArray(array_type, bx!(array_size))
     }
@@ -1905,6 +2046,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let member = parse_member(
             &member_raw,
@@ -1913,6 +2055,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
 
         return Expression::WithSelector(bx!(selector), bx!(member))
@@ -1921,7 +2064,7 @@ fn parse_member(
     let regex_arithmetic = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*(?P<operation>[/+\-*]+)
+        \s*(?P<operation>[/+\-*%]+)
         [^=]\s*(?P<right>.+)
         \s*$"#,
     )
@@ -1930,7 +2073,15 @@ fn parse_member(
         let left_raw = capture_regex(&regex_arithmetic, raw, "left").unwrap();
         let right_raw = capture_regex(&regex_arithmetic, raw, "right").unwrap();
         let operation_raw = capture_regex(&regex_arithmetic, raw, "operation").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+        let left = parse_member(
+            &left_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         let right = parse_member(
             &right_raw,
             constructor,
@@ -1938,6 +2089,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
 
@@ -1956,7 +2108,15 @@ fn parse_member(
         let left_raw = capture_regex(&regex_logical, raw, "left").unwrap();
         let operation_raw = capture_regex(&regex_logical, raw, "operation").unwrap();
         let right_raw = capture_regex(&regex_logical, raw, "right").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+        let left = parse_member(
+            &left_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
         let right = parse_member(
             &right_raw,
@@ -1965,6 +2125,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
 
         return Expression::Logical(bx!(left), operation, bx!(right))
@@ -1978,7 +2139,6 @@ fn parse_member(
     )
     .unwrap();
     if regex_ternary.is_match(raw) {
-        println!("ternary_raw: {raw}");
         let condition_raw = capture_regex(&regex_ternary, raw, "condition").unwrap();
         let if_true_raw = capture_regex(&regex_ternary, raw, "if_true").unwrap();
         let if_false_raw = capture_regex(&regex_ternary, raw, "if_false").unwrap();
@@ -1991,6 +2151,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let if_true = parse_member(
             &if_true_raw,
@@ -1999,6 +2160,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         let if_false = parse_member(
             &if_false_raw,
@@ -2007,6 +2169,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         return Expression::Ternary(bx!(condition), bx!(if_true), bx!(if_false))
     }
@@ -2020,19 +2183,24 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
         return Expression::Condition(bx!(condition))
-    }
-
-    if REGEX_FUNCTION_CALL.is_match(raw) {
-        return parse_function_call(raw, constructor, storage, imports, functions, structs)
     }
 
     let regex_with_selector = Regex::new(r#"(?x)^\s*(?P<left>.+?)\.(?P<right>.+?);*\s*$"#).unwrap();
     if regex_with_selector.is_match(raw) {
         let left_raw = capture_regex(&regex_with_selector, raw, "left").unwrap();
         let right_raw = capture_regex(&regex_with_selector, raw, "right").unwrap();
-        let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+        let left = parse_member(
+            &left_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         let right = parse_member(
             &right_raw,
             constructor,
@@ -2040,6 +2208,7 @@ fn parse_member(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
 
         match &right {
@@ -2099,6 +2268,7 @@ fn parse_member(
                             imports,
                             functions,
                             structs,
+                            enclosed_expressions,
                         ));
                         buffer.clear();
                     } else {
@@ -2119,6 +2289,81 @@ fn parse_member(
     Expression::Member(raw.clone(), selector)
 }
 
+fn extract_parentheses(
+    raw: &String,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
+) -> (String, i32, HashMap<String, Expression>) {
+    let mut buffer_out = String::new();
+    let mut buffer_tmp = String::new();
+    let mut open_parentheses = 0;
+    let mut close_parentheses = 0;
+    let mut map = HashMap::<String, Expression>::new();
+    let mut args = 0;
+    let mut group_possible = true;
+    let mut group = false;
+
+    for ch in raw.chars() {
+        match ch {
+            PARENTHESIS_CLOSE => {
+                close_parentheses += 1;
+            }
+            PARENTHESIS_OPEN => {
+                open_parentheses += 1;
+            }
+            _ => {}
+        }
+        match ch {
+            ASTERISK | SLASH | EQUALS | PLUS | MINUS | AMPERSAND | PIPE | PERCENT | EXCLAMAITON
+                if open_parentheses == close_parentheses =>
+            {
+                group_possible = true;
+                buffer_out.push(ch);
+            }
+            SPACE if group_possible => {
+                buffer_out.push(ch);
+            }
+            PARENTHESIS_OPEN if group_possible => {
+                group = true;
+                group_possible = false;
+            }
+            PARENTHESIS_CLOSE if group && open_parentheses == close_parentheses => {
+                group = false;
+                let arg_name = format!("___{args}___");
+                let expression = parse_member(
+                    &buffer_tmp,
+                    constructor,
+                    storage,
+                    imports,
+                    functions,
+                    structs,
+                    enclosed_expressions,
+                );
+                map.insert(arg_name.clone(), expression);
+                buffer_out.push_str(&arg_name);
+                buffer_tmp.clear();
+                args += 1;
+            }
+            _ => {
+                if group_possible {
+                    group_possible = false;
+                }
+                if group {
+                    buffer_tmp.push(ch);
+                } else {
+                    buffer_out.push(ch);
+                }
+            }
+        }
+    }
+
+    (buffer_out, args, map)
+}
+
 fn parse_function_call(
     raw: &str,
     constructor: bool,
@@ -2126,6 +2371,7 @@ fn parse_function_call(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Expression {
     let function_name_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "function_name").unwrap();
     let args_raw = capture_regex(&REGEX_FUNCTION_CALL, raw, "args").unwrap();
@@ -2146,7 +2392,8 @@ fn parse_function_call(
                     storage,
                     imports,
                     functions,
-                    structs
+                    structs,
+                    enclosed_expressions
                 )),
             )
         } else {
@@ -2159,7 +2406,8 @@ fn parse_function_call(
                     storage,
                     imports,
                     functions,
-                    structs
+                    structs,
+                    enclosed_expressions
                 )),
             )
         }
@@ -2184,6 +2432,7 @@ fn parse_function_call(
                         imports,
                         functions,
                         structs,
+                        enclosed_expressions,
                     ));
                     buffer.clear();
                 } else {
@@ -2201,6 +2450,7 @@ fn parse_function_call(
         imports,
         functions,
         structs,
+        enclosed_expressions,
     ));
 
     return Expression::FunctionCall(
@@ -2231,13 +2481,22 @@ fn parse_condition(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Condition {
     let (mut left, mut operation, mut right) = if REGEX_BOOLEAN.is_match(line) {
         let left_raw = capture_regex(&REGEX_BOOLEAN, line, "left").unwrap();
         let operation_raw = capture_regex(&REGEX_BOOLEAN, line, "operation").unwrap();
         let right_raw = capture_regex(&REGEX_BOOLEAN, line, "right").unwrap();
 
-        let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+        let left = parse_member(
+            &left_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
         let right = parse_member(
             &right_raw,
@@ -2246,6 +2505,7 @@ fn parse_condition(
             imports,
             functions,
             structs,
+            enclosed_expressions,
         );
 
         (left, operation, Some(right))
@@ -2253,10 +2513,26 @@ fn parse_condition(
         let regex_negative = Regex::new(r#"(?x)^\s*!(?P<value>.+?)\s*$"#).unwrap();
         if regex_negative.is_match(line) {
             let left_raw = capture_regex(&regex_negative, line, "value").unwrap();
-            let left = parse_member(&left_raw, constructor, storage, imports, functions, structs);
+            let left = parse_member(
+                &left_raw,
+                constructor,
+                storage,
+                imports,
+                functions,
+                structs,
+                enclosed_expressions,
+            );
             (left, Operation::Not, None)
         } else {
-            let left = parse_member(line, constructor, storage, imports, functions, structs);
+            let left = parse_member(
+                line,
+                constructor,
+                storage,
+                imports,
+                functions,
+                structs,
+                enclosed_expressions,
+            );
             (left, Operation::True, None)
         }
     };
@@ -2298,6 +2574,7 @@ fn parse_declaration(
     imports: &mut HashSet<String>,
     functions: &HashMap<String, bool>,
     structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let field_type_raw = capture_regex(&REGEX_DECLARE, line, "field_type").unwrap();
     let field_name = capture_regex(&REGEX_DECLARE, line, "field_name").unwrap();
@@ -2305,7 +2582,15 @@ fn parse_declaration(
     let field_type = convert_variable_type(field_type_raw, imports);
 
     if let Some(value) = value_raw {
-        let expression = parse_member(&value, constructor, storage, imports, functions, structs);
+        let expression = parse_member(
+            &value,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         Statement::Declaration(field_name, field_type, Some(expression))
     } else {
         Statement::Declaration(field_name, field_type, None)
@@ -2371,7 +2656,7 @@ fn parse_function_attributes(attributes: &str) -> (bool, bool, bool) {
     (external, view, payable)
 }
 
-fn parse_modifiers(attributes: &str) -> Vec<String> {
+fn parse_modifiers(attributes: &str) -> Vec<Expression> {
     let mut adjusted = attributes.to_owned();
     adjusted.remove_matches("payable");
     adjusted.remove_matches("external");
@@ -2388,6 +2673,9 @@ fn parse_modifiers(attributes: &str) -> Vec<String> {
         Vec::default()
     } else {
         split(&adjusted, " ", None)
+            .iter()
+            .map(|raw_modifier| Expression::Modifier(raw_modifier.to_owned()))
+            .collect()
     }
 }
 

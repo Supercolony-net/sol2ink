@@ -89,7 +89,7 @@ pub mod example {
         #[ink(message)]
         pub fn is_zombie_reaper(&self) -> Result<bool, Error> {
             // must be pid 1 and not zombie ourselves *
-            return Ok((pid == self.first_pid && self.state != state.zombie))
+            return Ok((self.pid == self.first_pid && self.state != state.zombie))
         }
 
         ///Returning a constant does not access storage at all, so
@@ -161,14 +161,14 @@ pub mod example {
             let n: u64 = 8;
             let i: u16 = 1;
             while i < 10 {
-                if (i_ % _3) == 0 {
+                if (i % 3) == 0 {
                     n *= pid / (i as u64);
                 } else {
                     n /= 3;
                 }
                 i += 1;
             }
-            return Ok(self._state(n_ % _uint_64(state.state_count))?)
+            return Ok(self._state(n % (state.state_count as u64))?)
         }
 
         ///Overloaded function with different return value!

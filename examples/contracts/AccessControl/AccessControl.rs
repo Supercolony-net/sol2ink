@@ -194,7 +194,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleGranted} event.
         #[ink(message)]
-        #[modifiers(_only_role(get_role_admin(role)))]
+        # [modifiers (self . _only_role (self . get_role_admin (role ,) ? ,) ?)]
         pub fn grant_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._grant_role(role, account)?;
             Ok(())
@@ -206,7 +206,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleRevoked} event.
         #[ink(message)]
-        #[modifiers(_only_role(get_role_admin(role)))]
+        # [modifiers (self . _only_role (self . get_role_admin (role ,) ? ,) ?)]
         pub fn revoke_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._revoke_role(role, account)?;
             Ok(())

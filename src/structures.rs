@@ -92,7 +92,7 @@ pub struct FunctionHeader {
     pub payable: bool,
     pub return_params: Vec<FunctionParam>,
     pub comments: Vec<String>,
-    pub modifiers: Vec<String>,
+    pub modifiers: Vec<Expression>,
 }
 
 #[derive(Clone)]
@@ -233,6 +233,7 @@ pub enum Expression {
     Arithmetic(Box<Expression>, Box<Expression>, Operation),
     Cast(bool, String, Box<Expression>),
     Condition(Box<Condition>),
+    Enclosed(Box<Expression>),
     EnvCaller(Option<String>),
     FunctionCall(String, Vec<Expression>, Option<String>, bool),
     IsZero(Box<Expression>),
@@ -245,6 +246,7 @@ pub enum Expression {
         Option<String>,
         Option<Box<Expression>>,
     ),
+    Modifier(String),
     NewArray(String, Box<Expression>),
     StructArg(String, Box<Expression>),
     StructInit(String, Vec<Expression>),
