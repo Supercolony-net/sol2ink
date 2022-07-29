@@ -461,7 +461,7 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                 if param.name != "_" {
                     let param_name = TokenStream::from_str(&param.name.to_case(Snake)).unwrap();
                     body.extend(quote! {
-                        let mut #param_name = #param_type::default();
+                        let mut #param_name = Default::default();
                     })
                 }
             }

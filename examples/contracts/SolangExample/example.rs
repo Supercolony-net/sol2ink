@@ -123,7 +123,7 @@ pub mod example {
         ///calculate the population count (number of set bits) using Brian Kerningham's way
         #[ink(message)]
         pub fn population_count(&self, n: u128) -> Result<u128, Error> {
-            let mut count = u128::default();
+            let mut count = Default::default();
             count = 0;
             while n != 0 {
                 n &= (n - 1);
@@ -145,17 +145,20 @@ pub mod example {
         }
 
         ///reverse the bytes in an array of 8 (endian swap)
-        ///TODO: parse this
-        ///function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
-        ///out = ((input << 56) & hex"ff00_0000_0000_0000") |
-        ///((input << 40) & hex"00ff_0000_0000_0000") |
-        ///((input << 24) & hex"0000_ff00_0000_0000") |
-        ///((input <<  8) & hex"0000_00ff_0000_0000") |
-        ///((input >>  8) & hex"0000_0000_ff00_0000") |
-        ///((input >> 24) & hex"0000_0000_00ff_0000") |
-        ///((input >> 40) & hex"0000_0000_0000_ff00") |
-        ///((input >> 56) & hex"0000_0000_0000_00ff");
-        ///}
+        #[ink(message)]
+        pub fn byte_8_reverse(&self, input: [u8; 8]) -> Result<[u8; 8], Error> {
+            let mut out = Default::default();
+            out = ((input << 56) & &hex::decode("ff00_0000_0000_0000"))
+                | ((input << 40) & &hex::decode("00ff_0000_0000_0000"))
+                | ((input << 24) & &hex::decode("0000_ff00_0000_0000"))
+                | ((input << 8) & &hex::decode("0000_00ff_0000_0000"))
+                | ((input >> 8) & &hex::decode("0000_0000_ff00_0000"))
+                | ((input >> 24) & &hex::decode("0000_0000_00ff_0000"))
+                | ((input >> 40) & &hex::decode("0000_0000_0000_ff00"))
+                | ((input >> 56) & &hex::decode("0000_0000_0000_00ff"));
+            Ok(out)
+        }
+
         ///This mocks a pid state
         fn _get_pid_state(&self, pid: u64) -> Result<State, Error> {
             let n: u64 = 8;
@@ -208,7 +211,7 @@ pub mod example {
         ///This function does a lot of copying
         #[ink(message)]
         pub fn set_card_1(&mut self, c: card) -> Result<card, Error> {
-            let mut previous = card::default();
+            let mut previous = Default::default();
             previous = card_1;
             card_1 = c;
             Ok(previous)
@@ -226,7 +229,7 @@ pub mod example {
         ///score card
         #[ink(message)]
         pub fn score_card(&self, c: card) -> Result<u32, Error> {
-            let mut score = u32::default();
+            let mut score = Default::default();
             if c.s == suit.hearts {
                 if c.v == value.ace {
                     score = 14;

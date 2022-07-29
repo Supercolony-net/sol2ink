@@ -41,10 +41,16 @@ const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
     static ref TYPES: HashMap<&'static str, (&'static str, Option<&'static str>, Option<&'static str>)> = {
+        // solidityType -> (inkType, initializerMaybe, importMaybe)
         let mut map = HashMap::new();
+
         map.insert(
             "address",
             ("AccountId", None, Some("brush::traits::AccountId")),
+        );
+        map.insert(
+            "hex",
+            ("[u8]", Some("&hex::decode"), None),
         );
         map.insert("bool", ("bool", None, None));
         map.insert("bytes1", ("[u8; 1]", None, None));
@@ -248,7 +254,7 @@ lazy_static! {
     static ref REGEX_BOOLEAN: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*(?P<operation>[!=><]=*)\s*
+        \s*(?P<operation>[!=><]+)\s*
         (?P<right>.+)
         \s*$"#,
     )
@@ -1914,13 +1920,11 @@ fn parse_member(
         )
     }
 
-    let regex_hex = Regex::new(r#"(?x)^(?P<before>.*)hex"(?P<value>.+?)"(?P<after>.*)$"#).unwrap();
+    let regex_hex = Regex::new(r#"(?x)^\s*hex"(?P<value>.+?)"\s*$"#).unwrap();
     if regex_hex.is_match(raw) {
-        let before = capture_regex(&regex_hex, raw, "before").unwrap();
         let value = capture_regex(&regex_hex, raw, "value").unwrap();
-        let after = capture_regex(&regex_hex, raw, "after").unwrap();
         return parse_member(
-            &format!("{before}hex(\"{value}\"){after}"),
+            &format!("hex(\"{value}\")"),
             constructor,
             storage,
             imports,

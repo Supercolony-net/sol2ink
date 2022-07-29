@@ -74,18 +74,17 @@ contract example {
 		return a == address(0);
 	}
 
-	/// reverse the bytes in an array of 8 (endian swap)
-    // TODO: parse this
-	// function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
-	// 	out = ((input << 56) & hex"ff00_0000_0000_0000") |
-	// 		  ((input << 40) & hex"00ff_0000_0000_0000") |
-	// 		  ((input << 24) & hex"0000_ff00_0000_0000") |
-	// 		  ((input <<  8) & hex"0000_00ff_0000_0000") |
-	// 		  ((input >>  8) & hex"0000_0000_ff00_0000") |
-	// 		  ((input >> 24) & hex"0000_0000_00ff_0000") |
-	// 		  ((input >> 40) & hex"0000_0000_0000_ff00") |
-	// 		  ((input >> 56) & hex"0000_0000_0000_00ff");
-	// }
+	// reverse the bytes in an array of 8 (endian swap)
+	function byte8reverse(bytes8 input) public pure returns (bytes8 out) {
+		out = ((input << 56) & hex"ff00_0000_0000_0000") |
+			  ((input << 40) & hex"00ff_0000_0000_0000") |
+			  ((input << 24) & hex"0000_ff00_0000_0000") |
+			  ((input <<  8) & hex"0000_00ff_0000_0000") |
+			  ((input >>  8) & hex"0000_0000_ff00_0000") |
+			  ((input >> 24) & hex"0000_0000_00ff_0000") |
+			  ((input >> 40) & hex"0000_0000_0000_ff00") |
+			  ((input >> 56) & hex"0000_0000_0000_00ff");
+	}
 
 	// This mocks a pid state
 	function get_pid_state(uint64 _pid) pure private returns (State) {
