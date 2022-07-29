@@ -726,6 +726,7 @@ impl ToTokens for Operation {
             Operation::ShiftRight => quote!(>>),
             Operation::Subtract => quote!(-),
             Operation::SubtractAssign => quote!(-=),
+            Operation::Xor => quote!(^),
             _ => quote!(),
         })
     }
@@ -943,7 +944,7 @@ impl ToTokens for Expression {
                     quote!(#expression)
                 }
             }
-            Expression::Mapping(name_raw, indices_raw, selector_raw, insert_maybe) => {
+            Expression::Mapping(expression, indices_raw, insert_maybe) => {
                 let indices = if indices_raw.len() > 1 {
                     let mut inner = TokenStream::new();
                     for i in 0..indices_raw.len() {
@@ -958,17 +959,10 @@ impl ToTokens for Expression {
                     let expression = indices_raw.get(0).unwrap();
                     quote!(#expression)
                 };
-                let expression = format_ident!("{}", name_raw.to_case(Snake));
-                let name_and_selector = if let Some(selector_raw) = selector_raw {
-                    let selector = format_ident!("{}", selector_raw);
-                    quote!(#selector.#expression)
-                } else {
-                    quote!(#expression)
-                };
                 if let Some(insert) = insert_maybe {
-                    quote!(#name_and_selector.insert(&#indices, #insert))
+                    quote!(#expression.insert(&#indices, #insert))
                 } else {
-                    quote!(#name_and_selector.get(&#indices).unwrap())
+                    quote!(#expression.get(&#indices).unwrap())
                 }
             }
             Expression::Modifier(modifier_raw) => {

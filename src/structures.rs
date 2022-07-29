@@ -170,6 +170,7 @@ pub enum Operation {
     ShiftLeft,
     ShiftRight,
     True,
+    Xor,
 }
 
 impl Operation {
@@ -205,9 +206,8 @@ pub enum Expression {
     Logical(Box<Expression>, Operation, Box<Expression>),
     Member(String, Option<String>),
     Mapping(
-        String,
+        Box<Expression>,
         Vec<Expression>,
-        Option<String>,
         Option<Box<Expression>>,
     ),
     Modifier(String),

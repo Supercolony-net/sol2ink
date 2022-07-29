@@ -197,6 +197,7 @@ lazy_static! {
         map.insert(String::from("%"), Operation::Modulo);
         map.insert(String::from("++"), Operation::AddOne);
         map.insert(String::from("--"), Operation::SubtractOne);
+        map.insert(String::from("^"), Operation::Xor);
         map
     };
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
@@ -217,7 +218,7 @@ lazy_static! {
     static ref REGEX_REQUIRE: Regex = Regex::new(
         r#"(?x)
         ^\s*require\s*\((?P<condition>.+?)\s*
-        (,\s*"(?P<error>.*)"\s*)*\);\s*$"#
+        (,\s*["|'](?P<error>.*)["|']\s*)*\);\s*$"#
     )
     .unwrap();
     static ref REGEX_COMMENT: Regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)\s*$"#).unwrap();
@@ -254,7 +255,7 @@ lazy_static! {
     static ref REGEX_BOOLEAN: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<left>.+?)
-        \s*(?P<operation>[!=><]+)\s*
+        \s*(?P<operation>[!=><^]+)\s*
         (?P<right>.+)
         \s*$"#,
     )
@@ -525,6 +526,10 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
                     functions.push(parse_function(&mut imports, chars, &comments)?);
                     comments.clear();
                     buffer.clear();
+                } else if buffer.trim() == "receive" || buffer.trim() == "fallback" {
+                    parse_function(&mut imports, chars, &comments)?;
+                    comments.clear();
+                    buffer.clear();
                 } else if buffer.trim() == "using" {
                     read_until(chars, vec![SEMICOLON]);
                     buffer.clear();
@@ -734,7 +739,7 @@ fn parse_contract_field(
     let regex: Regex = Regex::new(
         r#"(?x)^\s*
         (?P<field_type>.+?)\s
-        (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*)*)*
+        (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*|\s*immutable\s*)*)*
         (?P<field_name>.+?)\s*
         (=\s*(?P<initial_value>.+)\s*)*
         ;\s*$"#,
@@ -1322,7 +1327,7 @@ fn parse_assign(
         return Statement::Group(vec![assign, arithmetic])
     }
 
-    if let Expression::Mapping(name, indices, selector, None) = left {
+    if let Expression::Mapping(name, indices, None) = left {
         let converted_operation = match operation {
             Operation::AddAssign => Operation::Add,
             Operation::MulAssign => Operation::Mul,
@@ -1333,19 +1338,14 @@ fn parse_assign(
         let right_mapping = match converted_operation {
             Operation::Add | Operation::Mul | Operation::Div | Operation::Subtract => {
                 Some(bx!(Expression::Arithmetic(
-                    bx!(Expression::Mapping(
-                        name.clone(),
-                        indices.clone(),
-                        selector.clone(),
-                        None,
-                    )),
+                    bx!(Expression::Mapping(name.clone(), indices.clone(), None,)),
                     bx!(right),
                     converted_operation,
                 )))
             }
             _ => Some(bx!(right)),
         };
-        Statement::FunctionCall(Expression::Mapping(name, indices, selector, right_mapping))
+        Statement::FunctionCall(Expression::Mapping(name, indices, right_mapping))
     } else {
         Statement::Assign(left, right, operation)
     }
@@ -1606,7 +1606,8 @@ fn parse_else_if(
     structs: &HashMap<String, Struct>,
     enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
-    let condition_raw = capture_regex(&REGEX_IF, line, "condition");
+    let condition_raw = capture_regex(&REGEX_ELSE_IF, line, "condition");
+    println!("{line}");
     let condition = parse_condition(
         &condition_raw.unwrap(),
         constructor,
@@ -2247,7 +2248,16 @@ fn parse_member(
     )
     .unwrap();
     if regex_mapping.is_match(raw) {
-        let mapping_name_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
+        let mapping_raw = capture_regex(&regex_mapping, raw, "mapping_name").unwrap();
+        let mapping = parse_member(
+            &mapping_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        );
         let indices_raw = capture_regex(&regex_mapping, raw, "index").unwrap();
         let mut indices = Vec::<Expression>::new();
         let mut buffer = String::new();
@@ -2283,9 +2293,7 @@ fn parse_member(
             }
         }
 
-        let selector = get_selector(storage, constructor, &mapping_name_raw);
-
-        return Expression::Mapping(mapping_name_raw, indices, selector, None)
+        return Expression::Mapping(bx!(mapping), indices, None)
     }
 
     let selector = get_selector(storage, constructor, raw);

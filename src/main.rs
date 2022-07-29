@@ -98,6 +98,22 @@ mod test {
     }
 
     #[test]
+    fn flipper() {
+        assert_eq!(
+            run(&"examples/contracts/Flipper/flipper.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn primitives() {
+        assert_eq!(
+            run(&"examples/contracts/Primitives/Primitives.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
     fn ierc20() {
         assert_eq!(
             run(&"examples/interfaces/IERC20/IERC20.sol".to_string()),
