@@ -172,42 +172,6 @@ pub enum Operation {
     True,
 }
 
-impl ToString for Operation {
-    fn to_string(&self) -> String {
-        match self {
-            Operation::Add => String::from("+"),
-            Operation::AddOne => String::from("+= 1"),
-            Operation::AddAssign => String::from("+="),
-            Operation::AndAssign => String::from("&="),
-            Operation::Assign => String::from("="),
-            Operation::BitwiseAnd => String::from("&"),
-            Operation::BitwiseOr => String::from("|"),
-            Operation::Div => String::from("/"),
-            Operation::DivAssign => String::from("/="),
-            Operation::Equal => String::from("=="),
-            Operation::GreaterThanEqual => String::from(">="),
-            Operation::GreaterThan => String::from(">"),
-            Operation::LessThanEqual => String::from("<="),
-            Operation::LessThan => String::from("<"),
-            Operation::LogicalAnd => String::from("&&"),
-            Operation::LogicalOr => String::from("||"),
-            Operation::Modulo => String::from("%"),
-            Operation::Mul => String::from("*"),
-            Operation::MulAssign => String::from("*="),
-            Operation::Not => String::from("!"),
-            Operation::NotEqual => String::from("!="),
-            Operation::OrAssign => String::from("|="),
-            Operation::Pow => String::from("**"),
-            Operation::ShiftLeft => String::from("<<"),
-            Operation::ShiftRight => String::from(">>"),
-            Operation::Subtract => String::from("-"),
-            Operation::SubtractOne => String::from("-= 1"),
-            Operation::SubtractAssign => String::from("-="),
-            Operation::True => String::from(""),
-        }
-    }
-}
-
 impl Operation {
     pub fn negate(&self) -> Operation {
         match self {

@@ -735,8 +735,7 @@ impl ToTokens for Statement {
     fn to_tokens(&self, stream: &mut TokenStream) {
         match self {
             Statement::AssemblyEnd => {}
-            Statement::Assign(left, right, operation_raw) => {
-                let operation = TokenStream::from_str(&operation_raw.to_string()).unwrap();
+            Statement::Assign(left, right, operation) => {
                 stream.extend(quote! {
                     #left #operation #right;
                 })
