@@ -501,17 +501,19 @@ fn assemble_functions(functions: Vec<Function>) -> TokenStream {
                     .join(","),
             )
             .unwrap();
-            body.extend(
-                if function.header.return_params.len() > 1 {
-                    quote! {
-                        Ok((#out))
-                    }
-                } else {
-                    quote! {
-                        Ok(#out)
-                    }
-                },
-            );
+            if !statements.iter().any(|s| matches!(s, Statement::Return(_))) {
+                body.extend(
+                    if function.header.return_params.len() > 1 {
+                        quote! {
+                            Ok((#out))
+                        }
+                    } else {
+                        quote! {
+                            Ok(#out)
+                        }
+                    },
+                );
+            }
         }
 
         output.extend(quote! {
@@ -849,6 +851,29 @@ impl ToTokens for Statement {
                     return Ok(#output)
                 })
             }
+            Statement::Ternary(condition_raw, if_true, if_false) => {
+                let left = &condition_raw.left;
+                let operation = condition_raw.operation;
+                stream.extend(
+                    if let Some(right) = &condition_raw.right {
+                        quote! {
+                            if #left #operation #right {
+                                #if_true
+                            } else {
+                                #if_false
+                            }
+                        }
+                    } else {
+                        quote! {
+                            if #operation #left {
+                                #if_true
+                            } else {
+                                #if_false
+                            }
+                        }
+                    },
+                );
+            }
             Statement::Try(statements) => {
                 stream.extend(quote! {
                     _comment_!("Please handle try/catch blocks manually >>>");
@@ -935,13 +960,16 @@ impl ToTokens for Expression {
                 quote!(#left #operation #right)
             }
             Expression::Member(expression_raw, selector_raw) => {
-                let expression = TokenStream::from_str(&expression_raw.to_case(Snake))
-                    .unwrap_or_else(|_| panic!("{expression_raw}"));
-                if let Some(selector_raw) = selector_raw {
-                    let selector = format_ident!("{}", selector_raw);
-                    quote!(#selector.#expression)
+                let expression_maybe = TokenStream::from_str(&expression_raw.to_case(Snake));
+                if let Ok(expression) = expression_maybe {
+                    if let Some(selector_raw) = selector_raw {
+                        let selector = format_ident!("{}", selector_raw);
+                        quote!(#selector.#expression)
+                    } else {
+                        quote!(#expression)
+                    }
                 } else {
-                    quote!(#expression)
+                    TokenStream::from_str("S2I_INCORRECTLY_PARSED_MEMBER").unwrap()
                 }
             }
             Expression::Mapping(expression, indices_raw, insert_maybe) => {

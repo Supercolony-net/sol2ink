@@ -95,7 +95,7 @@ pub struct FunctionHeader {
     pub modifiers: Vec<Expression>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FunctionParam {
     pub name: String,
     pub param_type: String,
@@ -127,6 +127,7 @@ pub enum Statement {
     Raw(String),
     Require(Condition, String),
     Return(Expression),
+    Ternary(Condition, Box<Statement>, Box<Statement>),
     Try(Vec<Statement>),
     TryEnd,
     WhileEnd,

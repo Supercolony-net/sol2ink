@@ -11,7 +11,7 @@
 /// Originally based on code by Enjin: https://github.com/enjin/erc-1155
 /// _Available since v3.1._
 #[brush::contract]
-pub mod ierc_1155_metadata_uri {
+pub mod erc_1155 {
     use brush::traits::{
         AccountId,
         AcountIdExt,
@@ -85,7 +85,7 @@ pub mod ierc_1155_metadata_uri {
 
     #[ink(storage)]
     #[derive(Default, SpreadAllocate)]
-    pub struct IERC1155MetadataURI {
+    pub struct ERC1155 {
         ///Mapping from token ID to account balances
         balances: Mapping<(u128, AccountId), u128>,
         ///Mapping from account to operator approvals
@@ -94,7 +94,7 @@ pub mod ierc_1155_metadata_uri {
         uri: String,
     }
 
-    impl IERC1155MetadataURI {
+    impl ERC1155 {
         /// @dev See {_setURI}.
         #[ink(constructor)]
         pub fn new(uri: String) -> Self {
@@ -606,15 +606,15 @@ pub mod ierc_1155_metadata_uri {
                 if true {
                     // try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, data) returns (bytes4 response) {
                     if response != ierc_1155_receiver.on_erc_1155_received.selector {
-                        self._revert("ERC1155: ERC1155Receiver rejected tokens")?;
+                        revert("ERC1155: ERC1155Receiver rejected tokens")?;
                     }
                 } else if false {
                     // catch Error(string reason) {
-                    self._revert(reason)?;
+                    revert(reason)?;
                     // <<< Please handle try/catch blocks manually
                 } else if false {
                     // catch {
-                    self._revert("ERC1155: transfer to non-ERC1155Receiver implementer")?;
+                    revert("ERC1155: transfer to non-ERC1155Receiver implementer")?;
                     // <<< Please handle try/catch blocks manually
                 }
             }
@@ -635,15 +635,15 @@ pub mod ierc_1155_metadata_uri {
                 if true {
                     // try IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data) returns ( bytes4 response ) {
                     if response != ierc_1155_receiver.on_erc_1155_batch_received.selector {
-                        self._revert("ERC1155: ERC1155Receiver rejected tokens")?;
+                        revert("ERC1155: ERC1155Receiver rejected tokens")?;
                     }
                 } else if false {
                     // catch Error(string reason) {
-                    self._revert(reason)?;
+                    revert(reason)?;
                     // <<< Please handle try/catch blocks manually
                 } else if false {
                     // catch {
-                    self._revert("ERC1155: transfer to non-ERC1155Receiver implementer")?;
+                    revert("ERC1155: transfer to non-ERC1155Receiver implementer")?;
                     // <<< Please handle try/catch blocks manually
                 }
             }

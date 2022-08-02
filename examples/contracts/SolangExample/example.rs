@@ -171,7 +171,7 @@ pub mod example {
                 }
                 i += 1;
             }
-            return Ok(self._state(n % (state.state_count as u64))?)
+            return Ok(state(n % (state.state_count as u64))?)
         }
 
         ///Overloaded function with different return value!

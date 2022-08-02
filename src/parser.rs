@@ -222,6 +222,13 @@ lazy_static! {
     )
     .unwrap();
     static ref REGEX_COMMENT: Regex = Regex::new(r#"(?x)^\s*///*\s*(?P<comment>.*)\s*$"#).unwrap();
+    static ref REGEX_CONDITION_ONE_LINE: Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<keyword>(else|if)(\s*if)*)\s*
+        (\(\s*(?P<condition>.+)\s*\))*
+        (?P<then>.+)\s*;\s*
+        $"#
+    ).unwrap();
     static ref REGEX_IF: Regex =
         Regex::new(r#"(?x)^\s*if\s*\((?P<condition>.+)\s*\)\s*\{\s*"#).unwrap();
     static ref REGEX_ELSE: Regex = Regex::new(r#"^\s*else\s*\{\s*"#).unwrap();
@@ -242,7 +249,7 @@ lazy_static! {
         r#"(?x)
         ^\s*(?P<left>[0-9a-zA-Z_\[\].]+?)\s*
         (?P<operation>[+\-*/&|]*=)\s*
-        (?P<right>.+)+?;\s*$"#
+        (?P<right>[^=][^;]*)+?;*\s*$"#
     )
     .unwrap();
     static ref REGEX_FUNCTION_CALL: Regex = Regex::new(
@@ -288,6 +295,13 @@ lazy_static! {
         ^\s*while\s*\(\s*
         (?P<condition>.+?)\s*
         \)\s*\{$"#,
+    )
+    .unwrap();
+    static ref REGEX_TERNARY:Regex = Regex::new(
+        r#"(?x)
+        ^\s*(?P<condition>.+?)\s*\?
+        \s*(?P<if_true>.+?)\s*:
+        \s*(?P<if_false>.+?)\s*$"#,
     )
     .unwrap();
 }
@@ -492,13 +506,13 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
                 comments.append(&mut new_comments);
                 action = Action::Contract;
             }
-            CURLY_OPEN if action == Action::None => {
-                action = Action::Contract;
-            }
             SPACE if action == Action::ContractName => {
                 name = buffer.trim().to_string();
                 buffer = String::new();
-                action = Action::None;
+                // we skip everything regarding generalization
+                // TODO: cover generaliztaion
+                read_until(chars, vec![CURLY_OPEN]);
+                action = Action::Contract;
             }
             _ if action == Action::None => {
                 buffer.push(ch);
@@ -527,7 +541,9 @@ fn parse_contract(chars: &mut Chars, contract_doc: Vec<String>) -> Result<Contra
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "receive" || buffer.trim() == "fallback" {
-                    parse_function(&mut imports, chars, &comments)?;
+                    let mut function = parse_function(&mut imports, chars, &comments)?;
+                    function.header.name = buffer.trim().to_owned();
+                    functions.push(function);
                     comments.clear();
                     buffer.clear();
                 } else if buffer.trim() == "using" {
@@ -739,7 +755,7 @@ fn parse_contract_field(
     let regex: Regex = Regex::new(
         r#"(?x)^\s*
         (?P<field_type>.+?)\s
-        (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*|\s*immutable\s*)*)*
+        (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*|\s*immutable\s*|\s*override\s*)*)*
         (?P<field_name>.+?)\s*
         (=\s*(?P<initial_value>.+)\s*)*
         ;\s*$"#,
@@ -1071,6 +1087,19 @@ fn parse_statement(
     } else if REGEX_COMMENT.is_match(&line) {
         let comment = capture_regex(&REGEX_COMMENT, &line, "comment").unwrap();
         return Statement::Comment(comment)
+    } else if REGEX_CONDITION_ONE_LINE.is_match(&line) {
+        return parse_condition_one_line(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+            structs,
+            &HashMap::default(),
+        )
     } else if REGEX_IF.is_match(&line) {
         stack.push_back(Block::If);
         return parse_if(
@@ -1206,6 +1235,18 @@ fn parse_statement(
             functions,
             structs,
             &HashMap::default(),
+        )
+    } else if REGEX_TERNARY.is_match(&line) {
+        return parse_ternary_statement(
+            &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+            structs,
         )
     } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&line) {
         return parse_double_sign(
@@ -1525,6 +1566,61 @@ fn parse_block(
     }
 }
 
+fn parse_condition_one_line(
+    line: &str,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+    structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
+) -> Statement {
+    let keyword = capture_regex(&REGEX_CONDITION_ONE_LINE, line, "keyword").unwrap();
+    let condition_raw = capture_regex(&REGEX_CONDITION_ONE_LINE, line, "condition").unwrap();
+    let then_raw = capture_regex(&REGEX_CONDITION_ONE_LINE, line, "then").unwrap();
+    let then = parse_statement(
+        &then_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        structs,
+    );
+    let statements = vec![then];
+
+    let condition = if keyword == "if" || keyword == "else if" {
+        Some(parse_condition(
+            &condition_raw,
+            constructor,
+            false,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        ))
+    } else {
+        None
+    };
+
+    match condition {
+        Some(condition) => {
+            if keyword == "if" {
+                Statement::If(condition, statements)
+            } else {
+                Statement::ElseIf(condition, statements)
+            }
+        }
+        None => Statement::Else(statements),
+    }
+}
+
 fn parse_if(
     line: &str,
     constructor: bool,
@@ -1607,7 +1703,6 @@ fn parse_else_if(
     enclosed_expressions: &HashMap<String, Expression>,
 ) -> Statement {
     let condition_raw = capture_regex(&REGEX_ELSE_IF, line, "condition");
-    println!("{line}");
     let condition = parse_condition(
         &condition_raw.unwrap(),
         constructor,
@@ -1911,13 +2006,13 @@ fn parse_member(
     );
     if extracted.1 > 0 {
         return parse_member(
-            &extracted.0.clone(),
+            &extracted.0,
             constructor,
             storage,
             imports,
             functions,
             structs,
-            &extracted.2.clone(),
+            &extracted.2,
         )
     }
 
@@ -1942,12 +2037,12 @@ fn parse_member(
     )
     .unwrap();
     if regex_struct_init.is_match(raw) {
-        let struct_name_raw = capture_regex(&regex_struct_init, &raw, "struct_name").unwrap();
-        let mut args_string = trim(&capture_regex(&regex_struct_init, &raw, "args").unwrap());
+        let struct_name_raw = capture_regex(&regex_struct_init, raw, "struct_name").unwrap();
+        let mut args_string = trim(&capture_regex(&regex_struct_init, raw, "args").unwrap());
         args_string = args_string.replace(": ", ":");
         args_string = args_string.replace(", ", ",");
 
-        if args_string.contains(":") {
+        if args_string.contains(':') {
             // named params
             let args_raw = split(&args_string, ",", None);
             let regex_named_param = Regex::new(
@@ -1959,8 +2054,8 @@ fn parse_member(
             let args = args_raw
                 .iter()
                 .map(|raw| {
-                    let param_name = capture_regex(&regex_named_param, &raw, "param_name").unwrap();
-                    let value_raw = capture_regex(&regex_named_param, &raw, "value").unwrap();
+                    let param_name = capture_regex(&regex_named_param, raw, "param_name").unwrap();
+                    let value_raw = capture_regex(&regex_named_param, raw, "value").unwrap();
                     let value = parse_member(
                         &value_raw,
                         constructor,
@@ -1977,9 +2072,9 @@ fn parse_member(
         } else {
             let args_raw = split(&args_string, ",", None);
             let mut args = Vec::default();
-            for i in 0..args_raw.len() {
+            for (i, raw) in args_raw.iter().enumerate() {
                 let value = parse_member(
-                    &args_raw[i],
+                    raw,
                     constructor,
                     storage,
                     imports,
@@ -2136,47 +2231,16 @@ fn parse_member(
         return Expression::Logical(bx!(left), operation, bx!(right))
     }
 
-    let regex_ternary = Regex::new(
-        r#"(?x)
-        ^\s*(?P<condition>.+?)\s*\?
-        \s*(?P<if_true>.+?)\s*:
-        \s*(?P<if_false>.+?)\s*$"#,
-    )
-    .unwrap();
-    if regex_ternary.is_match(raw) {
-        let condition_raw = capture_regex(&regex_ternary, raw, "condition").unwrap();
-        let if_true_raw = capture_regex(&regex_ternary, raw, "if_true").unwrap();
-        let if_false_raw = capture_regex(&regex_ternary, raw, "if_false").unwrap();
-
-        let condition = parse_condition(
-            &condition_raw,
-            constructor,
-            false,
-            storage,
-            imports,
-            functions,
-            structs,
-            enclosed_expressions,
-        );
-        let if_true = parse_member(
-            &if_true_raw,
+    if REGEX_TERNARY.is_match(raw) {
+        return parse_ternary(
+            raw,
             constructor,
             storage,
             imports,
             functions,
             structs,
             enclosed_expressions,
-        );
-        let if_false = parse_member(
-            &if_false_raw,
-            constructor,
-            storage,
-            imports,
-            functions,
-            structs,
-            enclosed_expressions,
-        );
-        return Expression::Ternary(bx!(condition), bx!(if_true), bx!(if_false))
+        )
     }
 
     if REGEX_BOOLEAN.is_match(raw) {
@@ -2301,8 +2365,102 @@ fn parse_member(
     Expression::Member(raw.clone(), selector)
 }
 
+fn parse_ternary(
+    raw: &str,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
+) -> Expression {
+    let condition_raw = capture_regex(&REGEX_TERNARY, raw, "condition").unwrap();
+    let if_true_raw = capture_regex(&REGEX_TERNARY, raw, "if_true").unwrap();
+    let if_false_raw = capture_regex(&REGEX_TERNARY, raw, "if_false").unwrap();
+
+    let condition = parse_condition(
+        &condition_raw,
+        constructor,
+        false,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
+    let if_true = parse_member(
+        &if_true_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
+    let if_false = parse_member(
+        &if_false_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        structs,
+        enclosed_expressions,
+    );
+    Expression::Ternary(bx!(condition), bx!(if_true), bx!(if_false))
+}
+
+fn parse_ternary_statement(
+    line_raw: &str,
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+    structs: &HashMap<String, Struct>,
+) -> Statement {
+    let condition_raw = capture_regex(&REGEX_TERNARY, line_raw, "condition").unwrap();
+    let if_true_raw = capture_regex(&REGEX_TERNARY, line_raw, "if_true").unwrap();
+    let if_false_raw = capture_regex(&REGEX_TERNARY, line_raw, "if_false").unwrap();
+
+    let condition = parse_condition(
+        &condition_raw,
+        constructor,
+        false,
+        storage,
+        imports,
+        functions,
+        structs,
+        &HashMap::new(),
+    );
+    let if_true = parse_statement(
+        &if_true_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        structs,
+    );
+    let if_false = parse_statement(
+        &if_false_raw,
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        structs,
+    );
+    Statement::Ternary(condition, bx!(if_true), bx!(if_false))
+}
+
 fn extract_parentheses(
-    raw: &String,
+    raw: &str,
     constructor: bool,
     storage: &HashMap<String, String>,
     imports: &mut HashSet<String>,
@@ -2465,11 +2623,17 @@ fn parse_function_call(
         enclosed_expressions,
     ));
 
+    let selector = if functions.get(&function_name_raw).is_some() {
+        Some(selector!(constructor))
+    } else {
+        None
+    };
+
     return Expression::FunctionCall(
         function_name_raw.clone(),
         args,
-        Some(selector!(constructor)),
-        *functions.get(&function_name_raw).unwrap_or(&false),
+        selector,
+        *functions.get(&function_name_raw).unwrap_or(&true),
     )
 }
 
@@ -2708,15 +2872,13 @@ fn parse_return_parameters(
     while let Some(token) = iterator.next() {
         token.to_owned().remove_matches(",");
         let param_type = convert_variable_type(token.to_owned(), imports);
-        let name = if tokens.len() >= (parameters.matches(',').count() + 1) * 2 {
-            iterator.next().unwrap()
+        let mut name = if tokens.len() >= (parameters.matches(',').count() + 1) * 2 {
+            iterator.next().unwrap().to_owned()
         } else {
-            "_"
+            String::from("_")
         };
-        out.push(FunctionParam {
-            name: name.to_owned(),
-            param_type,
-        })
+        name.remove_matches(",");
+        out.push(FunctionParam { name, param_type })
     }
 
     out
@@ -2895,7 +3057,7 @@ fn convert_variable_type(arg_type: String, imports: &mut HashSet<String>) -> Str
             }
             the_type.0.to_string()
         }
-        _ => arg_type,
+        _ => no_array_arg_type.to_owned(),
     };
     return if is_vec {
         imports.insert(String::from("use ink::prelude::vec::Vec;\n"));

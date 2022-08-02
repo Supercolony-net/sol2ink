@@ -167,12 +167,12 @@ pub mod access_control {
         /// /^AccessControl: account (0x[0-9a-f]{40}) is missing role (0x[0-9a-f]{64})$/
         fn _check_role(&self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             if !self.has_role(role, account)? {
-                self._revert(
-                    (abi._encode_packed(
+                revert(
+                    (abi.encode_packed(
                         "AccessControl: account ",
-                        strings._to_hex_string(account)?,
+                        strings.to_hex_string(account)?,
                         " is missing role ",
-                        strings._to_hex_string((role as u128), 32)?,
+                        strings.to_hex_string((role as u128), 32)?,
                     )? as String),
                 )?;
             }
@@ -194,7 +194,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleGranted} event.
         #[ink(message)]
-        # [modifiers (self . _only_role (self . get_role_admin (role ,) ? ,) ?)]
+        # [modifiers (only_role (self . get_role_admin (role ,) ? ,) ?)]
         pub fn grant_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._grant_role(role, account)?;
             Ok(())
@@ -206,7 +206,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleRevoked} event.
         #[ink(message)]
-        # [modifiers (self . _only_role (self . get_role_admin (role ,) ? ,) ?)]
+        # [modifiers (only_role (self . get_role_admin (role ,) ? ,) ?)]
         pub fn revoke_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._revoke_role(role, account)?;
             Ok(())

@@ -139,7 +139,7 @@ pub mod erc_721 {
             self._require_minted(token_id)?;
             let base_uri: String = base_uri();
             return Ok(if Vec::<u8>::from(base_uri).length > 0 {
-                (abi._encode_packed(base_uri, token_id.to_string())? as String)
+                (abi.encode_packed(base_uri, token_id.to_string())? as String)
             } else {
                 ""
             })
@@ -465,7 +465,7 @@ pub mod erc_721 {
                 } else if false {
                     // catch (bytes reason) {
                     if reason.length == 0 {
-                        self._revert("ERC721: transfer to non ERC721Receiver implementer")?;
+                        revert("ERC721: transfer to non ERC721Receiver implementer")?;
                     } else {
                         // @solidity memory-safe-assembly
                         // Please handle assembly blocks manually >>>
