@@ -231,6 +231,7 @@ lazy_static! {
         (?P<then>.+)\s*;\s*
         $"#
     ).unwrap();
+    static ref REGEX_DO: Regex = Regex::new(r#"(?x)^\s*do\s*\{\s*"#).unwrap();
     static ref REGEX_IF: Regex =
         Regex::new(r#"(?x)^\s*if\s*\((?P<condition>.+)\s*\)\s*\{\s*"#).unwrap();
     static ref REGEX_ELSE: Regex = Regex::new(r#"^\s*else\s*\{\s*"#).unwrap();
@@ -296,7 +297,7 @@ lazy_static! {
         r#"(?x)
         ^\s*while\s*\(\s*
         (?P<condition>.+?)\s*
-        \)\s*\{$"#,
+        \);*\s*\{*$"#,
     )
     .unwrap();
     static ref REGEX_TERNARY:Regex = Regex::new(
@@ -768,8 +769,8 @@ fn parse_contract_field(
     let attributes_raw = capture_regex(&regex, &line, "attributes");
     let field_name = capture_regex(&regex, &line, "field_name").unwrap();
     let initial_value_maybe = capture_regex(&regex, &line, "initial_value");
-    let initial_value = if let Some(initial_raw) = initial_value_maybe {
-        Some(parse_member(
+    let initial_value = initial_value_maybe.map(|initial_raw| {
+        parse_member(
             &initial_raw,
             false,
             &HashMap::<String, String>::new(),
@@ -777,10 +778,8 @@ fn parse_contract_field(
             &HashMap::<String, bool>::new(),
             &HashMap::<String, Struct>::new(),
             &HashMap::<String, Expression>::new(),
-        ))
-    } else {
-        None
-    };
+        )
+    });
     let constant = attributes_raw
         .unwrap_or_else(|| String::from(""))
         .contains("constant");
@@ -1190,6 +1189,19 @@ fn parse_statement(
         stack.push_back(Block::While);
         return parse_for(
             &line,
+            constructor,
+            storage,
+            imports,
+            functions,
+            stack,
+            iterator,
+            events,
+            structs,
+            &HashMap::default(),
+        )
+    } else if REGEX_DO.is_match(&line) {
+        stack.push_back(Block::While);
+        return parse_do(
             constructor,
             storage,
             imports,
@@ -1885,6 +1897,51 @@ fn parse_while(
     );
 
     Statement::While(None, condition, None, statements)
+}
+
+fn parse_do(
+    constructor: bool,
+    storage: &HashMap<String, String>,
+    imports: &mut HashSet<String>,
+    functions: &HashMap<String, bool>,
+    stack: &mut VecDeque<Block>,
+    iterator: &mut Iter<Statement>,
+    events: &HashMap<String, Event>,
+    structs: &HashMap<String, Struct>,
+    enclosed_expressions: &HashMap<String, Expression>,
+) -> Statement {
+    let mut statements = Vec::default();
+
+    parse_block(
+        constructor,
+        storage,
+        imports,
+        functions,
+        stack,
+        iterator,
+        events,
+        &mut statements,
+        Statement::WhileEnd,
+        structs,
+    );
+
+    let next_statement = iterator.next().unwrap();
+    let condition = if let Statement::Raw(content) = next_statement {
+        let condition_raw = capture_regex(&REGEX_WHILE, content, "condition").unwrap();
+        parse_member(
+            &condition_raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        )
+    } else {
+        panic!("Expected Raw statement after do block")
+    };
+
+    Statement::Do(None, condition, None, statements)
 }
 
 fn parse_assembly(stack: &mut VecDeque<Block>, iterator: &mut Iter<Statement>) -> Statement {

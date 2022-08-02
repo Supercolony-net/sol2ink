@@ -110,16 +110,16 @@ pub enum Statement {
     CatchEnd,
     Comment(String),
     Declaration(String, String, Option<Expression>),
-    Else(Vec<Statement>),
-    ElseIf(Condition, Vec<Statement>),
-    Emit(String, Vec<Expression>),
-    FunctionCall(Expression),
-    While(
+    Do(
         Option<Box<Statement>>,
         Expression,
         Option<Box<Statement>>,
         Vec<Statement>,
     ),
+    Else(Vec<Statement>),
+    ElseIf(Condition, Vec<Statement>),
+    Emit(String, Vec<Expression>),
+    FunctionCall(Expression),
     Group(Vec<Statement>),
     If(Condition, Vec<Statement>),
     IfEnd,
@@ -130,6 +130,12 @@ pub enum Statement {
     Ternary(Condition, Box<Statement>, Box<Statement>),
     Try(Vec<Statement>),
     TryEnd,
+    While(
+        Option<Box<Statement>>,
+        Expression,
+        Option<Box<Statement>>,
+        Vec<Statement>,
+    ),
     WhileEnd,
 }
 

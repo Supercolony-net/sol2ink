@@ -71,6 +71,8 @@ pub mod example {
         state: State,
         pid: i32,
         reaped: u32,
+        card_1: card,
+        card_2: card,
     }
 
     impl example {
@@ -81,6 +83,11 @@ pub mod example {
                 // Set contract storage
                 instance.pid = pid;
                 self.reaped = 3;
+                self.card_1 = card(value.two, suit.club)?;
+                self.card_2 = Card {
+                    s: suit.club,
+                    v: value.two,
+                };
             })
         }
 
@@ -197,23 +204,23 @@ pub mod example {
             let count: u16 = 0;
             // no initializer means its 0.
             let n: u32 = 0;
-            // Sol2Ink Not Implemented yet: do {
-            if self._get_pid_state(n)? == state.waiting {
-                count += 1;
+            loop {
+                if self._get_pid_state(n)? == state.waiting {
+                    count += 1;
+                }
+                if n < 1000 {
+                    break
+                }
             }
-            // Sol2Ink Not Implemented yet End Block here
-            // while (++n < 1000);
             return Ok(count)
         }
 
-        ///card card1 = card(value.two, suit.club);
-        ///card card2 = card({s: suit.club, v: value.two});
         ///This function does a lot of copying
         #[ink(message)]
         pub fn set_card_1(&mut self, c: card) -> Result<card, Error> {
             let mut previous = Default::default();
-            previous = card_1;
-            card_1 = c;
+            previous = self.card_1;
+            self.card_1 = c;
             Ok(previous)
         }
 

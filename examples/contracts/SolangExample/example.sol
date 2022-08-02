@@ -127,7 +127,7 @@ contract example {
 				count++;
 			}
 		}
-		// while (++n < 1000);
+		while (++n < 1000);
 
 		return count;
 	}
@@ -140,8 +140,8 @@ contract example {
 		suit s;
 	}
 
-	// card card1 = card(value.two, suit.club);
-	// card card2 = card({s: suit.club, v: value.two});
+	card card1 = card(value.two, suit.club);
+	card card2 = card({s: suit.club, v: value.two});
 
 	// This function does a lot of copying
 	function set_card1(card memory c) public returns (card memory previous) {

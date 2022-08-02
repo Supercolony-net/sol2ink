@@ -770,6 +770,18 @@ impl ToTokens for Statement {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
             }
+            Statement::Do(assign, condition, modification, statements) => {
+                stream.extend(quote! {
+                    #assign
+                    loop {
+                        #(#statements)*
+                        #modification
+                        if #condition {
+                            break;
+                        }
+                    }
+                })
+            }
             Statement::Group(statements) => {
                 stream.extend(quote! {
                         #(#statements)*
