@@ -601,7 +601,7 @@ pub mod erc_1155 {
             amount: u128,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            if to.is_contract() {
+            if to.is_contract()? {
                 // Please handle try/catch blocks manually >>>
                 if true {
                     // try IERC1155Receiver(to).onERC1155Received(operator, from, id, amount, data) returns (bytes4 response) {
@@ -630,7 +630,7 @@ pub mod erc_1155 {
             amounts: Vec<u128>,
             data: Vec<u8>,
         ) -> Result<(), Error> {
-            if to.is_contract() {
+            if to.is_contract()? {
                 // Please handle try/catch blocks manually >>>
                 if true {
                     // try IERC1155Receiver(to).onERC1155BatchReceived(operator, from, ids, amounts, data) returns ( bytes4 response ) {

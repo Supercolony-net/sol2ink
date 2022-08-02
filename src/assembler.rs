@@ -248,7 +248,7 @@ fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
     for field in fields.iter().filter(|field| field.constant) {
         let field_name = format_ident!("{}", field.name.to_case(Snake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
-        let initial_value = TokenStream::from_str(&field.initial_value.clone().unwrap()).unwrap();
+        let initial_value = field.initial_value.clone().unwrap();
 
         for comment in field.comments.iter() {
             output.extend(quote! {
@@ -346,8 +346,7 @@ fn assemble_constructor(constructor: Function, fields: &[ContractField]) -> Toke
         .filter(|field| field.initial_value.is_some() && !field.constant)
     {
         let field_name = format_ident!("{}", field.name.to_case(Snake));
-        let intial_value =
-            TokenStream::from_str(field.initial_value.clone().unwrap().as_str()).unwrap();
+        let intial_value = field.initial_value.clone();
 
         body.extend(quote! {
             self.#field_name = #intial_value;
@@ -945,8 +944,12 @@ impl ToTokens for Expression {
                     function_name_raw.to_case(Snake)
                 );
                 let mut args = TokenStream::new();
-                for arg in args_raw {
-                    args.extend(quote!(#arg, ));
+                for (i, arg) in args_raw.iter().enumerate() {
+                    if i > 0 {
+                        args.extend(quote!(,#arg));
+                    } else {
+                        args.extend(quote!(#arg));
+                    }
                 }
                 quote! {
                     #function_call #function_name(#args)?
@@ -955,7 +958,11 @@ impl ToTokens for Expression {
             Expression::IsZero(expression) => {
                 quote!(#expression.is_zero())
             }
-            Expression::Literal(content) => TokenStream::from_str(content).unwrap(),
+            Expression::Literal(content) => {
+                TokenStream::from_str(content).unwrap_or_else(|_| {
+                    TokenStream::from_str(format!("\"S2I_ERR:{content}\"").as_str()).unwrap()
+                })
+            }
             Expression::Logical(left, operation, right) => {
                 quote!(#left #operation #right)
             }
@@ -1037,6 +1044,11 @@ impl ToTokens for Expression {
                         }
                     }
                 }
+            }
+            Expression::TransferredValue(selector_raw) => {
+                let selector =
+                    TokenStream::from_str(&selector_raw.clone().unwrap_or_default()).unwrap();
+                quote!(#selector.env().transferred_value())
             }
             Expression::WithSelector(left, right) => {
                 quote!(#left.#right)

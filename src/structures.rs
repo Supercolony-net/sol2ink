@@ -34,7 +34,7 @@ pub struct ContractField {
     pub field_type: String,
     pub name: String,
     pub comments: Vec<String>,
-    pub initial_value: Option<String>,
+    pub initial_value: Option<Expression>,
     pub constant: bool,
 }
 
@@ -206,16 +206,13 @@ pub enum Expression {
     Literal(String),
     Logical(Box<Expression>, Operation, Box<Expression>),
     Member(String, Option<String>),
-    Mapping(
-        Box<Expression>,
-        Vec<Expression>,
-        Option<Box<Expression>>,
-    ),
+    Mapping(Box<Expression>, Vec<Expression>, Option<Box<Expression>>),
     Modifier(String),
     NewArray(String, Box<Expression>),
     StructArg(String, Box<Expression>),
     StructInit(String, Vec<Expression>),
     Ternary(Box<Condition>, Box<Expression>, Box<Expression>),
+    TransferredValue(Option<String>),
     WithSelector(Box<Expression>, Box<Expression>),
     ZeroAddressInto,
 }

@@ -66,7 +66,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -89,7 +89,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -112,7 +112,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -133,7 +133,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -149,7 +149,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> r)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -162,7 +162,7 @@ pub mod primitives {
             } else if op == oper.xor {
                 return Ok(a ^ b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -173,7 +173,7 @@ pub mod primitives {
             } else if op == oper.shr {
                 return Ok(a >> r)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 
@@ -186,7 +186,7 @@ pub mod primitives {
             } else if op == oper.xor {
                 return Ok(a ^ b)
             } else {
-                // Sol2Ink Not Implemented yet: revert();
+                revert()?;
             }
         }
 

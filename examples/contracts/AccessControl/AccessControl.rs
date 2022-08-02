@@ -55,7 +55,7 @@ pub mod access_control {
         Custom(String),
     }
 
-    pub const default_admin_role: [u8; 32] = 0x00;
+    pub const default_admin_role: [u8; 32] = &hex::decode("0x00");
 
     /// @dev Modifier that checks that an account has a specific role. Reverts
     /// with a standardized message including the required role.
@@ -194,7 +194,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleGranted} event.
         #[ink(message)]
-        # [modifiers (only_role (self . get_role_admin (role ,) ? ,) ?)]
+        # [modifiers (only_role (self . get_role_admin (role) ?) ?)]
         pub fn grant_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._grant_role(role, account)?;
             Ok(())
@@ -206,7 +206,7 @@ pub mod access_control {
         /// - the caller must have ``role``'s admin role.
         /// May emit a {RoleRevoked} event.
         #[ink(message)]
-        # [modifiers (only_role (self . get_role_admin (role ,) ? ,) ?)]
+        # [modifiers (only_role (self . get_role_admin (role) ?) ?)]
         pub fn revoke_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             self._revoke_role(role, account)?;
             Ok(())

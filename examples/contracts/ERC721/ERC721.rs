@@ -137,9 +137,9 @@ pub mod erc_721 {
         #[ink(message)]
         pub fn token_uri(&self, token_id: u128) -> Result<String, Error> {
             self._require_minted(token_id)?;
-            let base_uri: String = base_uri();
+            let base_uri: String = self._base_uri()?;
             return Ok(if Vec::<u8>::from(base_uri).length > 0 {
-                (abi.encode_packed(base_uri, token_id.to_string())? as String)
+                (abi.encode_packed(base_uri, token_id.to_string()?)? as String)
             } else {
                 ""
             })
@@ -457,7 +457,7 @@ pub mod erc_721 {
             token_id: u128,
             data: Vec<u8>,
         ) -> Result<bool, Error> {
-            if to.is_contract() {
+            if to.is_contract()? {
                 // Please handle try/catch blocks manually >>>
                 if true {
                     // try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 retval) {

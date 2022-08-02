@@ -203,7 +203,9 @@ lazy_static! {
     static ref SPECIFIC_EXPRESSION: HashMap<String, Expression> = {
         let mut map = HashMap::new();
         map.insert(String::from("address(0)"), Expression::ZeroAddressInto);
+        map.insert(String::from("address(0x0)"), Expression::ZeroAddressInto);
         map.insert(String::from("msg.sender"), Expression::EnvCaller(None));
+        map.insert(String::from("msg.value"), Expression::TransferredValue(None));
         map
     };
     static ref REGEX_RETURN: Regex =
@@ -255,7 +257,7 @@ lazy_static! {
     static ref REGEX_FUNCTION_CALL: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<function_name>[a-zA-Z0-9_]+?)\s*\(
-        \s*(?P<args>.+)\s*
+        \s*(?P<args>.*)\s*
         \);*\s*$"#,
     )
     .unwrap();
@@ -765,7 +767,20 @@ fn parse_contract_field(
     let field_type_raw = capture_regex(&regex, &line, "field_type").unwrap();
     let attributes_raw = capture_regex(&regex, &line, "attributes");
     let field_name = capture_regex(&regex, &line, "field_name").unwrap();
-    let initial_value = capture_regex(&regex, &line, "initial_value");
+    let initial_value_maybe = capture_regex(&regex, &line, "initial_value");
+    let initial_value = if let Some(initial_raw) = initial_value_maybe {
+        Some(parse_member(
+            &initial_raw,
+            false,
+            &HashMap::<String, String>::new(),
+            &mut HashSet::<String>::new(),
+            &HashMap::<String, bool>::new(),
+            &HashMap::<String, Struct>::new(),
+            &HashMap::<String, Expression>::new(),
+        ))
+    } else {
+        None
+    };
     let constant = attributes_raw
         .unwrap_or_else(|| String::from(""))
         .contains("constant");
@@ -1984,6 +1999,9 @@ fn parse_member(
         } else if expression == &Expression::EnvCaller(None) {
             imports.insert(String::from("use ink_lang::codegen::Env;"));
             return Expression::EnvCaller(Some(selector!(constructor)))
+        } else if expression == &Expression::TransferredValue(None) {
+            imports.insert(String::from("use ink_lang::codegen::Env;"));
+            return Expression::TransferredValue(Some(selector!(constructor)))
         }
 
         return expression.clone()
@@ -2016,9 +2034,11 @@ fn parse_member(
         )
     }
 
-    let regex_hex = Regex::new(r#"(?x)^\s*hex"(?P<value>.+?)"\s*$"#).unwrap();
-    if regex_hex.is_match(raw) {
-        let value = capture_regex(&regex_hex, raw, "value").unwrap();
+    let regex_hex_string = Regex::new(r#"(?x)^\s*hex"(?P<value>.+?)"\s*$"#).unwrap();
+    let regex_hex = Regex::new(r#"(?x)^\s*(?P<value>0x[0-9A-Fa-f]*?)\s*$"#).unwrap();
+    if regex_hex_string.is_match(raw) || regex_hex.is_match(raw) {
+        let value = capture_regex(&regex_hex_string, raw, "value")
+            .unwrap_or_else(|| capture_regex(&regex_hex, raw, "value").unwrap());
         return parse_member(
             &format!("hex(\"{value}\")"),
             constructor,
@@ -2163,9 +2183,9 @@ fn parse_member(
 
     let regex_arithmetic = Regex::new(
         r#"(?x)
-        ^\s*(?P<left>.+?)
-        \s*(?P<operation>[/+\-*%]+)
-        [^=]\s*(?P<right>.+)
+        ^\s*(?P<left>[^+\-]*?)
+        \s*(?P<operation>[/+\-*%][*]*)
+        \s*(?P<right>[^+\-=].*)
         \s*$"#,
     )
     .unwrap();
@@ -2358,6 +2378,38 @@ fn parse_member(
         }
 
         return Expression::Mapping(bx!(mapping), indices, None)
+    }
+
+    if REGEX_DOUBLE_SIGN_RIGHT.is_match(raw) {
+        let statement = parse_double_sign(
+            raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_RIGHT,
+            structs,
+            enclosed_expressions,
+        );
+        if let Statement::Assign(member, _, _) = statement {
+            return member
+        }
+    }
+
+    if REGEX_DOUBLE_SIGN_LEFT.is_match(raw) {
+        let statement = parse_double_sign(
+            raw,
+            constructor,
+            storage,
+            imports,
+            functions,
+            &REGEX_DOUBLE_SIGN_LEFT,
+            structs,
+            enclosed_expressions,
+        );
+        if let Statement::Assign(member, _, _) = statement {
+            return member
+        }
     }
 
     let selector = get_selector(storage, constructor, raw);
@@ -2613,15 +2665,17 @@ fn parse_function_call(
         }
     }
 
-    args.push(parse_member(
-        &buffer,
-        constructor,
-        storage,
-        imports,
-        functions,
-        structs,
-        enclosed_expressions,
-    ));
+    if !trim(&buffer).is_empty() {
+        args.push(parse_member(
+            &buffer,
+            constructor,
+            storage,
+            imports,
+            functions,
+            structs,
+            enclosed_expressions,
+        ));
+    }
 
     let selector = if functions.get(&function_name_raw).is_some() {
         Some(selector!(constructor))
@@ -2870,8 +2924,9 @@ fn parse_return_parameters(
 
     let mut iterator = tokens.iter();
     while let Some(token) = iterator.next() {
-        token.to_owned().remove_matches(",");
-        let param_type = convert_variable_type(token.to_owned(), imports);
+        let mut param_raw = token.to_owned();
+        param_raw.remove_matches(",");
+        let param_type = convert_variable_type(param_raw, imports);
         let mut name = if tokens.len() >= (parameters.matches(',').count() + 1) * 2 {
             iterator.next().unwrap().to_owned()
         } else {

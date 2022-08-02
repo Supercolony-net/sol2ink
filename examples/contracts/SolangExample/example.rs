@@ -20,7 +20,7 @@ pub mod example {
     }
 
     ///Constants
-    pub const bad_state: State = State.Zombie;
+    pub const bad_state: State = state.zombie;
     pub const first_pid: i32 = 1;
 
     ///Process state
