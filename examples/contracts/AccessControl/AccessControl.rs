@@ -55,7 +55,7 @@ pub mod access_control {
         Custom(String),
     }
 
-    pub const default_admin_role: [u8; 32] = &hex::decode("0x00");
+    pub const DEFAULT_ADMIN_ROLE: [u8; 32] = &hex::decode("0x00");
 
     /// @dev Modifier that checks that an account has a specific role. Reverts
     /// with a standardized message including the required role.

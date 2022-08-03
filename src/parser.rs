@@ -37,7 +37,7 @@ macro_rules! bx {
     };
 }
 
-const DEFAULT_ERROR: &str = "SMART CONTRACTZ MAKE PANIC BEEP BEEP BEEP";
+const DEFAULT_ERROR: &str = "SMART CONTRACT MAKE PANIC BEEP BEEP BEEP";
 
 lazy_static! {
     static ref TYPES: HashMap<&'static str, (&'static str, Option<&'static str>, Option<&'static str>)> = {
@@ -270,14 +270,14 @@ lazy_static! {
         \s*$"#,
     )
     .unwrap();
-    static ref REGEX_DOUBLE_SIGN_RIGHT: Regex = Regex::new(
+    static ref REGEX_BINARY_SUFFIX: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<value>.+?)
         \s*(?P<operation>[+-]{2});*
         \s*$"#,
     )
     .unwrap();
-    static ref REGEX_BINARY_OPERATOR: Regex = Regex::new(
+    static ref REGEX_BINARY_PREFIX: Regex = Regex::new(
         r#"(?x)
         ^\s*(?P<operation>[+-]{2})
         \s*(?P<value>.+?);*
@@ -356,7 +356,7 @@ const SPACE: char = ' ';
 pub struct Parser<'a> {
     chars: &'a mut Chars<'a>,
     imports: &'a mut HashSet<String>,
-    storage: &'a mut HashMap<String, String>,
+    storage: &'a mut HashMap<String, ContractField>,
     functions: &'a mut HashMap<String, bool>,
     events: &'a mut HashMap<String, Event>,
     modifiers: &'a mut HashMap<String, ()>,
@@ -364,13 +364,11 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    /// creates a new parser from a given chars iterator
-    ///
-    /// `chars` is a reference to the mutable chars iterator to be used by the parser
+    /// creates a new parser from the given parameters
     pub fn new(
         chars: &'a mut Chars<'a>,
         imports: &'a mut HashSet<String>,
-        storage: &'a mut HashMap<String, String>,
+        storage: &'a mut HashMap<String, ContractField>,
         functions: &'a mut HashMap<String, bool>,
         events: &'a mut HashMap<String, Event>,
         modifiers: &'a mut HashMap<String, ()>,
@@ -608,10 +606,8 @@ impl<'a> Parser<'a> {
         }
 
         for contract_field in fields.iter() {
-            self.storage.insert(
-                contract_field.name.clone(),
-                contract_field.field_type.clone(),
-            );
+            self.storage
+                .insert(contract_field.name.clone(), contract_field.clone());
         }
         for function in functions.iter() {
             self.functions
@@ -1254,10 +1250,10 @@ impl<'a> Parser<'a> {
             return self.parse_assign(&line, constructor)
         } else if REGEX_TERNARY.is_match(&line) {
             return self.parse_ternary_statement(&line, constructor, stack, iterator)
-        } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&line) {
-            return self.parse_binary_operation(&line, constructor, &REGEX_DOUBLE_SIGN_RIGHT, None)
-        } else if REGEX_BINARY_OPERATOR.is_match(&line) {
-            return self.parse_binary_operation(&line, constructor, &REGEX_BINARY_OPERATOR, None)
+        } else if REGEX_BINARY_SUFFIX.is_match(&line) {
+            return self.parse_binary_operation(&line, constructor, &REGEX_BINARY_SUFFIX, None)
+        } else if REGEX_BINARY_PREFIX.is_match(&line) {
+            return self.parse_binary_operation(&line, constructor, &REGEX_BINARY_PREFIX, None)
         } else if REGEX_FUNCTION_CALL.is_match(&line) {
             let expression = self.parse_function_call(&line, constructor, None);
             return Statement::FunctionCall(expression)
@@ -1824,23 +1820,19 @@ impl<'a> Parser<'a> {
         let operation = *OPERATIONS.get(&operation_raw).unwrap();
         let right = self.parse_expression(&right_raw, constructor, None);
 
-        if REGEX_BINARY_OPERATOR.is_match(&right_raw) {
-            let value_raw = capture_regex(&REGEX_BINARY_OPERATOR, &right_raw, "value").unwrap();
+        if REGEX_BINARY_PREFIX.is_match(&right_raw) {
+            let value_raw = capture_regex(&REGEX_BINARY_PREFIX, &right_raw, "value").unwrap();
             let value = self.parse_expression(&value_raw, constructor, None);
             let assign = Statement::Assign(left, value, operation);
             let arithmetic =
-                self.parse_binary_operation(&right_raw, constructor, &REGEX_BINARY_OPERATOR, None);
+                self.parse_binary_operation(&right_raw, constructor, &REGEX_BINARY_PREFIX, None);
             return Statement::Group(vec![arithmetic, assign])
-        } else if REGEX_DOUBLE_SIGN_RIGHT.is_match(&right_raw) {
-            let value_raw = capture_regex(&REGEX_DOUBLE_SIGN_RIGHT, &right_raw, "value").unwrap();
+        } else if REGEX_BINARY_SUFFIX.is_match(&right_raw) {
+            let value_raw = capture_regex(&REGEX_BINARY_SUFFIX, &right_raw, "value").unwrap();
             let value = self.parse_expression(&value_raw, constructor, None);
             let assign = Statement::Assign(left, value, operation);
-            let arithmetic = self.parse_binary_operation(
-                &right_raw,
-                constructor,
-                &REGEX_DOUBLE_SIGN_RIGHT,
-                None,
-            );
+            let arithmetic =
+                self.parse_binary_operation(&right_raw, constructor, &REGEX_BINARY_SUFFIX, None);
             return Statement::Group(vec![assign, arithmetic])
         }
 
@@ -2162,11 +2154,11 @@ impl<'a> Parser<'a> {
             return Expression::Mapping(bx!(mapping), indices, None)
         }
 
-        if REGEX_DOUBLE_SIGN_RIGHT.is_match(raw) {
+        if REGEX_BINARY_SUFFIX.is_match(raw) {
             let statement = self.parse_binary_operation(
                 raw,
                 constructor,
-                &REGEX_DOUBLE_SIGN_RIGHT,
+                &REGEX_BINARY_SUFFIX,
                 enclosed_expressions.clone(),
             );
             if let Statement::Assign(member, _, _) = statement {
@@ -2174,15 +2166,21 @@ impl<'a> Parser<'a> {
             }
         }
 
-        if REGEX_BINARY_OPERATOR.is_match(raw) {
+        if REGEX_BINARY_PREFIX.is_match(raw) {
             let statement = self.parse_binary_operation(
                 raw,
                 constructor,
-                &REGEX_BINARY_OPERATOR,
+                &REGEX_BINARY_PREFIX,
                 enclosed_expressions,
             );
             if let Statement::Assign(member, _, _) = statement {
                 return member
+            }
+        }
+
+        if let Some(contract_field) = self.storage.get(raw) {
+            if contract_field.constant {
+                return Expression::Constant(contract_field.name.clone())
             }
         }
 
@@ -2494,7 +2492,12 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[inline(always)]
+/// Captures a regex group and returns it
+///
+/// `regex` the regex to use
+/// `line` the string on which we will use the regex
+/// `capture_name` the name of the group to capture
+#[inline]
 fn capture_regex(regex: &Regex, line: &str, capture_name: &str) -> Option<String> {
     regex.captures(line).and_then(|cap| {
         cap.name(capture_name)

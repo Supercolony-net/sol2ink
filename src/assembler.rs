@@ -8,6 +8,7 @@ use convert_case::{
     Case::{
         Pascal,
         Snake,
+        UpperSnake,
     },
     Casing,
 };
@@ -246,7 +247,7 @@ fn assemble_constants(fields: Vec<ContractField>) -> TokenStream {
 
     // assemble storage fields
     for field in fields.iter().filter(|field| field.constant) {
-        let field_name = format_ident!("{}", field.name.to_case(Snake));
+        let field_name = format_ident!("{}", field.name.to_case(UpperSnake));
         let field_type = TokenStream::from_str(&field.field_type).unwrap();
         let initial_value = field.initial_value.clone().unwrap();
 
@@ -930,6 +931,11 @@ impl ToTokens for Expression {
                 } else {
                     quote!(#operation #left)
                 }
+            }
+            Expression::Constant(expression_raw) => {
+                let expression =
+                    TokenStream::from_str(&expression_raw.to_case(UpperSnake)).unwrap();
+                quote!(#expression)
             }
             Expression::Enclosed(expression) => {
                 quote!((#expression))

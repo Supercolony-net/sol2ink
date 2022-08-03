@@ -20,8 +20,8 @@ pub mod example {
     }
 
     ///Constants
-    pub const bad_state: State = state.zombie;
-    pub const first_pid: i32 = 1;
+    pub const BAD_STATE: State = state.zombie;
+    pub const FIRST_PID: i32 = 1;
 
     ///Process state
     pub enum State {
@@ -96,7 +96,7 @@ pub mod example {
         #[ink(message)]
         pub fn is_zombie_reaper(&self) -> Result<bool, Error> {
             // must be pid 1 and not zombie ourselves *
-            return Ok((self.pid == self.first_pid && self.state != state.zombie))
+            return Ok((self.pid == FIRST_PID && self.state != state.zombie))
         }
 
         ///Returning a constant does not access storage at all, so
@@ -105,7 +105,7 @@ pub mod example {
         pub fn systemd_pid(&self) -> Result<u32, Error> {
             // Note that cast is required to change sign from
             // int32 to uint32
-            return Ok((self.first_pid as u32))
+            return Ok((FIRST_PID as u32))
         }
 
         ///Convert celcius to fahrenheit

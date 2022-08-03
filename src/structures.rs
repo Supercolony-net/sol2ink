@@ -30,6 +30,7 @@ pub struct Interface {
     pub comments: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct ContractField {
     pub field_type: String,
     pub name: String,
@@ -204,6 +205,7 @@ pub enum Expression {
     Arithmetic(Box<Expression>, Box<Expression>, Operation),
     Cast(bool, String, Box<Expression>),
     Condition(Box<Condition>),
+    Constant(String),
     Enclosed(Box<Expression>),
     EnvCaller(Option<String>),
     FunctionCall(String, Vec<Expression>, Option<String>, bool),
