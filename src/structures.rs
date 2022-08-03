@@ -103,14 +103,13 @@ pub struct FunctionParam {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
-    Assembly(Vec<Statement>),
     AssemblyEnd,
     Assign(Expression, Expression, Operation),
     Catch(Vec<Statement>),
     CatchEnd,
     Comment(String),
     Declaration(String, String, Option<Expression>),
-    Do(
+    Loop(
         Option<Box<Statement>>,
         Expression,
         Option<Box<Statement>>,

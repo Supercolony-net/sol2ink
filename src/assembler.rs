@@ -742,11 +742,6 @@ impl ToTokens for Statement {
                     #left #operation #right;
                 })
             }
-            Statement::Assembly(statements) => {
-                stream.extend(quote! {
-                        #(#statements)*
-                })
-            }
             Statement::Catch(statements) => {
                 stream.extend(quote! {
                     else if false {
@@ -770,7 +765,7 @@ impl ToTokens for Statement {
                     stream.extend(quote!(let #var_name : #var_type;));
                 }
             }
-            Statement::Do(assign, condition, modification, statements) => {
+            Statement::Loop(assign, condition, modification, statements) => {
                 stream.extend(quote! {
                     #assign
                     loop {

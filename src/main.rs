@@ -8,7 +8,13 @@ pub mod formatter;
 pub mod parser;
 pub mod structures;
 
-use std::env;
+use std::{
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    env,
+};
 
 use crate::parser::ParserError;
 
@@ -32,8 +38,24 @@ fn main() {
 fn run(path: &String) -> Result<(), parser::ParserError> {
     // read the file
     let content = file_utils::read_file(path)?;
+    let mut chars = content.chars();
+    let mut imports = HashSet::new();
+    let mut storage = HashMap::new();
+    let mut functions = HashMap::new();
+    let mut events = HashMap::new();
+    let mut modifiers = HashMap::new();
+    let mut structs = HashMap::new();
 
-    let output = parser::parse_file(content)?;
+    let mut parser = parser::Parser::new(
+        &mut chars,
+        &mut imports,
+        &mut storage,
+        &mut functions,
+        &mut events,
+        &mut modifiers,
+        &mut structs,
+    );
+    let output = parser.parse_file()?;
     match output {
         (None, None) | (Some(_), Some(_)) => Err(ParserError::FileCorrupted),
         (Some(contract), None) => {
