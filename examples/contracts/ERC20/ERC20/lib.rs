@@ -121,14 +121,14 @@ pub mod erc_20 {
         /// @dev Returns the name of the token.
         #[ink(message)]
         pub fn name(&self) -> Result<String, Error> {
-            return Ok(self.data.name.clone())
+            return Ok(self.data.name)
         }
 
         /// @dev Returns the symbol of the token, usually a shorter version of the
         /// name.
         #[ink(message)]
         pub fn symbol(&self) -> Result<String, Error> {
-            return Ok(self.data.symbol.clone())
+            return Ok(self.data.symbol)
         }
 
         /// @dev Returns the number of decimals used to get its user representation.
@@ -401,7 +401,7 @@ pub mod erc_20 {
             amount: u128,
         ) -> Result<(), Error> {
             let current_allowance: u128 = self.allowance(owner, spender)?;
-            if current_allowance != u128::MAX {
+            if current_allowance != u128.max {
                 if current_allowance < amount {
                     return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
                 }
