@@ -20,13 +20,13 @@ Read more about how Sol2Ink works under the hood here.
 
 ### Future development
 
-[X] Sol2Ink CLI
-[ ] User friendly errors when transpiling uncompilable contract
-[ ] Parsing libraries
-[ ] Implement currently incorrectly parsed statements and expressions
-[ ] Ability to parse a whole Solidity project into ink! project
-[ ] Parse inheritance
-[ ] Sol2Ink Web Application with interface
+- [X] Sol2Ink CLI
+- [ ] User friendly errors when transpiling uncompilable contract
+- [ ] Parsing libraries
+- [ ] Implement currently incorrectly parsed statements and expressions
+- [ ] Ability to parse a whole Solidity project into ink! project
+- [ ] Parse inheritance
+- [ ] Sol2Ink Web Application with interface
 
 ### How to use it?
 
