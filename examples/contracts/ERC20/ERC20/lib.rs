@@ -24,19 +24,22 @@
 /// Finally, the non-standard {decreaseAllowance} and {increaseAllowance}
 /// functions have been added to mitigate the well-known issues around setting
 /// allowances. See {IERC20-approve}.
-#[brush::contract]
+#[openbrush::contract]
 pub mod erc_20 {
-    use brush::traits::{
-        AccountId,
-        AcountIdExt,
-        ZERO_ADDRESS,
+    use ink_prelude::string::String;
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::{
+        storage::Mapping,
+        traits::{
+            AccountIdExt,
+            Storage,
+            ZERO_ADDRESS,
+        },
     };
-    use ink::prelude::string::String;
-    use ink_lang::codegen::{
-        EmitEvent,
-        Env,
+    use scale::{
+        Decode,
+        Encode,
     };
-    use ink_storage::Mapping;
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -82,14 +85,23 @@ pub mod erc_20 {
         field_2: u128,
     }
 
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {
+        pub balances: Mapping<AccountId, u128>,
+        pub allowances: Mapping<(AccountId, AccountId), u128>,
+        pub total_supply: u128,
+        pub name: String,
+        pub symbol: String,
+    }
+
     #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
+    #[derive(Default, SpreadAllocate, Storage)]
     pub struct ERC20 {
-        balances: Mapping<AccountId, u128>,
-        allowances: Mapping<(AccountId, AccountId), u128>,
-        total_supply: u128,
-        name: String,
-        symbol: String,
+        #[storage_field]
+        data: Data,
     }
 
     impl ERC20 {
@@ -101,22 +113,22 @@ pub mod erc_20 {
         #[ink(constructor)]
         pub fn new(name: String, symbol: String) -> Self {
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
-                instance.name = name;
-                instance.symbol = symbol;
+                instance.data.name = name;
+                instance.data.symbol = symbol;
             })
         }
 
         /// @dev Returns the name of the token.
         #[ink(message)]
         pub fn name(&self) -> Result<String, Error> {
-            return Ok(self.name)
+            return Ok(self.data.name.clone())
         }
 
         /// @dev Returns the symbol of the token, usually a shorter version of the
         /// name.
         #[ink(message)]
         pub fn symbol(&self) -> Result<String, Error> {
-            return Ok(self.symbol)
+            return Ok(self.data.symbol.clone())
         }
 
         /// @dev Returns the number of decimals used to get its user representation.
@@ -136,13 +148,13 @@ pub mod erc_20 {
         /// @dev See {IERC20-totalSupply}.
         #[ink(message)]
         pub fn total_supply(&self) -> Result<u128, Error> {
-            return Ok(self.total_supply)
+            return Ok(self.data.total_supply)
         }
 
         /// @dev See {IERC20-balanceOf}.
         #[ink(message)]
         pub fn balance_of(&self, account: AccountId) -> Result<u128, Error> {
-            return Ok(self.balances.get(&account).unwrap())
+            return Ok(self.data.balances.get(&account).unwrap())
         }
 
         /// @dev See {IERC20-transfer}.
@@ -159,7 +171,7 @@ pub mod erc_20 {
         /// @dev See {IERC20-allowance}.
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Result<u128, Error> {
-            return Ok(self.allowances.get(&(owner, spender)).unwrap())
+            return Ok(self.data.allowances.get(&(owner, spender)).unwrap())
         }
 
         /// @dev See {IERC20-approve}.
@@ -265,17 +277,18 @@ pub mod erc_20 {
                 )))
             }
             self._before_token_transfer(from, to, amount)?;
-            let from_balance: u128 = self.balances.get(&from).unwrap();
+            let from_balance: u128 = self.data.balances.get(&from).unwrap();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: transfer amount exceeds balance",
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            self.balances.insert(&from, from_balance - amount);
+            self.data.balances.insert(&from, &(from_balance - amount));
             // <<< Please handle unchecked blocks manually
-            self.balances
-                .insert(&to, self.balances.get(&to).unwrap() + amount);
+            self.data
+                .balances
+                .insert(&to, &(self.data.balances.get(&to).unwrap() + amount));
             self.env().emit_event(Transfer {
                 from,
                 to,
@@ -297,9 +310,11 @@ pub mod erc_20 {
                 )))
             }
             self._before_token_transfer(ZERO_ADDRESS.into(), account, amount)?;
-            self.total_supply += amount;
-            self.balances
-                .insert(&account, self.balances.get(&account).unwrap() + amount);
+            self.data.total_supply += amount;
+            self.data.balances.insert(
+                &account,
+                &(self.data.balances.get(&account).unwrap() + amount),
+            );
             self.env().emit_event(Transfer {
                 from: ZERO_ADDRESS.into(),
                 to: account,
@@ -322,16 +337,18 @@ pub mod erc_20 {
                 )))
             }
             self._before_token_transfer(account, ZERO_ADDRESS.into(), amount)?;
-            let account_balance: u128 = self.balances.get(&account).unwrap();
+            let account_balance: u128 = self.data.balances.get(&account).unwrap();
             if account_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: burn amount exceeds balance",
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            self.balances.insert(&account, account_balance - amount);
+            self.data
+                .balances
+                .insert(&account, &(account_balance - amount));
             // <<< Please handle unchecked blocks manually
-            self.total_supply -= amount;
+            self.data.total_supply -= amount;
             self.env().emit_event(Transfer {
                 from: account,
                 to: ZERO_ADDRESS.into(),
@@ -364,7 +381,7 @@ pub mod erc_20 {
                     "ERC20: approve to the zero address",
                 )))
             }
-            self.allowances.insert(&(owner, spender), amount);
+            self.data.allowances.insert(&(owner, spender), &(amount));
             self.env().emit_event(Approval {
                 owner,
                 spender,
@@ -384,7 +401,7 @@ pub mod erc_20 {
             amount: u128,
         ) -> Result<(), Error> {
             let current_allowance: u128 = self.allowance(owner, spender)?;
-            if current_allowance != u128.max {
+            if current_allowance != u128::MAX {
                 if current_allowance < amount {
                     return Err(Error::Custom(String::from("ERC20: insufficient allowance")))
                 }

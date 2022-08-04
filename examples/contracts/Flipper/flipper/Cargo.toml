@@ -19,7 +19,7 @@ openbrush = { version = "2.2.0", default-features = false }
 [lib]
 name = "sol_2_ink_generated"
 path = "lib.rs"
-crate-type = ["rlib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["std"]

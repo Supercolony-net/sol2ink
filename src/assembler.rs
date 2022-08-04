@@ -40,10 +40,14 @@ pub fn assemble_contract(contract: Contract) -> TokenStream {
         _blank_!();
         #signature
         #comments
-        #[brush::contract]
+        #[openbrush::contract]
         pub mod #mod_name {
             #imports
-
+            use scale::Encode;
+            use scale::Decode;
+            use ink_storage::traits::SpreadAllocate;
+            use openbrush::traits::Storage;
+            _blank_!();
             #[derive(Debug, Encode, Decode, PartialEq)]
             #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
             pub enum Error {
@@ -84,10 +88,10 @@ pub fn assemble_interface(interface: Interface) -> TokenStream {
         #events
         #enums
         #structs
-        #[brush::wrapper]
+        #[openbrush::wrapper]
         pub type #interface_name_ref = dyn #interface_name;
         _blank_!();
-        #[brush::trait_definition]
+        #[openbrush::trait_definition]
         pub trait #interface_name {
             #function_headers
         }
@@ -117,10 +121,6 @@ fn assemble_imports(imports: HashSet<String>) -> TokenStream {
     for import in output_vec {
         output.extend(TokenStream::from_str(&import).unwrap());
     }
-
-    output.extend(quote! {
-        _blank_!();
-    });
 
     output
 }
@@ -225,15 +225,24 @@ fn assemble_storage(contract_name: &String, fields: &[ContractField]) -> TokenSt
             });
         }
         storage_fields.extend(quote! {
-            #field_name: #field_type,
+            pub #field_name: #field_type,
         });
     }
 
     output.extend(quote! {
-        #[ink(storage)]
-        #[derive(Default, SpreadAllocate)]
-        pub struct #contract_name {
+        pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+        _blank_!();
+        #[derive(Default, Debug)]
+        #[openbrush::upgradeable_storage(STORAGE_KEY)]
+        pub struct Data {
             #storage_fields
+        }
+        _blank_!();
+        #[ink(storage)]
+        #[derive(Default, SpreadAllocate, Storage)]
+        pub struct #contract_name {
+            #[storage_field]
+            data: Data,
         }
         _blank_!();
     });
@@ -984,7 +993,7 @@ impl ToTokens for Expression {
                 if let Ok(expression) = expression_maybe {
                     if let Some(selector_raw) = selector_raw {
                         let selector = format_ident!("{}", selector_raw);
-                        quote!(#selector.#expression)
+                        quote!(#selector.data.#expression)
                     } else {
                         quote!(#expression)
                     }
@@ -1008,7 +1017,7 @@ impl ToTokens for Expression {
                     quote!(#expression)
                 };
                 if let Some(insert) = insert_maybe {
-                    quote!(#expression.insert(&#indices, #insert))
+                    quote!(#expression.insert(&#indices, &(#insert)))
                 } else {
                     quote!(#expression.get(&#indices).unwrap())
                 }

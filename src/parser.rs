@@ -46,7 +46,7 @@ lazy_static! {
 
         map.insert(
             "address",
-            ("AccountId", None, Some("brush::traits::AccountId")),
+            ("AccountId", None, None),
         );
         map.insert(
             "hex",
@@ -90,7 +90,7 @@ lazy_static! {
             (
                 "Vec<u8>",
                 Some("Vec::<u8>::from"),
-                Some("ink::prelude::vec::Vec"),
+                Some("ink_prelude::vec::Vec"),
             ),
         );
         map.insert("byte", ("u8", None, None));
@@ -130,7 +130,7 @@ lazy_static! {
         map.insert("mapping", ("Mapping", None, None));
         map.insert(
             "string",
-            ("String", None, Some("ink::prelude::string::String")),
+            ("String", None, Some("ink_prelude::string::String")),
         );
         map.insert("uint8", ("u8", None, None));
         map.insert("uint16", ("u16", None, None));
@@ -1131,8 +1131,9 @@ impl<'a> Parser<'a> {
     /// returns the representation of the modifier header as `Modifier` struct
     fn parse_modifier(&mut self, comments: &[String]) -> Result<Modifier, ParserError> {
         self.imports
-            .insert(String::from("use brush::modifier_definition;"));
-        self.imports.insert(String::from("use brush::modifiers;"));
+            .insert(String::from("use openbrush::modifier_definition;"));
+        self.imports
+            .insert(String::from("use openbrush::modifiers;"));
         Ok(Modifier {
             header: self.parse_function_header(comments),
             statements: self.parse_body(),
@@ -1316,7 +1317,7 @@ impl<'a> Parser<'a> {
     /// returns the statements in form of `Statement::Require`
     fn parse_require(&mut self, line: &str, constructor: bool) -> Statement {
         self.imports
-            .insert(String::from("use ink::prelude::string::String;"));
+            .insert(String::from("use ink_prelude::string::String;"));
 
         let condition = capture_regex(&REGEX_REQUIRE, line, "condition");
         let error = capture_regex(&REGEX_REQUIRE, line, "error");
@@ -1506,7 +1507,7 @@ impl<'a> Parser<'a> {
             right = None;
             left = Expression::IsZero(bx!(left));
             self.imports
-                .insert(String::from("use brush::traits::AcountIdExt;\n"));
+                .insert(String::from("use openbrush::traits::AccountIdExt;\n"));
         }
 
         Condition {
@@ -1759,9 +1760,6 @@ impl<'a> Parser<'a> {
     ///
     /// Return the statement in form of `Statement::Emit`
     fn parse_emit(&mut self, line: &str, constructor: bool) -> Statement {
-        self.imports
-            .insert(String::from("use ink_lang::codegen::EmitEvent;"));
-
         let event_name_raw = capture_regex(&REGEX_EMIT, line, "event_name").unwrap();
         let args_raw = capture_regex(&REGEX_EMIT, line, "args").unwrap();
 
@@ -1916,14 +1914,10 @@ impl<'a> Parser<'a> {
         } else if let Some(expression) = SPECIFIC_EXPRESSION.get(raw) {
             if expression == &Expression::ZeroAddressInto {
                 self.imports
-                    .insert(String::from("use brush::traits::ZERO_ADDRESS;"));
+                    .insert(String::from("use openbrush::traits::ZERO_ADDRESS;"));
             } else if expression == &Expression::EnvCaller(None) {
-                self.imports
-                    .insert(String::from("use ink_lang::codegen::Env;"));
                 return Expression::EnvCaller(Some(selector!(constructor)))
             } else if expression == &Expression::TransferredValue(None) {
-                self.imports
-                    .insert(String::from("use ink_lang::codegen::Env;"));
                 return Expression::TransferredValue(Some(selector!(constructor)))
             }
 
@@ -2453,7 +2447,7 @@ impl<'a> Parser<'a> {
         .unwrap();
         if regex_mapping.is_match(&arg_type) {
             self.imports
-                .insert(String::from("use ink_storage::Mapping;\n"));
+                .insert(String::from("use openbrush::storage::Mapping;\n"));
             let mut from_raw = capture_regex(&regex_mapping, &arg_type, "type_from").unwrap();
             let mut to_raw = capture_regex(&regex_mapping, &arg_type, "type_to").unwrap();
 
@@ -2487,7 +2481,7 @@ impl<'a> Parser<'a> {
         };
         return if is_vec {
             self.imports
-                .insert(String::from("use ink::prelude::vec::Vec;\n"));
+                .insert(String::from("use ink_prelude::vec::Vec;\n"));
             format!("Vec<{}>", output_type)
         } else {
             output_type

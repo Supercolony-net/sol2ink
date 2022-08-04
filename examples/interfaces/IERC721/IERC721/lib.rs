@@ -1,9 +1,7 @@
 // Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
-use ink::prelude::vec::Vec;
-
+use ink_prelude::vec::Vec;
 /// @dev Emitted when `tokenId` token is transferred from `from` to `to`.
 #[ink(event)]
 pub struct Transfer {
@@ -36,10 +34,10 @@ pub struct ApprovalForAll {
     approved: bool,
 }
 
-#[brush::wrapper]
+#[openbrush::wrapper]
 pub type ERC721Ref = dyn ERC721;
 
-#[brush::trait_definition]
+#[openbrush::trait_definition]
 pub trait ERC721 {
     /// @dev Returns the number of tokens in ``owner``'s account.
     #[ink(message)]

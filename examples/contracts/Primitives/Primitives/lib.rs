@@ -4,9 +4,14 @@
 // Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-#[brush::contract]
+#[openbrush::contract]
 pub mod primitives {
-    use brush::traits::AccountId;
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::traits::Storage;
+    use scale::{
+        Decode,
+        Encode,
+    };
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -29,9 +34,18 @@ pub mod primitives {
         Xor,
     }
 
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {}
+
     #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
-    pub struct primitives {}
+    #[derive(Default, SpreadAllocate, Storage)]
+    pub struct primitives {
+        #[storage_field]
+        data: Data,
+    }
 
     impl primitives {
         #[ink(constructor)]

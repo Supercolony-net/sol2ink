@@ -5,12 +5,17 @@
 // https://github.com/Supercolony-net/sol2ink
 
 ///example.sol
-#[brush::contract]
+#[openbrush::contract]
 pub mod example {
-    use brush::traits::{
-        AccountId,
-        AcountIdExt,
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::traits::{
+        AccountIdExt,
+        Storage,
         ZERO_ADDRESS,
+    };
+    use scale::{
+        Decode,
+        Encode,
     };
 
     #[derive(Debug, Encode, Decode, PartialEq)]
@@ -64,15 +69,24 @@ pub mod example {
         s: suit,
     }
 
-    #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
-    pub struct example {
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {
         ///Variables in contract storage
-        state: State,
-        pid: i32,
-        reaped: u32,
-        card_1: card,
-        card_2: card,
+        pub state: State,
+        pub pid: i32,
+        pub reaped: u32,
+        pub card_1: card,
+        pub card_2: card,
+    }
+
+    #[ink(storage)]
+    #[derive(Default, SpreadAllocate, Storage)]
+    pub struct example {
+        #[storage_field]
+        data: Data,
     }
 
     impl example {
@@ -81,7 +95,7 @@ pub mod example {
         pub fn new(pid: i32) -> Self {
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
                 // Set contract storage
-                instance.pid = pid;
+                instance.data.pid = pid;
                 self.reaped = 3;
                 self.card_1 = card(value.two, suit.club)?;
                 self.card_2 = Card {
@@ -96,7 +110,7 @@ pub mod example {
         #[ink(message)]
         pub fn is_zombie_reaper(&self) -> Result<bool, Error> {
             // must be pid 1 and not zombie ourselves *
-            return Ok((self.pid == FIRST_PID && self.state != state.zombie))
+            return Ok((self.data.pid == FIRST_PID && self.data.state != state.zombie))
         }
 
         ///Returning a constant does not access storage at all, so
@@ -183,7 +197,7 @@ pub mod example {
 
         ///Overloaded function with different return value!
         fn _get_pid_state(&self) -> Result<u32, Error> {
-            return Ok(self.reaped)
+            return Ok(self.data.reaped)
         }
 
         #[ink(message)]
@@ -192,7 +206,7 @@ pub mod example {
             while n < 100 {
                 if self._get_pid_state(n)? == state.zombie {
                     // reap!
-                    self.reaped += 1;
+                    self.data.reaped += 1;
                 }
                 n += 1;
             }
@@ -219,8 +233,8 @@ pub mod example {
         #[ink(message)]
         pub fn set_card_1(&mut self, c: card) -> Result<card, Error> {
             let mut previous = Default::default();
-            previous = self.card_1;
-            self.card_1 = c;
+            previous = self.data.card_1;
+            self.data.card_1 = c;
             Ok(previous)
         }
 

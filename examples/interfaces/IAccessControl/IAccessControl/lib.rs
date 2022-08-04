@@ -1,8 +1,6 @@
 // Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
-
 /// @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`
 /// `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite
 /// {RoleAdminChanged} not being emitted signaling this.
@@ -44,10 +42,10 @@ pub struct RoleRevoked {
     sender: AccountId,
 }
 
-#[brush::wrapper]
+#[openbrush::wrapper]
 pub type AccessControlRef = dyn AccessControl;
 
-#[brush::trait_definition]
+#[openbrush::trait_definition]
 pub trait AccessControl {
     /// @dev Returns `true` if `account` has been granted `role`.
     #[ink(message)]

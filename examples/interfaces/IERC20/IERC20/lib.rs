@@ -1,8 +1,6 @@
 // Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
-
 /// @dev Emitted when `value` tokens are moved from one account (`from`) to
 /// another (`to`).
 /// Note that `value` may be zero.
@@ -26,10 +24,10 @@ pub struct Approval {
     value: u128,
 }
 
-#[brush::wrapper]
+#[openbrush::wrapper]
 pub type ERC20Ref = dyn ERC20;
 
-#[brush::trait_definition]
+#[openbrush::trait_definition]
 pub trait ERC20 {
     /// @dev Returns the amount of tokens in existence.
     #[ink(message)]

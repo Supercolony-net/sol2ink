@@ -10,22 +10,25 @@
 /// See https://eips.ethereum.org/EIPS/eip-1155
 /// Originally based on code by Enjin: https://github.com/enjin/erc-1155
 /// _Available since v3.1._
-#[brush::contract]
+#[openbrush::contract]
 pub mod erc_1155 {
-    use brush::traits::{
-        AccountId,
-        AcountIdExt,
-        ZERO_ADDRESS,
-    };
-    use ink::prelude::{
+    use ink_prelude::{
         string::String,
         vec::Vec,
     };
-    use ink_lang::codegen::{
-        EmitEvent,
-        Env,
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::{
+        storage::Mapping,
+        traits::{
+            AccountIdExt,
+            Storage,
+            ZERO_ADDRESS,
+        },
     };
-    use ink_storage::Mapping;
+    use scale::{
+        Decode,
+        Encode,
+    };
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -83,15 +86,24 @@ pub mod erc_1155 {
         id: u128,
     }
 
-    #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
-    pub struct ERC1155 {
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {
         ///Mapping from token ID to account balances
-        balances: Mapping<(u128, AccountId), u128>,
+        pub balances: Mapping<(u128, AccountId), u128>,
         ///Mapping from account to operator approvals
-        operator_approvals: Mapping<(AccountId, AccountId), bool>,
+        pub operator_approvals: Mapping<(AccountId, AccountId), bool>,
         ///Used as the URI for all token types by relying on ID substitution, e.g. https://token-cdn-domain/{id}.json
-        uri: String,
+        pub uri: String,
+    }
+
+    #[ink(storage)]
+    #[derive(Default, SpreadAllocate, Storage)]
+    pub struct ERC1155 {
+        #[storage_field]
+        data: Data,
     }
 
     impl ERC1155 {
@@ -119,7 +131,7 @@ pub mod erc_1155 {
         /// actual token type ID.
         #[ink(message)]
         pub fn uri(&self) -> Result<String, Error> {
-            return Ok(self.uri)
+            return Ok(self.data.uri)
         }
 
         /// @dev See {IERC1155-balanceOf}.
@@ -132,7 +144,7 @@ pub mod erc_1155 {
                     "ERC1155: address zero is not a valid owner",
                 )))
             }
-            return Ok(self.balances.get(&(id, account)).unwrap())
+            return Ok(self.data.balances.get(&(id, account)).unwrap())
         }
 
         /// @dev See {IERC1155-balanceOfBatch}.
@@ -154,7 +166,7 @@ pub mod erc_1155 {
             while i < accounts.length {
                 batch_balances.insert(
                     &i,
-                    self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?,
+                    &(self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?),
                 );
                 i += 1;
             }
@@ -179,7 +191,11 @@ pub mod erc_1155 {
             account: AccountId,
             operator: AccountId,
         ) -> Result<bool, Error> {
-            return Ok(self.operator_approvals.get(&(account, operator)).unwrap())
+            return Ok(self
+                .data
+                .operator_approvals
+                .get(&(account, operator))
+                .unwrap())
         }
 
         /// @dev See {IERC1155-safeTransferFrom}.
@@ -244,17 +260,21 @@ pub mod erc_1155 {
             let ids: Vec<u128> = self._as_singleton_array(id)?;
             let amounts: Vec<u128> = self._as_singleton_array(amount)?;
             self._before_token_transfer(operator, from, to, ids, amounts, data)?;
-            let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC1155: insufficient balance for transfer",
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            self.balances.insert(&(id, from), from_balance - amount);
+            self.data
+                .balances
+                .insert(&(id, from), &(from_balance - amount));
             // <<< Please handle unchecked blocks manually
-            self.balances
-                .insert(&(id, to), self.balances.get(&(id, to)).unwrap() + amount);
+            self.data.balances.insert(
+                &(id, to),
+                &(self.data.balances.get(&(id, to)).unwrap() + amount),
+            );
             self.env().emit_event(TransferSingle {
                 operator,
                 from,
@@ -296,17 +316,21 @@ pub mod erc_1155 {
             while i < ids.length {
                 let id: u128 = ids.get(&i).unwrap();
                 let amount: u128 = amounts.get(&i).unwrap();
-                let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
                 if from_balance < amount {
                     return Err(Error::Custom(String::from(
                         "ERC1155: insufficient balance for transfer",
                     )))
                 }
                 // Please handle unchecked blocks manually >>>
-                self.balances.insert(&(id, from), from_balance - amount);
+                self.data
+                    .balances
+                    .insert(&(id, from), &(from_balance - amount));
                 // <<< Please handle unchecked blocks manually
-                self.balances
-                    .insert(&(id, to), self.balances.get(&(id, to)).unwrap() + amount);
+                self.data.balances.insert(
+                    &(id, to),
+                    &(self.data.balances.get(&(id, to)).unwrap() + amount),
+                );
                 i += 1;
             }
             self.env().emit_event(TransferBatch {
@@ -335,7 +359,7 @@ pub mod erc_1155 {
         /// Because these URIs cannot be meaningfully represented by the {URI} event,
         /// this function emits no events.
         fn _set_uri(&mut self, newuri: String) -> Result<(), Error> {
-            self.uri = newuri;
+            self.data.uri = newuri;
             Ok(())
         }
 
@@ -361,8 +385,10 @@ pub mod erc_1155 {
             let ids: Vec<u128> = self._as_singleton_array(id)?;
             let amounts: Vec<u128> = self._as_singleton_array(amount)?;
             self._before_token_transfer(operator, ZERO_ADDRESS.into(), to, ids, amounts, data)?;
-            self.balances
-                .insert(&(id, to), self.balances.get(&(id, to)).unwrap() + amount);
+            self.data.balances.insert(
+                &(id, to),
+                &(self.data.balances.get(&(id, to)).unwrap() + amount),
+            );
             self.env().emit_event(TransferSingle {
                 operator,
                 from: ZERO_ADDRESS.into(),
@@ -409,10 +435,10 @@ pub mod erc_1155 {
             self._before_token_transfer(operator, ZERO_ADDRESS.into(), to, ids, amounts, data)?;
             let i: u128 = 0;
             while i < ids.length {
-                self.balances.insert(
+                self.data.balances.insert(
                     &(ids.get(&i).unwrap(), to),
-                    self.balances.get(&(ids.get(&i).unwrap(), to)).unwrap()
-                        + amounts.get(&i).unwrap(),
+                    &(self.data.balances.get(&(ids.get(&i).unwrap(), to)).unwrap()
+                        + amounts.get(&i).unwrap()),
                 );
                 i += 1;
             }
@@ -450,14 +476,16 @@ pub mod erc_1155 {
             let ids: Vec<u128> = self._as_singleton_array(id)?;
             let amounts: Vec<u128> = self._as_singleton_array(amount)?;
             self._before_token_transfer(operator, from, ZERO_ADDRESS.into(), ids, amounts, "")?;
-            let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC1155: burn amount exceeds balance",
                 )))
             }
             // Please handle unchecked blocks manually >>>
-            self.balances.insert(&(id, from), from_balance - amount);
+            self.data
+                .balances
+                .insert(&(id, from), &(from_balance - amount));
             // <<< Please handle unchecked blocks manually
             self.env().emit_event(TransferSingle {
                 operator,
@@ -496,14 +524,16 @@ pub mod erc_1155 {
             while i < ids.length {
                 let id: u128 = ids.get(&i).unwrap();
                 let amount: u128 = amounts.get(&i).unwrap();
-                let from_balance: u128 = self.balances.get(&(id, from)).unwrap();
+                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
                 if from_balance < amount {
                     return Err(Error::Custom(String::from(
                         "ERC1155: burn amount exceeds balance",
                     )))
                 }
                 // Please handle unchecked blocks manually >>>
-                self.balances.insert(&(id, from), from_balance - amount);
+                self.data
+                    .balances
+                    .insert(&(id, from), &(from_balance - amount));
                 // <<< Please handle unchecked blocks manually
                 i += 1;
             }
@@ -531,7 +561,9 @@ pub mod erc_1155 {
                     "ERC1155: setting approval status for self",
                 )))
             }
-            self.operator_approvals.insert(&(owner, operator), approved);
+            self.data
+                .operator_approvals
+                .insert(&(owner, operator), &(approved));
             self.env().emit_event(ApprovalForAll {
                 account: owner,
                 operator,
@@ -652,7 +684,7 @@ pub mod erc_1155 {
 
         fn _as_singleton_array(&self, element: u128) -> Result<Vec<u128>, Error> {
             let array: Vec<u128> = vec![u128::default(); 1];
-            array.insert(&0, element);
+            array.insert(&0, &(element));
             return Ok(array)
         }
 

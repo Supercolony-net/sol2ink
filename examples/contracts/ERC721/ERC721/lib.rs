@@ -9,22 +9,25 @@
 /// @dev Implementation of https://eips.ethereum.org/EIPS/eip-721[ERC721] Non-Fungible Token Standard, including
 /// the Metadata extension, but not including the Enumerable extension, which is available separately as
 /// {ERC721Enumerable}.
-#[brush::contract]
+#[openbrush::contract]
 pub mod erc_721 {
-    use brush::traits::{
-        AccountId,
-        AcountIdExt,
-        ZERO_ADDRESS,
-    };
-    use ink::prelude::{
+    use ink_prelude::{
         string::String,
         vec::Vec,
     };
-    use ink_lang::codegen::{
-        EmitEvent,
-        Env,
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::{
+        storage::Mapping,
+        traits::{
+            AccountIdExt,
+            Storage,
+            ZERO_ADDRESS,
+        },
     };
-    use ink_storage::Mapping;
+    use scale::{
+        Decode,
+        Encode,
+    };
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -65,21 +68,30 @@ pub mod erc_721 {
         approved: bool,
     }
 
-    #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
-    pub struct ERC721 {
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {
         ///Token name
-        name: String,
+        pub name: String,
         ///Token symbol
-        symbol: String,
+        pub symbol: String,
         ///Mapping from token ID to owner address
-        owners: Mapping<u128, AccountId>,
+        pub owners: Mapping<u128, AccountId>,
         ///Mapping owner address to token count
-        balances: Mapping<AccountId, u128>,
+        pub balances: Mapping<AccountId, u128>,
         ///Mapping from token ID to approved address
-        token_approvals: Mapping<u128, AccountId>,
+        pub token_approvals: Mapping<u128, AccountId>,
         ///Mapping from owner to operator approvals
-        operator_approvals: Mapping<(AccountId, AccountId), bool>,
+        pub operator_approvals: Mapping<(AccountId, AccountId), bool>,
+    }
+
+    #[ink(storage)]
+    #[derive(Default, SpreadAllocate, Storage)]
+    pub struct ERC721 {
+        #[storage_field]
+        data: Data,
     }
 
     impl ERC721 {
@@ -87,8 +99,8 @@ pub mod erc_721 {
         #[ink(constructor)]
         pub fn new(name: String, symbol: String) -> Self {
             ink_lang::codegen::initialize_contract(|instance: &mut Self| {
-                instance.name = name;
-                instance.symbol = symbol;
+                instance.data.name = name;
+                instance.data.symbol = symbol;
             })
         }
 
@@ -108,13 +120,13 @@ pub mod erc_721 {
                     "ERC721: address zero is not a valid owner",
                 )))
             }
-            return Ok(self.balances.get(&owner).unwrap())
+            return Ok(self.data.balances.get(&owner).unwrap())
         }
 
         /// @dev See {IERC721-ownerOf}.
         #[ink(message)]
         pub fn owner_of(&self, token_id: u128) -> Result<AccountId, Error> {
-            let owner: AccountId = self.owners.get(&token_id).unwrap();
+            let owner: AccountId = self.data.owners.get(&token_id).unwrap();
             if owner.is_zero() {
                 return Err(Error::Custom(String::from("ERC721: invalid token ID")))
             }
@@ -124,13 +136,13 @@ pub mod erc_721 {
         /// @dev See {IERC721Metadata-name}.
         #[ink(message)]
         pub fn name(&self) -> Result<String, Error> {
-            return Ok(self.name)
+            return Ok(self.data.name)
         }
 
         /// @dev See {IERC721Metadata-symbol}.
         #[ink(message)]
         pub fn symbol(&self) -> Result<String, Error> {
-            return Ok(self.symbol)
+            return Ok(self.data.symbol)
         }
 
         /// @dev See {IERC721Metadata-tokenURI}.
@@ -174,7 +186,7 @@ pub mod erc_721 {
         #[ink(message)]
         pub fn get_approved(&self, token_id: u128) -> Result<AccountId, Error> {
             self._require_minted(token_id)?;
-            return Ok(self.token_approvals.get(&token_id).unwrap())
+            return Ok(self.data.token_approvals.get(&token_id).unwrap())
         }
 
         /// @dev See {IERC721-setApprovalForAll}.
@@ -195,7 +207,11 @@ pub mod erc_721 {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool, Error> {
-            return Ok(self.operator_approvals.get(&(owner, operator)).unwrap())
+            return Ok(self
+                .data
+                .operator_approvals
+                .get(&(owner, operator))
+                .unwrap())
         }
 
         /// @dev See {IERC721-transferFrom}.
@@ -278,7 +294,7 @@ pub mod erc_721 {
         /// Tokens start existing when they are minted (`_mint`),
         /// and stop existing when they are burned (`_burn`).
         fn _exists(&self, token_id: u128) -> Result<bool, Error> {
-            return Ok(!self.owners.get(&token_id).unwrap().is_zero())
+            return Ok(!self.data.owners.get(&token_id).unwrap().is_zero())
         }
 
         /// @dev Returns whether `spender` is allowed to manage `tokenId`.
@@ -334,9 +350,10 @@ pub mod erc_721 {
                 return Err(Error::Custom(String::from("ERC721: token already minted")))
             }
             self._before_token_transfer(ZERO_ADDRESS.into(), to, token_id)?;
-            self.balances
-                .insert(&to, self.balances.get(&to).unwrap() + 1);
-            self.owners.insert(&token_id, to);
+            self.data
+                .balances
+                .insert(&to, &(self.data.balances.get(&to).unwrap() + 1));
+            self.data.owners.insert(&token_id, &(to));
             self.env().emit_event(Transfer {
                 from: ZERO_ADDRESS.into(),
                 to,
@@ -356,8 +373,9 @@ pub mod erc_721 {
             self._before_token_transfer(owner, ZERO_ADDRESS.into(), token_id)?;
             // Clear approvals
             // Sol2Ink Not Implemented yet: delete _tokenApprovals[tokenId];
-            self.balances
-                .insert(&owner, self.balances.get(&owner).unwrap() - 1);
+            self.data
+                .balances
+                .insert(&owner, &(self.data.balances.get(&owner).unwrap() - 1));
             // Sol2Ink Not Implemented yet: delete _owners[tokenId];
             self.env().emit_event(Transfer {
                 from: owner,
@@ -393,11 +411,13 @@ pub mod erc_721 {
             self._before_token_transfer(from, to, token_id)?;
             // Clear approvals from the previous owner
             // Sol2Ink Not Implemented yet: delete _tokenApprovals[tokenId];
-            self.balances
-                .insert(&from, self.balances.get(&from).unwrap() - 1);
-            self.balances
-                .insert(&to, self.balances.get(&to).unwrap() + 1);
-            self.owners.insert(&token_id, to);
+            self.data
+                .balances
+                .insert(&from, &(self.data.balances.get(&from).unwrap() - 1));
+            self.data
+                .balances
+                .insert(&to, &(self.data.balances.get(&to).unwrap() + 1));
+            self.data.owners.insert(&token_id, &(to));
             self.env().emit_event(Transfer { from, to, token_id });
             self._after_token_transfer(from, to, token_id)?;
             Ok(())
@@ -406,7 +426,7 @@ pub mod erc_721 {
         /// @dev Approve `to` to operate on `tokenId`
         /// Emits an {Approval} event.
         fn _approve(&mut self, to: AccountId, token_id: u128) -> Result<(), Error> {
-            self.token_approvals.insert(&token_id, to);
+            self.data.token_approvals.insert(&token_id, &(to));
             self.env().emit_event(Approval {
                 owner: erc_721.owner_of(token_id)?,
                 approved: to,
@@ -426,7 +446,9 @@ pub mod erc_721 {
             if owner == operator {
                 return Err(Error::Custom(String::from("ERC721: approve to caller")))
             }
-            self.operator_approvals.insert(&(owner, operator), approved);
+            self.data
+                .operator_approvals
+                .insert(&(owner, operator), &(approved));
             self.env().emit_event(ApprovalForAll {
                 owner,
                 operator,

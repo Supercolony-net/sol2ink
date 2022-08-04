@@ -24,7 +24,7 @@ pub fn generate_cargo_toml() -> String {
     out.push_str("[lib]\n");
     out.push_str("name = \"sol_2_ink_generated\"\n");
     out.push_str("path = \"lib.rs\"\n");
-    out.push_str("crate-type = [\"rlib\"]\n");
+    out.push_str("crate-type = [\"cdylib\"]\n");
     out.push_str("\n");
     out.push_str("[features]\n");
     out.push_str("default = [\"std\"]\n");

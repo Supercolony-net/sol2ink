@@ -1,12 +1,10 @@
 // Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
-use ink::prelude::{
+use ink_prelude::{
     string::String,
     vec::Vec,
 };
-
 /// @dev Emitted when `value` tokens of token type `id` are transferred from `from` to `to` by `operator`.
 #[ink(event)]
 pub struct TransferSingle {
@@ -56,10 +54,10 @@ pub struct URI {
     id: u128,
 }
 
-#[brush::wrapper]
+#[openbrush::wrapper]
 pub type ERC1155Ref = dyn ERC1155;
 
-#[brush::trait_definition]
+#[openbrush::trait_definition]
 pub trait ERC1155 {
     /// @dev Returns the amount of tokens of token type `id` owned by `account`.
     /// Requirements:

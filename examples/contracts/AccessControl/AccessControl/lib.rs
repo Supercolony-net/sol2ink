@@ -35,19 +35,20 @@
 /// WARNING: The `DEFAULT_ADMIN_ROLE` is also its own admin: it has permission to
 /// grant and revoke this role. Extra precautions should be taken to secure
 /// accounts that have been granted it.
-#[brush::contract]
+#[openbrush::contract]
 pub mod access_control {
-    use brush::{
+    use ink_prelude::string::String;
+    use ink_storage::traits::SpreadAllocate;
+    use openbrush::{
         modifier_definition,
         modifiers,
-        traits::AccountId,
+        storage::Mapping,
+        traits::Storage,
     };
-    use ink::prelude::string::String;
-    use ink_lang::codegen::{
-        EmitEvent,
-        Env,
+    use scale::{
+        Decode,
+        Encode,
     };
-    use ink_storage::Mapping;
 
     #[derive(Debug, Encode, Decode, PartialEq)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
@@ -122,10 +123,19 @@ pub mod access_control {
         admin_role: [u8; 32],
     }
 
+    pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+    #[derive(Default, Debug)]
+    #[openbrush::upgradeable_storage(STORAGE_KEY)]
+    pub struct Data {
+        pub roles: Mapping<[u8; 32], RoleData>,
+    }
+
     #[ink(storage)]
-    #[derive(Default, SpreadAllocate)]
+    #[derive(Default, SpreadAllocate, Storage)]
     pub struct AccessControl {
-        roles: Mapping<[u8; 32], RoleData>,
+        #[storage_field]
+        data: Data,
     }
 
     impl AccessControl {
@@ -145,6 +155,7 @@ pub mod access_control {
         #[ink(message)]
         pub fn has_role(&self, role: [u8; 32], account: AccountId) -> Result<bool, Error> {
             return Ok(self
+                .data
                 .roles
                 .get(&role)
                 .unwrap()
@@ -184,7 +195,7 @@ pub mod access_control {
         /// To change a role's admin, use {_setRoleAdmin}.
         #[ink(message)]
         pub fn get_role_admin(&self, role: [u8; 32]) -> Result<[u8; 32], Error> {
-            return Ok(self.roles.get(&role).unwrap().admin_role)
+            return Ok(self.data.roles.get(&role).unwrap().admin_role)
         }
 
         /// @dev Grants `role` to `account`.
@@ -254,7 +265,7 @@ pub mod access_control {
         /// Emits a {RoleAdminChanged} event.
         fn _set_role_admin(&mut self, role: [u8; 32], admin_role: [u8; 32]) -> Result<(), Error> {
             let previous_admin_role: [u8; 32] = self.get_role_admin(role)?;
-            self.roles.get(&role).unwrap().admin_role = admin_role;
+            self.data.roles.get(&role).unwrap().admin_role = admin_role;
             self.env().emit_event(RoleAdminChanged {
                 role,
                 previous_admin_role,
@@ -268,7 +279,8 @@ pub mod access_control {
         /// May emit a {RoleGranted} event.
         fn _grant_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             if !self.has_role(role, account)? {
-                self.roles
+                self.data
+                    .roles
                     .get(&role)
                     .unwrap()
                     .members
@@ -288,7 +300,8 @@ pub mod access_control {
         /// May emit a {RoleRevoked} event.
         fn _revoke_role(&mut self, role: [u8; 32], account: AccountId) -> Result<(), Error> {
             if self.has_role(role, account)? {
-                self.roles
+                self.data
+                    .roles
                     .get(&role)
                     .unwrap()
                     .members
