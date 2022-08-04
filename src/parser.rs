@@ -2210,13 +2210,15 @@ impl<'a> Parser<'a> {
     /// and maps the enclosed expressions to a parsed expression
     /// Then we can parse all the expressions in the correct order
     ///
-    /// For example ((1 + 2) + 3) + 4
-    /// Will be parsed as ___0___ + 4 and we will map ___0___ to (1 + 2) + 3
-    /// which itself will be ___0___ + 3 with ___0___ mapped to 1 + 2
-    /// we will then compose an expression without the brackets recursively
-    /// so the final statement will be
+    /// ```
+    /// let extracted = self.extract_parentheses("((1 + 2) + 3) + 4", false);
+    /// assert_eq!(extracted.0, String::from("___0___ + 4"));
+    /// assert_eq!(extracted.1, 1);
+    /// assert_eq!(extracted.2.get("___0___"), Some(
     /// Expression::Arithmetic(Expression::Enclosed(Expression::Arithmetic(
     /// Expression::Arithmetic(1, 2, Operation::Add)), 3, Operation::Add), 4, Operation::Add)
+    /// ));
+    /// ```
     ///
     /// `raw` the raw representation of the expression
     /// `constructor` if the expression is inside a constructor
