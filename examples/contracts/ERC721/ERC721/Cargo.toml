@@ -1,5 +1,5 @@
 [package]
-name = "examples/contracts/ERC721/ERC721"
+name = "sol_2_ink_generated"
 version = "0.1.0"
 edition = "2021"
 authors = ["Sol2Ink"]
@@ -17,7 +17,7 @@ scale-info = { version = "2", default-features = false, features = ["derive"], o
 openbrush = { version = "2.2.0", default-features = false }
 
 [lib]
-name = "examples/contracts/ERC721/ERC721"
+name = "sol_2_ink_generated"
 path = "lib.rs"
 crate-type = ["rlib"]
 

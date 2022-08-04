@@ -1,12 +1,10 @@
 const INK_VERSION: &'static str = "~3.3.0";
 
-pub fn generate_cargo_toml(project_name: &str) -> String {
+pub fn generate_cargo_toml() -> String {
     let mut out = String::new();
 
     out.push_str("[package]\n");
-    out.push_str("name = \"");
-    out.push_str(project_name);
-    out.push_str("\"\n");
+    out.push_str("name = \"sol_2_ink_generated\"\n");
     out.push_str("version = \"0.1.0\"\n");
     out.push_str("edition = \"2021\"\n");
     out.push_str("authors = [\"Sol2Ink\"]\n");
@@ -24,9 +22,7 @@ pub fn generate_cargo_toml(project_name: &str) -> String {
     out.push_str("openbrush = { version = \"2.2.0\", default-features = false }\n");
     out.push_str("\n");
     out.push_str("[lib]\n");
-    out.push_str("name = \"");
-    out.push_str(project_name);
-    out.push_str("\"\n");
+    out.push_str("name = \"sol_2_ink_generated\"\n");
     out.push_str("path = \"lib.rs\"\n");
     out.push_str("crate-type = [\"rlib\"]\n");
     out.push_str("\n");
