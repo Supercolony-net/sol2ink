@@ -546,17 +546,25 @@ impl<'a> Parser<'a> {
                     comments.append(&mut new_comments);
                     action = Action::Contract;
                 }
-                SPACE if action == Action::ContractName => {
+                SPACE | CURLY_OPEN if action == Action::ContractName => {
                     name = buffer.trim().to_string();
                     buffer.clear();
                     // we skip everything regarding generalization
                     // TODO: cover generaliztaion
-                    read_until(self.chars, vec![CURLY_OPEN]);
+                    if ch != CURLY_OPEN {
+                        read_until(self.chars, vec![CURLY_OPEN]);
+                    }
                     action = Action::Contract;
                 }
                 _ if action == Action::None => {
                     buffer.push(ch);
                     action = Action::ContractName;
+                }
+                SEMICOLON if action == Action::Contract => {
+                    buffer.push(ch);
+                    fields.push(self.parse_contract_field(buffer.trim(), &comments));
+                    buffer.clear();
+                    comments.clear();
                 }
                 _ if action == Action::ContractName || action == Action::Contract => {
                     buffer.push(ch);
@@ -595,10 +603,6 @@ impl<'a> Parser<'a> {
                         modifiers.push(self.parse_modifier(&comments)?);
                         comments.clear();
                         buffer.clear();
-                    } else if ch == SEMICOLON {
-                        fields.push(self.parse_contract_field(buffer.trim(), &comments));
-                        buffer.clear();
-                        comments.clear();
                     }
                 }
                 _ => {}
@@ -735,15 +739,26 @@ impl<'a> Parser<'a> {
     ///
     /// returns the representation of contract field as `ContractField` struct
     fn parse_contract_field(&mut self, line_raw: &str, comments: &[String]) -> ContractField {
-        let mut line = line_raw.replace(" => ", "=>");
-        line = line.replace(" ( ", "(");
-        line = line.replace(" ) ", ")");
+        let mut line = line_raw.to_owned();
+        line = Regex::new(r"\s*=>\s*")
+            .unwrap()
+            .replace_all(&line, "=>")
+            .to_string();
+        line = Regex::new(r"\s*\(\s*")
+            .unwrap()
+            .replace_all(&line, "(")
+            .to_string();
+        line = Regex::new(r"\s*\)\s*")
+            .unwrap()
+            .replace_all(&line, ")")
+            .to_string();
+
         let regex: Regex = Regex::new(
             r#"(?x)^\s*
-        (?P<field_type>.+?)\s
+        (?P<field_type>.+?(\s|\))+)
         (?P<attributes>(\s*constant\s*|\s*private\s*|\s*public\s*|\s*immutable\s*|\s*override\s*)*)*
         (?P<field_name>.+?)\s*
-        (=\s*(?P<initial_value>.+)\s*)*
+        (=\s*(?P<initial_value>[^>].+)\s*)*
         ;\s*$"#,
         )
         .unwrap();
@@ -757,7 +772,7 @@ impl<'a> Parser<'a> {
         let constant = attributes_raw
             .unwrap_or_else(|| String::from(""))
             .contains("constant");
-        let field_type = self.convert_variable_type(field_type_raw);
+        let field_type = self.convert_variable_type(trim(&field_type_raw));
 
         ContractField {
             field_type,
