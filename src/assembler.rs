@@ -834,7 +834,7 @@ impl ToTokens for Statement {
             Statement::IfEnd => {}
             Statement::ModifierBody => {
                 stream.extend(quote! {
-                    body(instance)
+                    body(instance);
                 })
             }
             Statement::Raw(_) => {}

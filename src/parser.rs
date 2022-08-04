@@ -415,7 +415,7 @@ impl<'a> Parser<'a> {
                     buffer.push(ch);
                     if buffer == "pragma" || buffer == "import" {
                         read_until(self.chars, vec![SEMICOLON]);
-                        buffer = String::new();
+                        buffer.clear();
                     } else if buffer == "abstract" {
                         buffer.clear();
                     } else if buffer == "contract" {
@@ -548,7 +548,7 @@ impl<'a> Parser<'a> {
                 }
                 SPACE if action == Action::ContractName => {
                     name = buffer.trim().to_string();
-                    buffer = String::new();
+                    buffer.clear();
                     // we skip everything regarding generalization
                     // TODO: cover generaliztaion
                     read_until(self.chars, vec![CURLY_OPEN]);
@@ -685,7 +685,7 @@ impl<'a> Parser<'a> {
                 }
                 SPACE if action == Action::ContractName => {
                     name = buffer.trim().substring(1, buffer.len()).to_owned();
-                    buffer = String::new();
+                    buffer.clear();
                     action = Action::ContractNamed;
                 }
                 _ if action == Action::None => {

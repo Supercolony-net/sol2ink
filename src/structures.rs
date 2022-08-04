@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 
-#[derive(Debug, Eq, PartialEq, Default)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ContractType {
-    #[default]
     INTERFACE,
     CONTRACT,
 }

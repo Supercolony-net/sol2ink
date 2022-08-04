@@ -71,7 +71,7 @@ pub mod access_control {
         F: FnOnce(&mut T) -> Result<R, Error>,
     {
         self._check_role(role)?;
-        body(instance)
+        body(instance);
     }
 
     /// @dev Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole`
