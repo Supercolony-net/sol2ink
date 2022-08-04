@@ -1,4 +1,5 @@
 const INK_VERSION: &str = "~3.3.0";
+const OPENBRUSH_VERSION: &str = "2.2.0";
 
 pub fn generate_cargo_toml() -> String {
     let mut out = String::new();
@@ -19,7 +20,9 @@ pub fn generate_cargo_toml() -> String {
     out.push_str(generate_ink_dependency("ink_engine", false, true).as_str());
     out.push_str("scale = { package = \"parity-scale-codec\", version = \"3\", default-features = false, features = [\"derive\"] }\n");
     out.push_str("scale-info = { version = \"2\", default-features = false, features = [\"derive\"], optional = true }\n");
-    out.push_str("openbrush = { version = \"2.2.0\", default-features = false }\n");
+    out.push_str("openbrush = { version = \"");
+    out.push_str(OPENBRUSH_VERSION);
+    out.push_str("\", default-features = false }\n");
     out.push('\n');
     out.push_str("[lib]\n");
     out.push_str("name = \"sol_2_ink_generated\"\n");
