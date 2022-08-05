@@ -1,6 +1,6 @@
 [package]
 name = "sol_to_ink"
-version = "0.4.1"
+version = "1.0.0"
 edition = "2021"
 
 license = "MIT"
