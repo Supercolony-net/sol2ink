@@ -1,47 +1,19 @@
 ---
 sidebar_position: 1
+slug: /
+title: Sol2Ink Documentation
+sidebar_label: Getting started
 ---
 
-# Tutorial Intro
+# Sol2Ink Documentation
 
-Let's discover **Docusaurus in less than 5 minutes**.
+Welcome to Sol2Ink documentation. In this documentation we will describe the capabilities of Sol2Ink, how the process works under the hood,
+what issues you may face while using Sol2Ink, and you will see some example of usage of Sol2Ink.
 
-## Getting Started
+## What is Sol2Ink
 
-Get started by **creating a new site**.
-
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
+Sol2Ink is a tool developed to ease the developers' process of transition from Solidity to ink!. Since we are the builders in the Dotsama ecosystem, we recognized a problem, that when some team wants to develop their already existing Solidity dapp in ink! smart contract language, the most annoying and time consuming part of the development will be rewriting the Solidity code into Rust and ink!. Sol2Ink aims to decrease this time by transpiling existing Solidity code into Rust and ink! code. So the dirty part of the job is automated, and now it is up to the developers to fix some language specific issues, while teaching how stuff is done in ink!. Sol2Ink will save time!
 
 ### What you'll need
 
-- [Node.js](https://nodejs.org/en/download/) version 16.14 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
-
-## Generate a new site
-
-Generate a new Docusaurus site using the **classic template**.
-
-The classic template will automatically be added to your project after you run the command:
-
-```bash
-npm init docusaurus@latest my-website classic
-```
-
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
-
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
-```
-
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
-
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
-
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+Sol2Ink is written in rust, so you will need Rust installed with the nightly toolchain. If this is satisfied, you will also need Sol2Ink itslef, which you can get here. Another thing you will need is the Solidity file you want to transpile. And that's it! We can start transpiling now!
