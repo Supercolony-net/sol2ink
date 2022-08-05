@@ -1,4 +1,4 @@
-// Generated with Sol2Ink v0.4.1
+// Generated with Sol2Ink v1.0.0
 // https://github.com/Supercolony-net/sol2ink
 
 /// @dev Emitted when `value` tokens are moved from one account (`from`) to

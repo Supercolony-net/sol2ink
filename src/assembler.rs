@@ -1019,7 +1019,7 @@ impl ToTokens for Expression {
                 if let Some(insert) = insert_maybe {
                     quote!(#expression.insert(&#indices, &(#insert)))
                 } else {
-                    quote!(#expression.get(&#indices).unwrap())
+                    quote!(#expression.get(&#indices).unwrap_or_default())
                 }
             }
             Expression::Modifier(modifier_raw) => {

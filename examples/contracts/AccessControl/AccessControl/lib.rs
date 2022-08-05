@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
-// Generated with Sol2Ink v0.4.1
+// Generated with Sol2Ink v1.0.0
 // https://github.com/Supercolony-net/sol2ink
 
 ///SPDX-License-Identifier: MIT
@@ -158,10 +158,10 @@ pub mod access_control {
                 .data
                 .roles
                 .get(&role)
-                .unwrap()
+                .unwrap_or_default()
                 .members
                 .get(&account)
-                .unwrap())
+                .unwrap_or_default())
         }
 
         /// @dev Revert with a standard message if `msg.sender` is missing `role`.
@@ -195,7 +195,7 @@ pub mod access_control {
         /// To change a role's admin, use {_setRoleAdmin}.
         #[ink(message)]
         pub fn get_role_admin(&self, role: [u8; 32]) -> Result<[u8; 32], Error> {
-            return Ok(self.data.roles.get(&role).unwrap().admin_role)
+            return Ok(self.data.roles.get(&role).unwrap_or_default().admin_role)
         }
 
         /// @dev Grants `role` to `account`.
@@ -265,7 +265,7 @@ pub mod access_control {
         /// Emits a {RoleAdminChanged} event.
         fn _set_role_admin(&mut self, role: [u8; 32], admin_role: [u8; 32]) -> Result<(), Error> {
             let previous_admin_role: [u8; 32] = self.get_role_admin(role)?;
-            self.data.roles.get(&role).unwrap().admin_role = admin_role;
+            self.data.roles.get(&role).unwrap_or_default().admin_role = admin_role;
             self.env().emit_event(RoleAdminChanged {
                 role,
                 previous_admin_role,
@@ -282,10 +282,10 @@ pub mod access_control {
                 self.data
                     .roles
                     .get(&role)
-                    .unwrap()
+                    .unwrap_or_default()
                     .members
                     .get(&account)
-                    .unwrap() = true;
+                    .unwrap_or_default() = true;
                 self.env().emit_event(RoleGranted {
                     role,
                     account,
@@ -303,10 +303,10 @@ pub mod access_control {
                 self.data
                     .roles
                     .get(&role)
-                    .unwrap()
+                    .unwrap_or_default()
                     .members
                     .get(&account)
-                    .unwrap() = false;
+                    .unwrap_or_default() = false;
                 self.env().emit_event(RoleRevoked {
                     role,
                     account,

@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
-// Generated with Sol2Ink v0.4.1
+// Generated with Sol2Ink v1.0.0
 // https://github.com/Supercolony-net/sol2ink
 
 ///SPDX-License-Identifier: MIT
@@ -154,7 +154,7 @@ pub mod erc_20 {
         /// @dev See {IERC20-balanceOf}.
         #[ink(message)]
         pub fn balance_of(&self, account: AccountId) -> Result<u128, Error> {
-            return Ok(self.data.balances.get(&account).unwrap())
+            return Ok(self.data.balances.get(&account).unwrap_or_default())
         }
 
         /// @dev See {IERC20-transfer}.
@@ -171,7 +171,11 @@ pub mod erc_20 {
         /// @dev See {IERC20-allowance}.
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Result<u128, Error> {
-            return Ok(self.data.allowances.get(&(owner, spender)).unwrap())
+            return Ok(self
+                .data
+                .allowances
+                .get(&(owner, spender))
+                .unwrap_or_default())
         }
 
         /// @dev See {IERC20-approve}.
@@ -277,7 +281,7 @@ pub mod erc_20 {
                 )))
             }
             self._before_token_transfer(from, to, amount)?;
-            let from_balance: u128 = self.data.balances.get(&from).unwrap();
+            let from_balance: u128 = self.data.balances.get(&from).unwrap_or_default();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: transfer amount exceeds balance",
@@ -286,9 +290,10 @@ pub mod erc_20 {
             // Please handle unchecked blocks manually >>>
             self.data.balances.insert(&from, &(from_balance - amount));
             // <<< Please handle unchecked blocks manually
-            self.data
-                .balances
-                .insert(&to, &(self.data.balances.get(&to).unwrap() + amount));
+            self.data.balances.insert(
+                &to,
+                &(self.data.balances.get(&to).unwrap_or_default() + amount),
+            );
             self.env().emit_event(Transfer {
                 from,
                 to,
@@ -313,7 +318,7 @@ pub mod erc_20 {
             self.data.total_supply += amount;
             self.data.balances.insert(
                 &account,
-                &(self.data.balances.get(&account).unwrap() + amount),
+                &(self.data.balances.get(&account).unwrap_or_default() + amount),
             );
             self.env().emit_event(Transfer {
                 from: ZERO_ADDRESS.into(),
@@ -337,7 +342,7 @@ pub mod erc_20 {
                 )))
             }
             self._before_token_transfer(account, ZERO_ADDRESS.into(), amount)?;
-            let account_balance: u128 = self.data.balances.get(&account).unwrap();
+            let account_balance: u128 = self.data.balances.get(&account).unwrap_or_default();
             if account_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC20: burn amount exceeds balance",

@@ -568,41 +568,51 @@ impl<'a> Parser<'a> {
                 }
                 _ if action == Action::ContractName || action == Action::Contract => {
                     buffer.push(ch);
-                    if buffer.trim() == "event" {
-                        let event = self.parse_event(&comments);
-                        self.events.insert(event.name.clone(), event.clone());
-                        events.push(event);
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "enum" {
-                        enums.push(self.parse_enum(&comments));
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "struct" {
-                        structs.push(self.parse_struct(&comments));
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "constructor" {
-                        constructor = self.parse_function(&comments)?;
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "function" {
-                        functions.push(self.parse_function(&comments)?);
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "receive" || buffer.trim() == "fallback" {
-                        let mut function = self.parse_function(&comments)?;
-                        function.header.name = buffer.trim().to_owned();
-                        functions.push(function);
-                        comments.clear();
-                        buffer.clear();
-                    } else if buffer.trim() == "using" {
-                        read_until(self.chars, vec![SEMICOLON]);
-                        buffer.clear();
-                    } else if buffer.trim() == "modifier" {
-                        modifiers.push(self.parse_modifier(&comments)?);
-                        comments.clear();
-                        buffer.clear();
+                    match buffer.trim() {
+                        "event" => {
+                            let event = self.parse_event(&comments);
+                            self.events.insert(event.name.clone(), event.clone());
+                            events.push(event);
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        "enum" => {
+                            enums.push(self.parse_enum(&comments));
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        "struct" => {
+                            structs.push(self.parse_struct(&comments));
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        "function" => {
+                            functions.push(self.parse_function(&comments)?);
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        "constructor" => {
+                            constructor = self.parse_function(&comments)?;
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        "modifier" => {
+                            modifiers.push(self.parse_modifier(&comments)?);
+                            buffer.clear();
+                            comments.clear();
+                        }
+                        "using" => {
+                            read_until(self.chars, vec![SEMICOLON]);
+                            buffer.clear();
+                        }
+                        "receive" | "fallback" => {
+                            let mut function = self.parse_function(&comments)?;
+                            function.header.name = buffer.trim().to_owned();
+                            functions.push(function);
+                            comments.clear();
+                            buffer.clear();
+                        }
+                        _ => {}
                     }
                 }
                 _ => {}
