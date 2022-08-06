@@ -1,12 +1,27 @@
+use proc_macro2::TokenStream;
 use std::{
-    fs::File,
+    fs::{
+        create_dir_all,
+        File,
+    },
     io::{
         prelude::*,
         BufReader,
     },
 };
 
-/// This function reads the file to be transpiled and returns it as string
+use rust_format::{
+    Config,
+    Formatter,
+    PostProcess,
+    RustFmt,
+};
+
+use crate::toml_builder;
+
+/// Reads the file to be transpiled and returns it as string
+///
+/// `path` the path to the file
 pub fn read_file(path: &String) -> std::io::Result<String> {
     let file = File::open(path)?;
     let mut buf_reader = BufReader::new(file);
@@ -19,11 +34,24 @@ pub fn read_file(path: &String) -> std::io::Result<String> {
 ///
 /// `lines` the transpiled file in the form of vec of strings
 /// each item in the vec represents a separate line in the output file
-pub fn write_file(lines: &Vec<String>, file_name: Option<String>) -> std::io::Result<()> {
-    let path = file_name.unwrap_or(String::from("output.rs"));
-    let mut file = File::create(path)?;
-    for line in lines.iter() {
-        file.write_all(line.as_bytes())?;
-    }
+pub fn write_file(
+    lines: TokenStream,
+    file_name: Option<String>,
+) -> std::io::Result<()> {
+    let path = file_name.unwrap_or_else(|| String::from("output"));
+    create_dir_all(&path)?;
+
+    let mut file = File::create(format!("{path}/lib.rs"))?;
+    let config = Config::new_str().post_proc(PostProcess::ReplaceMarkersAndDocBlocks);
+    file.write_all(
+        RustFmt::from_config(config)
+            .format_tokens(lines)
+            .unwrap()
+            .as_bytes(),
+    )?;
+
+    let mut cargo_toml = File::create(format!("{path}/Cargo.toml"))?;
+    cargo_toml.write_all(toml_builder::generate_cargo_toml().as_bytes())?;
+
     Ok(())
 }

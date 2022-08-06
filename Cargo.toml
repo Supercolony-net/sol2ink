@@ -1,10 +1,17 @@
 [package]
 name = "sol_to_ink"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 convert_case = "0.5.0"
 substring = "1.4.5"
+regex = "1.5.6"
+rust-format = { version = "0.3.4", features = ["token_stream", "post_process"] }
+proc-macro2 = "1.0.40"
+quote = "1.0.0"
+lazy_static = "1.4.0"
