@@ -7,8 +7,15 @@ pub mod file_utils;
 pub mod formatter;
 pub mod parser;
 pub mod structures;
+pub mod toml_builder;
 
-use std::env;
+use std::{
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    env,
+};
 
 use crate::parser::ParserError;
 
@@ -32,23 +39,39 @@ fn main() {
 fn run(path: &String) -> Result<(), parser::ParserError> {
     // read the file
     let content = file_utils::read_file(path)?;
+    let mut chars = content.chars();
+    let mut imports = HashSet::new();
+    let mut storage = HashMap::new();
+    let mut functions = HashMap::new();
+    let mut events = HashMap::new();
+    let mut modifiers = HashMap::new();
+    let mut structs = HashMap::new();
 
-    let output = parser::parse_file(content)?;
+    let mut parser = parser::Parser::new(
+        &mut chars,
+        &mut imports,
+        &mut storage,
+        &mut functions,
+        &mut events,
+        &mut modifiers,
+        &mut structs,
+    );
+    let output = parser.parse_file()?;
     match output {
-        (None, None) | (Some(_), Some(_)) => return Err(ParserError::FileCorrupted),
+        (None, None) | (Some(_), Some(_)) => Err(ParserError::FileCorrupted),
         (Some(contract), None) => {
             let ink_contract = assembler::assemble_contract(contract);
-            let file_name = path.replace(".sol", ".rs");
+            let file_name = path.replace(".sol", "");
             file_utils::write_file(ink_contract, Some(file_name))?;
             println!("File saved!");
-            return Ok(())
+            Ok(())
         }
         (None, Some(interface)) => {
             let ink_trait = assembler::assemble_interface(interface);
-            let file_name = path.replace(".sol", ".rs");
+            let file_name = path.replace(".sol", "");
             file_utils::write_file(ink_trait, Some(file_name))?;
             println!("File saved!");
-            return Ok(())
+            Ok(())
         }
     }
 }
@@ -58,23 +81,87 @@ mod test {
     use crate::run;
 
     #[test]
-    fn transpile_examples() {
+    fn erc20() {
         assert_eq!(
             run(&"examples/contracts/ERC20/ERC20.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn erc721() {
+        assert_eq!(
+            run(&"examples/contracts/ERC721/ERC721.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn erc1155() {
+        assert_eq!(
+            run(&"examples/contracts/ERC1155/ERC1155.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn access_control() {
+        assert_eq!(
+            run(&"examples/contracts/AccessControl/AccessControl.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn solang_example() {
+        assert_eq!(
+            run(&"examples/contracts/SolangExample/example.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn flipper() {
+        assert_eq!(
+            run(&"examples/contracts/Flipper/flipper.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn primitives() {
+        assert_eq!(
+            run(&"examples/contracts/Primitives/Primitives.sol".to_string()),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn ierc20() {
         assert_eq!(
             run(&"examples/interfaces/IERC20/IERC20.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn ierc721() {
         assert_eq!(
             run(&"examples/interfaces/IERC721/IERC721.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn ierc1155() {
         assert_eq!(
             run(&"examples/interfaces/IERC1155/IERC1155.sol".to_string()),
             Ok(())
         );
+    }
+
+    #[test]
+    fn iaccess_control() {
         assert_eq!(
             run(&"examples/interfaces/IAccessControl/IAccessControl.sol".to_string()),
             Ok(())

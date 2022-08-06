@@ -3,41 +3,38 @@
 
 As we are the builders in the Dotsama ecosystem and experts in ink! smart contracts, we help companies with their path to the Dotsama ecosystem.
 One of our many tasks is to help projects and teams migrate their smart contracts from popular Solidity to Polkadot's ink!. During this process,
-we found out that the process of transition may be unnecesarilly long, and if we had a tool which would transpile a Solidity file to Rust and ink!, 
-we would save a lot of time. And that is how the idea of Sol2Ink was born. 
+we found out that the transition process may be unnecessarily long, and if we had a tool that would transpile a Solidity file to Rust and ink!, 
+we would save much time. And that is how the idea of Sol2Ink was born.
 
 ### Capabilities
 
-Sol2Ink in its current state is able to parse Solidity interfaces into ink! traits, while also leveraging the power of 
-[OpenBrush](https://github.com/Supercolony-net/openbrush-contracts).
+Sol2Ink in its current state is able to parse compilable Solidity interfaces into ink! traits and compilable Solidity contracts into ink! contracts, while leveraging the power of [OpenBrush](https://github.com/Supercolony-net/openbrush-contracts). Currently, Sol2Ink supports only single file contract transpiling, not supporting inheritance. The output of Sol2Ink is a folder with the ink! smart contract and a Cargo.toml.
+
+Some errors may occur in this version of Sol2Ink and will be fixed in upcoming versions.
+With some statements, a parsing error can occur and cause the member to be parsed incorrectly. This needs to be corrected by the user.
+The program may panic while parsing uncompilable code. Future versions should bring more user-friendly errors.
+Some expressions may be parsed incorrectly, while still creating compilable code (one known example is `typeof(uint).max` is parsed as `u128.max` instead of `u128::MAX`.
+And of course, as with all programs, there are probably some hidden unknown bugs as well :)
+
+Read more about how Sol2Ink works under the hood here.
 
 ### Future development
 
-In the future Sol2Ink will be able to parse whole Solidity smart contract codebases and even projects into Rust and Ink! The complexity of parsable
-inputs will grow by time, beginning with interfaces through regular smart contracts up to inheritance, storage manipulation, delegate calls, etc.
-
-### Roadmap
-
-- Sol2Ink cli tool for simple smart contract parsing
-- Documentation and a website with guides on how to use Sol2Ink
-- Inheritance parsing
-- Delegate calls and storage manipulation parsing
-- Dependencies parsing and PSP usage
-- Sol2Ink	web application interface
-- Maintenance	and integration of new ecosystem standards and updates
+- [X] Sol2Ink CLI
+- [ ] User friendly errors when transpiling uncompilable contract
+- [ ] Parsing libraries
+- [ ] Implement currently incorrectly parsed statements and expressions
+- [ ] Ability to parse a whole Solidity project into ink! project
+- [ ] Parse inheritance
+- [ ] Sol2Ink Web Application with interface
 
 ### How to use it?
 
-We run the application with
-
-`cargo run input_file_name.sol`
-
-And the result file will be saved in `output.rs` file.
+To run the application you will need to have installed Rust and run the nightly toolchain. ​
+You can run the application with `cargo run contract.sol`.
+The result will be stored in `contract/lib.rs` and the Cargo.toml file in `contract/Cargo.toml`.
 
 ### Examples
 
 Examples are stored in the example folder, where we have the input Solidity file and the output Rust and Ink! file.
-Here we can find a folder with interface transpiling example and a folder with contracts transpiling example.
-All examples are taken from OpenZeppelin repository, and then transpiled to ink! by Sol2Ink. 
-Sol2Ink can at the time handle simple smart contracts parsing without inheritance, that is why in contracts we removed
-inheritance, and changed the calls to the Context functions to the basic retrieving of this data.
+By running `cargo test`, we will transpile all of the examples stored in this folder. We have several example contracts from OpenZeppelin and two example contracts from Solang. These original contracts were not modified (except the OpenZeppelin contracts, where we added missing enums, events, structs, etc. from the respective interface file), and the outputs of Sol2Ink are not modified either.

@@ -1,12 +1,10 @@
-// Generated with Sol2Ink v0.3.0
+// Generated with Sol2Ink v0.4.1
 // https://github.com/Supercolony-net/sol2ink
 
-use brush::traits::AccountId;
-use ink::prelude::{
+use ink_prelude::{
     string::String,
     vec::Vec,
 };
-
 /// @dev Emitted when `value` tokens of token type `id` are transferred from `from` to `to` by `operator`.
 #[ink(event)]
 pub struct TransferSingle {
@@ -56,34 +54,38 @@ pub struct URI {
     id: u128,
 }
 
-#[brush::wrapper]
+#[openbrush::wrapper]
 pub type ERC1155Ref = dyn ERC1155;
 
-#[brush::trait_definition]
+#[openbrush::trait_definition]
 pub trait ERC1155 {
     /// @dev Returns the amount of tokens of token type `id` owned by `account`.
     /// Requirements:
     /// - `account` cannot be the zero address.
     #[ink(message)]
-    fn balance_of(&self, account: AccountId, id: u128) -> u128;
+    fn balance_of(&self, account: AccountId, id: u128) -> Result<u128, Error>;
 
     /// @dev xref:ROOT:erc1155.adoc#batch-operations[Batched] version of {balanceOf}.
     /// Requirements:
     /// - `accounts` and `ids` must have the same length.
     #[ink(message)]
-    fn balance_of_batch(&self, accounts: Vec<AccountId>, ids: Vec<u128>) -> Vec<u128>;
+    fn balance_of_batch(
+        &self,
+        accounts: Vec<AccountId>,
+        ids: Vec<u128>,
+    ) -> Result<Vec<u128>, Error>;
 
     /// @dev Grants or revokes permission to `operator` to transfer the caller's tokens, according to `approved`,
     /// Emits an {ApprovalForAll} event.
     /// Requirements:
     /// - `operator` cannot be the caller.
     #[ink(message)]
-    fn set_approval_for_all(&mut self, operator: AccountId, approved: bool);
+    fn set_approval_for_all(&mut self, operator: AccountId, approved: bool) -> Result<(), Error>;
 
     /// @dev Returns true if `operator` is approved to transfer ``account``'s tokens.
     /// See {setApprovalForAll}.
     #[ink(message)]
-    fn is_approved_for_all(&self, account: AccountId, operator: AccountId) -> bool;
+    fn is_approved_for_all(&self, account: AccountId, operator: AccountId) -> Result<bool, Error>;
 
     /// @dev Transfers `amount` tokens of token type `id` from `from` to `to`.
     /// Emits a {TransferSingle} event.
@@ -101,7 +103,7 @@ pub trait ERC1155 {
         id: u128,
         amount: u128,
         data: Vec<u8>,
-    );
+    ) -> Result<(), Error>;
 
     /// @dev xref:ROOT:erc1155.adoc#batch-operations[Batched] version of {safeTransferFrom}.
     /// Emits a {TransferBatch} event.
@@ -117,5 +119,6 @@ pub trait ERC1155 {
         ids: Vec<u128>,
         amounts: Vec<u128>,
         data: Vec<u8>,
-    );
+    ) -> Result<(), Error>;
+
 }

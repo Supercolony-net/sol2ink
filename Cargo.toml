@@ -1,6 +1,6 @@
 [package]
 name = "sol_to_ink"
-version = "0.3.0"
+version = "0.4.1"
 edition = "2021"
 
 license = "MIT"
@@ -14,3 +14,4 @@ regex = "1.5.6"
 rust-format = { version = "0.3.4", features = ["token_stream", "post_process"] }
 proc-macro2 = "1.0.40"
 quote = "1.0.0"
+lazy_static = "1.4.0"
