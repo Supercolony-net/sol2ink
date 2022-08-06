@@ -13,7 +13,7 @@ Sol2Ink in its current state is able to parse compilable Solidity interfaces int
 Some errors may occur in this version of Sol2Ink and will be fixed in upcoming versions.
 With some statements, a parsing error can occur and cause the member to be parsed incorrectly. This needs to be corrected by the user.
 The program may panic while parsing uncompilable code. Future versions should bring more user-friendly errors.
-Some expressions may be parsed incorrectly, while still creating compilable code (one known example is `typeof(uint).max` is parsed as `u128.max` instead of `u128::MAX`.
+Some expressions may be parsed incorrectly, while still creating compilable code (one known example is `type(uint).max` is parsed as `u128.max` instead of `u128::MAX`.
 And of course, as with all programs, there are probably some hidden unknown bugs as well :)
 
 Read more about how Sol2Ink works under the hood here.
