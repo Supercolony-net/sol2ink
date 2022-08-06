@@ -9,13 +9,13 @@ It fails! So let's look at the issue.
 
 First issue looks like this:
 
-///
+![issue1](https://user-images.githubusercontent.com/43150707/183226415-17fa4232-9b38-4302-b8b8-4357c64ab740.png)
 
 This issue was described before, Solidity expression is written as `type(uint256).max` and gets parsed as `u128.max`. The correct form is `u128::MAX`, so now with no issues, we will try to build it again.
 
 And we failed again.
 
-///
+![issue2](https://user-images.githubusercontent.com/43150707/183226417-73ec8940-0800-4e70-9bee-91421def1ba2.png)
 
 These issues have the same reason, we want to return String, which can not be copied. Fixing both of these issues is simple, we will return the clones of these strings by calling `.clone()` on them. Now when we build, everything works! Congratulations!
 
