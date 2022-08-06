@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
-// Generated with Sol2Ink v0.4.1
+// Generated with Sol2Ink v1.0.0
 // https://github.com/Supercolony-net/sol2ink
 
 ///SPDX-License-Identifier: MIT
@@ -120,13 +120,13 @@ pub mod erc_721 {
                     "ERC721: address zero is not a valid owner",
                 )))
             }
-            return Ok(self.data.balances.get(&owner).unwrap())
+            return Ok(self.data.balances.get(&owner).unwrap_or_default())
         }
 
         /// @dev See {IERC721-ownerOf}.
         #[ink(message)]
         pub fn owner_of(&self, token_id: u128) -> Result<AccountId, Error> {
-            let owner: AccountId = self.data.owners.get(&token_id).unwrap();
+            let owner: AccountId = self.data.owners.get(&token_id).unwrap_or_default();
             if owner.is_zero() {
                 return Err(Error::Custom(String::from("ERC721: invalid token ID")))
             }
@@ -186,7 +186,7 @@ pub mod erc_721 {
         #[ink(message)]
         pub fn get_approved(&self, token_id: u128) -> Result<AccountId, Error> {
             self._require_minted(token_id)?;
-            return Ok(self.data.token_approvals.get(&token_id).unwrap())
+            return Ok(self.data.token_approvals.get(&token_id).unwrap_or_default())
         }
 
         /// @dev See {IERC721-setApprovalForAll}.
@@ -211,7 +211,7 @@ pub mod erc_721 {
                 .data
                 .operator_approvals
                 .get(&(owner, operator))
-                .unwrap())
+                .unwrap_or_default())
         }
 
         /// @dev See {IERC721-transferFrom}.
@@ -294,7 +294,12 @@ pub mod erc_721 {
         /// Tokens start existing when they are minted (`_mint`),
         /// and stop existing when they are burned (`_burn`).
         fn _exists(&self, token_id: u128) -> Result<bool, Error> {
-            return Ok(!self.data.owners.get(&token_id).unwrap().is_zero())
+            return Ok(!self
+                .data
+                .owners
+                .get(&token_id)
+                .unwrap_or_default()
+                .is_zero())
         }
 
         /// @dev Returns whether `spender` is allowed to manage `tokenId`.
@@ -352,7 +357,7 @@ pub mod erc_721 {
             self._before_token_transfer(ZERO_ADDRESS.into(), to, token_id)?;
             self.data
                 .balances
-                .insert(&to, &(self.data.balances.get(&to).unwrap() + 1));
+                .insert(&to, &(self.data.balances.get(&to).unwrap_or_default() + 1));
             self.data.owners.insert(&token_id, &(to));
             self.env().emit_event(Transfer {
                 from: ZERO_ADDRESS.into(),
@@ -373,9 +378,10 @@ pub mod erc_721 {
             self._before_token_transfer(owner, ZERO_ADDRESS.into(), token_id)?;
             // Clear approvals
             // Sol2Ink Not Implemented yet: delete _tokenApprovals[tokenId];
-            self.data
-                .balances
-                .insert(&owner, &(self.data.balances.get(&owner).unwrap() - 1));
+            self.data.balances.insert(
+                &owner,
+                &(self.data.balances.get(&owner).unwrap_or_default() - 1),
+            );
             // Sol2Ink Not Implemented yet: delete _owners[tokenId];
             self.env().emit_event(Transfer {
                 from: owner,
@@ -411,12 +417,13 @@ pub mod erc_721 {
             self._before_token_transfer(from, to, token_id)?;
             // Clear approvals from the previous owner
             // Sol2Ink Not Implemented yet: delete _tokenApprovals[tokenId];
+            self.data.balances.insert(
+                &from,
+                &(self.data.balances.get(&from).unwrap_or_default() - 1),
+            );
             self.data
                 .balances
-                .insert(&from, &(self.data.balances.get(&from).unwrap() - 1));
-            self.data
-                .balances
-                .insert(&to, &(self.data.balances.get(&to).unwrap() + 1));
+                .insert(&to, &(self.data.balances.get(&to).unwrap_or_default() + 1));
             self.data.owners.insert(&token_id, &(to));
             self.env().emit_event(Transfer { from, to, token_id });
             self._after_token_transfer(from, to, token_id)?;

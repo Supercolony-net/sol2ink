@@ -1,7 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
-// Generated with Sol2Ink v0.4.1
+// Generated with Sol2Ink v1.0.0
 // https://github.com/Supercolony-net/sol2ink
 
 ///SPDX-License-Identifier: MIT
@@ -144,7 +144,7 @@ pub mod erc_1155 {
                     "ERC1155: address zero is not a valid owner",
                 )))
             }
-            return Ok(self.data.balances.get(&(id, account)).unwrap())
+            return Ok(self.data.balances.get(&(id, account)).unwrap_or_default())
         }
 
         /// @dev See {IERC1155-balanceOfBatch}.
@@ -166,7 +166,10 @@ pub mod erc_1155 {
             while i < accounts.length {
                 batch_balances.insert(
                     &i,
-                    &(self.balance_of(accounts.get(&i).unwrap(), ids.get(&i).unwrap())?),
+                    &(self.balance_of(
+                        accounts.get(&i).unwrap_or_default(),
+                        ids.get(&i).unwrap_or_default(),
+                    )?),
                 );
                 i += 1;
             }
@@ -195,7 +198,7 @@ pub mod erc_1155 {
                 .data
                 .operator_approvals
                 .get(&(account, operator))
-                .unwrap())
+                .unwrap_or_default())
         }
 
         /// @dev See {IERC1155-safeTransferFrom}.
@@ -260,7 +263,7 @@ pub mod erc_1155 {
             let ids: Vec<u128> = self._as_singleton_array(id)?;
             let amounts: Vec<u128> = self._as_singleton_array(amount)?;
             self._before_token_transfer(operator, from, to, ids, amounts, data)?;
-            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
+            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap_or_default();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC1155: insufficient balance for transfer",
@@ -273,7 +276,7 @@ pub mod erc_1155 {
             // <<< Please handle unchecked blocks manually
             self.data.balances.insert(
                 &(id, to),
-                &(self.data.balances.get(&(id, to)).unwrap() + amount),
+                &(self.data.balances.get(&(id, to)).unwrap_or_default() + amount),
             );
             self.env().emit_event(TransferSingle {
                 operator,
@@ -314,9 +317,9 @@ pub mod erc_1155 {
             self._before_token_transfer(operator, from, to, ids, amounts, data)?;
             let i: u128 = 0;
             while i < ids.length {
-                let id: u128 = ids.get(&i).unwrap();
-                let amount: u128 = amounts.get(&i).unwrap();
-                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
+                let id: u128 = ids.get(&i).unwrap_or_default();
+                let amount: u128 = amounts.get(&i).unwrap_or_default();
+                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap_or_default();
                 if from_balance < amount {
                     return Err(Error::Custom(String::from(
                         "ERC1155: insufficient balance for transfer",
@@ -329,7 +332,7 @@ pub mod erc_1155 {
                 // <<< Please handle unchecked blocks manually
                 self.data.balances.insert(
                     &(id, to),
-                    &(self.data.balances.get(&(id, to)).unwrap() + amount),
+                    &(self.data.balances.get(&(id, to)).unwrap_or_default() + amount),
                 );
                 i += 1;
             }
@@ -387,7 +390,7 @@ pub mod erc_1155 {
             self._before_token_transfer(operator, ZERO_ADDRESS.into(), to, ids, amounts, data)?;
             self.data.balances.insert(
                 &(id, to),
-                &(self.data.balances.get(&(id, to)).unwrap() + amount),
+                &(self.data.balances.get(&(id, to)).unwrap_or_default() + amount),
             );
             self.env().emit_event(TransferSingle {
                 operator,
@@ -436,9 +439,13 @@ pub mod erc_1155 {
             let i: u128 = 0;
             while i < ids.length {
                 self.data.balances.insert(
-                    &(ids.get(&i).unwrap(), to),
-                    &(self.data.balances.get(&(ids.get(&i).unwrap(), to)).unwrap()
-                        + amounts.get(&i).unwrap()),
+                    &(ids.get(&i).unwrap_or_default(), to),
+                    &(self
+                        .data
+                        .balances
+                        .get(&(ids.get(&i).unwrap_or_default(), to))
+                        .unwrap_or_default()
+                        + amounts.get(&i).unwrap_or_default()),
                 );
                 i += 1;
             }
@@ -476,7 +483,7 @@ pub mod erc_1155 {
             let ids: Vec<u128> = self._as_singleton_array(id)?;
             let amounts: Vec<u128> = self._as_singleton_array(amount)?;
             self._before_token_transfer(operator, from, ZERO_ADDRESS.into(), ids, amounts, "")?;
-            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
+            let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap_or_default();
             if from_balance < amount {
                 return Err(Error::Custom(String::from(
                     "ERC1155: burn amount exceeds balance",
@@ -522,9 +529,9 @@ pub mod erc_1155 {
             self._before_token_transfer(operator, from, ZERO_ADDRESS.into(), ids, amounts, "")?;
             let i: u128 = 0;
             while i < ids.length {
-                let id: u128 = ids.get(&i).unwrap();
-                let amount: u128 = amounts.get(&i).unwrap();
-                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap();
+                let id: u128 = ids.get(&i).unwrap_or_default();
+                let amount: u128 = amounts.get(&i).unwrap_or_default();
+                let from_balance: u128 = self.data.balances.get(&(id, from)).unwrap_or_default();
                 if from_balance < amount {
                     return Err(Error::Custom(String::from(
                         "ERC1155: burn amount exceeds balance",
