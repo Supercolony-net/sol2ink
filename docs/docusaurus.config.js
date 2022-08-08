@@ -14,7 +14,8 @@ const config = {
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'supercolony-net', 
-  projectName: 'sol2ink', 
+  projectName: 'sol2ink',
+  deploymentBranch: 'gh-pages',
 
   themeConfig: {
     colorMode: {
@@ -56,7 +57,7 @@ const config = {
         docs: {
           routeBasePath: '/',
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: 'https://github.com/Supercolony-net/sol2ink/tree/main/docs/docs'
+          editUrl: 'https://github.com/Supercolony-net/sol2ink/tree/main/docs'
         },
         theme: {
           customCss: [require.resolve('./src/css/custom.scss')]
