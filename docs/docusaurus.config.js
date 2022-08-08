@@ -8,13 +8,14 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'Sol2Ink',
   tagline: 'Sol2Ink documentation',
-  url: 'https://sol2ink.com',
-  baseUrl: '/',
+  url: 'https://github.com',
+  baseUrl: '/sol2ink/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/favicon.ico',
   organizationName: 'supercolony-net', 
-  projectName: 'sol2ink', 
+  projectName: 'sol2ink',
+  deploymentBranch: 'gh-pages',
 
   themeConfig: {
     colorMode: {
