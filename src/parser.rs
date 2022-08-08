@@ -1959,12 +1959,24 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(expression) = enclosed_expressions.clone().unwrap_or_default().get(raw) {
-            return Expression::Enclosed(bx!(expression.clone()))
+            let regex = Regex::new(r"___0\d+___").unwrap();
+            return if regex.is_match(raw) {
+                expression.clone()
+            } else {
+                Expression::Enclosed(bx!(expression.clone()))
+            }
         }
 
-        let extracted = self.extract_parentheses(raw, constructor);
+        let extracted = self.extract_parentheses(raw, constructor, false);
         if extracted.1 > 0 {
             return self.parse_expression(&extracted.0, constructor, Some(extracted.2))
+        }
+
+        if enclosed_expressions.is_none() {
+            let indices = self.extract_parentheses(raw, constructor, true);
+            if indices.1 > 0 {
+                return self.parse_expression(&indices.0, constructor, Some(indices.2))
+            }
         }
 
         let regex_hex_string = Regex::new(r#"(?x)^\s*hex"(?P<value>.+?)"\s*$"#).unwrap();
@@ -2256,6 +2268,7 @@ impl<'a> Parser<'a> {
         &mut self,
         raw: &str,
         constructor: bool,
+        square_brackets: bool,
     ) -> (String, i32, HashMap<String, Expression>) {
         let mut buffer_out = String::new();
         let mut buffer_tmp = String::new();
@@ -2268,10 +2281,16 @@ impl<'a> Parser<'a> {
 
         for ch in raw.chars() {
             match ch {
-                PARENTHESIS_CLOSE => {
+                PARENTHESIS_CLOSE if !square_brackets => {
                     close_parentheses += 1;
                 }
-                PARENTHESIS_OPEN => {
+                PARENTHESIS_OPEN if !square_brackets => {
+                    open_parentheses += 1;
+                }
+                BRACKET_CLOSE if square_brackets => {
+                    close_parentheses += 1;
+                }
+                BRACKET_OPEN if square_brackets => {
                     open_parentheses += 1;
                 }
                 _ => {}
@@ -2287,11 +2306,17 @@ impl<'a> Parser<'a> {
                 SPACE if group_possible => {
                     buffer_out.push(ch);
                 }
-                PARENTHESIS_OPEN if group_possible => {
+                PARENTHESIS_OPEN if group_possible && !square_brackets => {
                     group = true;
                     group_possible = false;
                 }
-                PARENTHESIS_CLOSE if group && open_parentheses == close_parentheses => {
+                BRACKET_OPEN if square_brackets && !group => {
+                    group = true;
+                    buffer_out.push(ch);
+                }
+                PARENTHESIS_CLOSE
+                    if group && open_parentheses == close_parentheses && !square_brackets =>
+                {
                     group = false;
                     let arg_name = format!("___{args}___");
                     let expression = self.parse_expression(&buffer_tmp, constructor, None);
@@ -2299,6 +2324,20 @@ impl<'a> Parser<'a> {
                     buffer_out.push_str(&arg_name);
                     buffer_tmp.clear();
                     args += 1;
+                }
+                BRACKET_CLOSE
+                    if group && open_parentheses == close_parentheses && square_brackets =>
+                {
+                    group = false;
+                    if !buffer_tmp.is_empty() {
+                        let arg_name = format!("___0{args}___");
+                        let expression = self.parse_expression(&buffer_tmp, constructor, None);
+                        map.insert(arg_name.clone(), expression);
+                        buffer_out.push_str(&arg_name);
+                        args += 1;
+                    }
+                    buffer_out.push(ch);
+                    buffer_tmp.clear();
                 }
                 _ => {
                     if group_possible {
