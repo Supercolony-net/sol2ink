@@ -3,7 +3,7 @@ sidebar_position: 5
 title: Parsing expressions
 ---
 
-Another step of parsing a statement is parsing of each expressions. Here the program will decide how to parse each expression inside of a statement.
+Another step of parsing a statement is parsing each expression. Here the program will decide how to parse each expression inside a statement.
 
 ### Basics
 
@@ -13,7 +13,7 @@ Another step of parsing a statement is parsing of each expressions. Here the pro
 
 ### Enclosed expressions
 
-Parsing an enclosed expression like `((1+2)+3)+4` may be problematic. That is why Sol2Ink first gets rid of the brackets by extracting expressions in parentheses, substituting them with a simple expression, which is then parsed on its own and returning them as `Expression::Enclosed`. Here is an example of how the before mentioned expression would be parsed:
+Parsing an enclosed expression like `((1+2)+3)+4` may be problematic. That is why Sol2Ink first removes the brackets by extracting expressions in parentheses, substituting them with a simple expression, which is then parsed on its own and returning them as `Expression::Enclosed`. Here is an example of how Sol2Ink would parse the before-mentioned expression:
 
 ```rust
 let extracted = self.extract_parentheses("((1 + 2) + 3) + 4", false);
@@ -29,11 +29,11 @@ Expressions like `hex"0000_0000_0000_0000"` are converted to a call of `&hex::de
 
 ### type(T).f / type(T)
 
-These expressions are parsed normally, except `type` is changed to `type_of`, since `type` is a keyword in rust. If the original expression was a cast, the `type_of` call will be omitted and the expression will be parsed as a cast.
+These expressions are parsed as expected, except `type` is changed to `type_of` since `type` is a keyword in rust. If the original expression were a cast, the `type_of` call would be omitted, and the expression will be parsed as a cast.
 
 ### Mapping/array manipulation
 
-Only special thing here is that Sol2Ink will not use indexed approach to data, but will use `unwrap_or_default()` in case of reading, and `insert` in case of writing from or to a mapping or array (which is parsed as a vec).
+The only notable thing here is that Sol2Ink will not use an indexed approach to data; it will instead use `unwrap_or_default()` in case of reading and `insert` in case of writing from or to a mapping or array (which it parses as a vec).
 
 All other expressions are parsed as expected:
 
