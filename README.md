@@ -16,7 +16,7 @@ The program may panic while parsing uncompilable code. Future versions should br
 Some expressions may be parsed incorrectly, while still creating compilable code (one known example is `type(uint).max` is parsed as `u128.max` instead of `u128::MAX`.
 And of course, as with all programs, there are probably some hidden unknown bugs as well :)
 
-Read more about how Sol2Ink works under the hood here.
+Read more about how Sol2Ink works under the hood [here](https://www.sol2ink.com).
 
 ### Future development
 
@@ -33,9 +33,10 @@ Read more about how Sol2Ink works under the hood here.
 To run the application you will need to have installed Rust and run the nightly toolchain. ​
 You can run the application with `cargo +nightly run contract.sol`, assuming you have a solidity file called contract.sol in the working directory.
 The result will be stored in `contract/lib.rs` and the Cargo.toml file in `contract/Cargo.toml`.
+
 You can transpile the example contracts from examples folder by running `cargo +nightly test`.
+
 If you are using Sol2Ink from release pages, you will need to run `./sol_to_ink contract.sol`, substituting contract.sol with your Solidity contract's name.
-You can read more information about Sol2Ink [here](https://www.sol2ink.com).
 
 ### Examples
 
