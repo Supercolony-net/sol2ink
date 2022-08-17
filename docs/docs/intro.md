@@ -16,4 +16,4 @@ Sol2Ink is a tool developed to ease the developers' transition from Solidity to 
 
 ### What you'll need
 
-Sol2Ink is written in Rust, so you will need Rust installed with the nightly toolchain. If this is satisfied, you will also need Sol2Ink, which you can get (here)[https://github.com/Supercolony-net/sol2ink/releases/tag/v1.0.0]. Another thing you will need is the Solidity file you want to transpile. And that's it! We can start transpiling now!
+Sol2Ink is written in Rust, so you will need Rust installed with the nightly toolchain. If this is satisfied, you will also need Sol2Ink, which you can get [here](https://github.com/Supercolony-net/sol2ink/releases/tag/v1.0.0). Another thing you will need is the Solidity file you want to transpile. And that's it! We can start transpiling now!
