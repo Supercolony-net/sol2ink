@@ -31,8 +31,11 @@ Read more about how Sol2Ink works under the hood here.
 ### How to use it?
 
 To run the application you will need to have installed Rust and run the nightly toolchain. ​
-You can run the application with `cargo run contract.sol`.
+You can run the application with `cargo +nightly run contract.sol`, assuming you have a solidity file called contract.sol in the working directory.
 The result will be stored in `contract/lib.rs` and the Cargo.toml file in `contract/Cargo.toml`.
+You can transpile the example contracts from examples folder by running `cargo +nightly test`.
+If you are using Sol2Ink from release pages, you will need to run `./sol_to_ink contract.sol`, substituting contract.sol with your Solidity contract's name.
+You can read more information about Sol2Ink (here)[https://www.sol2ink.com].
 
 ### Examples
 
