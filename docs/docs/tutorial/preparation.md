@@ -3,7 +3,7 @@ sidebar_position: 1
 title: Preparation
 ---
 
-In this tutorial, we will transpile the [ERC-20 contract](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) from OpenZeppelin, which you can find here.
+In this tutorial, we will transpile the [ERC-20 contract](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol) from OpenZeppelin.
 
 #### Preparation
 
