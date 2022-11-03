@@ -329,6 +329,9 @@ lazy_static! {
         \s*(?P<if_false>.+?)\s*$"#,
     )
     .unwrap();
+    static ref REGEX_BREAK:Regex = Regex::new(
+        r#"^\s*break\s*;"#,
+    ).unwrap();
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -1305,6 +1308,8 @@ impl<'a> Parser<'a> {
         } else if REGEX_FUNCTION_CALL.is_match(&line) {
             let expression = self.parse_function_call(&line, constructor, None);
             return Statement::FunctionCall(expression)
+        } else if REGEX_BREAK.is_match(&line) {
+            return Statement::Break
         }
 
         Statement::Comment(format!("Sol2Ink Not Implemented yet: {}", line.clone()))

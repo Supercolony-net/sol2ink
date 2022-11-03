@@ -127,6 +127,7 @@ pub struct FunctionParam {
 pub enum Statement {
     AssemblyEnd,
     Assign(Expression, Expression, Operation),
+    Break,
     Catch(Vec<Statement>),
     CatchEnd,
     Comment(String),
